@@ -36,7 +36,20 @@ if [ -n "${HOSTED_DOCKER_MIRROR:-}" ]; then
   export BUILDKITD_FLAGS
 fi
 
+echo 'Hosted image: checking BuildKit worker readiness'
+buildctl-daemonless.sh debug workers
+mkdir "$hosted_build_dir/preflight"
+printf '# syntax=docker/dockerfile:1\nFROM node:24.21.0-bookworm-slim\nRUN true\n' > "$hosted_build_dir/preflight/Dockerfile"
+echo 'Hosted image: building the frontend and snapshotter preflight'
+buildctl-daemonless.sh build \
+  --frontend dockerfile.v0 \
+  --local "context=$hosted_build_dir/preflight" \
+  --local "dockerfile=$hosted_build_dir/preflight" \
+  --opt platform=linux/amd64 \
+  --output "type=image,name=dsh-hosted-preflight:$CI_COMMIT_SHA,push=false"
+
 hosted_image="dsh-hosted-workspaces:$CI_COMMIT_SHA"
+echo 'Hosted image: building the complete application image without uploading'
 buildctl-daemonless.sh build \
   --frontend dockerfile.v0 \
   --local context=. \

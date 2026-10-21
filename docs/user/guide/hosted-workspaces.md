@@ -67,6 +67,8 @@ The repository's [GitLab pipeline](../../../.gitlab-ci.yml) checks hosted-worksp
 
 Use a Linux amd64 Docker-executor runner with the tag in `HOSTED_CI_RUNNER_TAG` (default `rm-executor`, matching the company's shared Linux runners). Override this variable for another runner. Image builds use rootless BuildKit without a Docker socket or DinD service in the job. The runner must permit its user-namespace and mount operations; verify the [GitLab BuildKit requirements](https://docs.gitlab.com/ci/docker/using_buildkit/) against the runner configuration and check the image job result.
 
+The image job uses the official Docker rootless image as a shell environment; it starts neither `dockerd` nor a DinD service. It downloads pinned BuildKit binaries and the upstream daemonless script, verifies their SHA-256 checksums, and runs BuildKit as the image's non-root user. Temporary tools and runtime files stay outside the build context and are removed on exit. The job checks namespace and build support before building the application.
+
 `HOSTED_DOCKER_MIRROR` defaults to `docker-mirror.sh.synyi.com`. Both CI job images and BuildKit's Docker Hub resolution use this pull proxy, including the Dockerfile frontend and base image. The temporary BuildKit configuration stays outside the Docker context and is removed when the job ends.
 
 Protect the intended default branch. The [image build script](../../../deploy/hosted-workspaces/ci-image.sh) retains build metadata as a GitLab job artifact; the image stays in the job's temporary BuildKit storage. Registry, company SSO, and model credentials are unnecessary. Image distribution for deployment requires a separately approved destination whose access controls meet the project's requirements.

@@ -45,13 +45,13 @@ hosted-workspaces-check:
     - pnpm exec vitest run packages/experimental/hosted-workspaces/tests --maxWorkers=1 --coverage --coverage.include='packages/experimental/hosted-workspaces/src/**/*.ts'
     - sh -n deploy/hosted-workspaces/entrypoint.sh
     - sh -n deploy/hosted-workspaces/build-image.sh
+    - sh -n deploy/hosted-workspaces/ci-builder.sh
     - sh -n deploy/hosted-workspaces/ci-image.sh
 
 hosted-workspaces-image:
   stage: build
   image:
-    name: ${HOSTED_DOCKER_MIRROR}/moby/buildkit:v0.34.1-rootless
-    entrypoint: [""]
+    name: ${HOSTED_DOCKER_MIRROR}/library/docker:29.5.2-dind-rootless
   tags: [$HOSTED_CI_RUNNER_TAG]
   needs: [hosted-workspaces-check]
   variables:
@@ -62,7 +62,7 @@ hosted-workspaces-image:
       when: manual
       allow_failure: true
   script:
-    - sh deploy/hosted-workspaces/ci-image.sh
+    - sh deploy/hosted-workspaces/ci-builder.sh
   artifacts:
     paths: [hosted-build.json]
     expire_in: 1 week
