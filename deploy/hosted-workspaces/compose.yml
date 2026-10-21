@@ -35,6 +35,7 @@ services:
       HOSTED_OIDC_ISSUER: ${HOSTED_OIDC_ISSUER:-}
       HOSTED_OIDC_DISCOVERY_URL: ${HOSTED_OIDC_DISCOVERY_URL:-}
       HOSTED_OIDC_CLIENT_ID: ${HOSTED_OIDC_CLIENT_ID:-dsh-workspaces}
+      HOSTED_OIDC_FLOW: ${HOSTED_OIDC_FLOW:-authorization-code}
       HOSTED_OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc_client_secret
       HOSTED_DEEPSEEK_KEY_FILE: /run/secrets/deepseek_api_key
       HOSTED_ALLOW_HTTP: ${HOSTED_ALLOW_HTTP:-true}

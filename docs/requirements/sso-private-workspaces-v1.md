@@ -24,6 +24,8 @@ Provide one company SSO entry to the existing DSH Web application, with private 
 
 The user selected company stable SSO, multiple users with private conversations, preservation of DSH tool capabilities, and an internal Linux deployment. The user then authorized the Docker implementation and local verification before choosing a server or domain. The first delivery does not depend on registering a real SSO application; a local mock provider exercises the login flow.
 
+The user confirmed that company SSO does not support authorization-code flow and selected implicit compatibility with the existing EMR login approach. The implementation keeps authorization-code as its default and permits an ID-token-only implicit response for this company application; enabling code flow at the company provider is not a prerequisite.
+
 Each user needs a private workspace, execution permissions, and tool interactions. This scope includes the existing chat interface and its supported shell, file, terminal, approval, and subagent flows. Availability of platform-specific or external tools depends on the deployed image and integrations; retaining tools does not establish that every desktop capability works on Linux.
 
 The user selected server-side persistent private volumes for the first delivery. Moving conversations into the EMR PostgreSQL database or adding OceanBase is outside this delivery. Acceptance must verify retained history after restart, the same history after a fresh login from another browser, and denied cross-account access. The user approved the private GitLab project [xu.hailin/dsh-drg-test](http://git.sy/xu.hailin/dsh-drg-test) for CI and publication. CI builds images without uploading them, as selected by the user after an unauthenticated upload-start probe succeeded against the company registry and was cancelled. Server and company-domain selection remain deferred.
@@ -58,6 +60,8 @@ All DSH applications launch through named profiles. The repository image starts 
 
 Use the verified issuer and subject to resolve an internal user identity. A display name, employee number supplied by the browser, URL parameter, or forwarded client header cannot select another user's runtime. Repeated logins for the same identity recover the same private data; identical subject values from different issuers remain distinct.
 
+Both configured login flows authenticate a signed ID token before creating a session. Implicit mode receives the fragment through a same-origin POST and validates signature, issuer, audience, expiry, nonce, and browser-bound state at the gateway. DSH needs no EMR business access token, uses no password grant, and stores no SSO token in localStorage.
+
 The gateway owns the identity-to-runtime mapping and browser-session records. Each runtime owns its DSH_HOME, DSH_AGENTS_HOME, conversations, attachments, settings, installed user plugins, workspace, and terminal state. The runtime manager owns volume allocation and container lifecycle; private volumes are not mounted into other users' containers.
 
 The same authorization applies to index responses, API calls, uploads, downloads, exported logs, previews, and WebSocket upgrades. Personal runtime ports are not published to the host. The gateway uses a bare portal origin and per-account subdomains; a company reverse proxy must preserve Host and support upgrades, as described in the [deployment guide](../user/guide/hosted-workspaces.md#company-services).
@@ -91,6 +95,7 @@ The first delivery validates the local Docker composition with synthetic data an
 | A container or the server restarts. | The identity mapping and private conversations/files recover from their owned volumes; another identity cannot claim them. |
 | A inspects environment variables, credential files, or model errors. | The upstream DeepSeek Key is absent; only A's restricted proxy credential may be visible. Limits remain enforceable outside A's runtime. |
 | A logs out while a background tool is active. | Browser access is revoked, the tool remains confined to A's runtime, and the UI states that background work and files are retained. |
+| An implicit ID token is forged, expired, has the wrong audience, or is replayed. | Authentication fails without creating a browser session or selecting a runtime. |
 | SSO, container startup, model requests, or resource allocation fail. | The affected operation reports its failure without routing to another runtime, claiming success, or deleting private data. |
 
 Local acceptance requires two mock identities, streamed chat through the real DSH runtime, a real file/shell tool result, and observed isolation, persistence, logout, and failure outcomes. Unit checks and container startup alone do not satisfy that stage. Company acceptance additionally requires real SSO and a real streamed DeepSeek conversation through the intended entry; both stages require independent user acceptance.
@@ -100,7 +105,7 @@ Local acceptance requires two mock identities, streamed chat through the real DS
 
 Docker is the current implementation target; Kubernetes is outside this delivery. The exact Linux host, company entry domain/TLS, network/firewall controls, persistent storage quotas, and operational recovery remain deferred. None of those choices blocks the local mock composition.
 
-Company integration needs a separate confidential Web client with authorization-code flow, S256 PKCE, `client_secret_basic`, `openid profile`, and an exact portal `/auth/callback`; no callback registration is required for personal subdomains. The gateway does not call provider logout. The [registration checklist](../user/guide/hosted-workspaces.md#sso-registration) owns the complete administrator-facing settings. Real client registration, secret provisioning, and company deployment have not been performed.
+Company integration needs an administrator-assigned OIDC client for the selected flow, matching discovery/JWKS metadata, and the exact portal `/auth/callback`; personal subdomains need no callback registration. The confirmed company path uses implicit login without a client secret. Authorization-code remains available for providers supporting it. The gateway does not call provider logout. The [registration checklist](../user/guide/hosted-workspaces.md#sso-registration) owns administrator settings and secret requirements by flow. Real company SSO validation and deployment remain pending.
 
 <a id="dev-note"></a>
 ## Dev Note
@@ -108,13 +113,21 @@ Company integration needs a separate confidential Web client with authorization-
 <details>
 <summary>Working verification context — click to expand</summary>
 
-Local verification used Docker 29.5.2 on Linux arm64 through Colima, Node 24.21.0 in the image, and synthetic Alice/Bob identities. This record covers the workspace changes on `codex/sso-private-workspaces`; exact revision details are retained in local verification evidence.
+The 2026-10-21 authorization-code verification baseline used Docker 29.5.2 on Linux arm64 through Colima, Node 24.21.0 in the image, and synthetic Alice/Bob identities. This record covers the workspace changes on `codex/sso-private-workspaces`; exact revision details are retained in local verification evidence.
 
-The package has 210 passing tests across nine files, with 100% statement, branch, function, and line coverage. Host builds, aggregate checks, scoped lint, package constraints, shell syntax, Compose configuration, and the existing keyless Bash session snapshot passed. `pnpm run test:docs` passed 20 of 21 gates; the unchanged `python/sdk/uv.lock:113` commit reference fails the repository-reference gate.
+That baseline package run had 210 passing tests across nine files, with 100% statement, branch, function, and line coverage. Host builds, aggregate checks, scoped lint, package constraints, shell syntax, Compose configuration, and the existing keyless Bash session snapshot passed. `pnpm run test:docs` passed 20 of 21 gates; the unchanged `python/sdk/uv.lock:113` commit reference fails the repository-reference gate.
 
 The Docker smoke exercises real Web profiles and Bash, streamed mock-model responses, separate account origins/history/volumes/networks, rejected foreign cookies and session IDs, default workspace permissions, peer-network denial, runtime and gateway restart, model access after restart, fresh-login history recovery, and logout revocation without disconnecting Bob. Browser verification confirms automatic SSO navigation, approval reaching only Alice and creating her marker only after she allows it, working logout, fresh-login restoration, an unobstructed account row, and zero Bob console errors or warnings. The final local image passed the same Docker smoke without development code mounts; the approved Alice file also survived container replacement while retaining its home volume.
 
 A separate real DeepSeek request through the restricted model proxy returned HTTP 200 and a completed SSE response containing the requested marker, without exposing the upstream key. This is separate from a real-model conversation through the deployed company entry. Linux artifacts were built with the bounded builder and recovered after fixing the final Web build invocation; local image updates used those Linux artifacts plus rebuilt gateway JavaScript. GitLab CI independently verifies a clean build from the final Dockerfile; its actual run result is reported separately.
+
+The 2026-10-21 implicit verification run passed 253 tests across nine files, with 100% statement, branch, function, and line coverage. The complete `pnpm run build` passed all nine checks. A new local Linux arm64 image passed all 12 implicit Docker smoke checks, including real Bash, concurrent model streams, cross-account denial, separate volumes and networks, runtime/gateway restart, fresh-login history recovery, and logout revoking Alice while Bob remains connected. The authorization-code Docker regression also passed all 12 checks and exited successfully.
+
+A real Chromium browser completed mock implicit sign-in and automatically opened the personal DSH URL. The browser reproduced the earlier CSP rejection of the cross-origin redirect after the callback POST. The verified flow retains `form-action 'self'` on the fragment bridge and returns an HTTP 200 completion page with `form-action 'none'` before navigating to the private-origin handoff. The personal URL has no fragment, and the browser-storage check found no token-named keys.
+
+The final `doc-sync` run passed 41 of 43 gates, including documentation build, pairing, catalogs, and links. The CLI-help check rejected a diagnostic caused by the inherited SOCKS `ALL_PROXY` setting; the same check passed after unsetting only `ALL_PROXY` and `all_proxy`. The other failure is the unchanged `python/sdk/uv.lock:113` repository reference.
+
+Company SSO discovery is reachable, but authorization attempts with both `response_type=id_token` and `response_type=id_token token` return `invalid_request`. The exact callback and application registration await user confirmation. This evidence does not establish a working company SSO connection; assigned scopes/callbacks, JWKS token validation, and independent company-browser acceptance remain pending.
 
 Company SSO registration, company server/TLS entry, hard disk quotas, deployment firewall controls, image-attachment fallback, physical second-computer access, backup restoration, and independent user acceptance remain unverified. Kubernetes, a shared SQL database, and production patient-data use are outside this delivery.
 

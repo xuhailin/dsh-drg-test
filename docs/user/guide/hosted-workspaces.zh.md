@@ -78,28 +78,30 @@ docker compose -f deploy/hosted-workspaces/compose.yml -f deploy/hosted-workspac
 <a id="sso-registration"></a>
 ## 注册公司 SSO 应用
 
-请公司身份管理员创建独立的机密 Web 应用。复用公司的 SSO 提供方和登录体验，同时保持本应用与 EMR 使用不同的客户端注册。本地 mock 试用不需要注册公司应用。
+请公司身份管理员提供独立的 OIDC 应用及其支持的流程。默认 `authorization-code` 模式在服务端交换授权码。若提供方只支持现有 EMR 风格的 ID token 响应而不支持授权码交换，则选择 `implicit`；本次集成不要求公司启用授权码流程。复用其登录体验，同时保持本应用与 EMR 使用不同的客户端注册。本地 mock 试用不需要公司应用注册。
 
-| 设置 | 所需值 | 要求 |
+| 设置 | `authorization-code`（默认） | `implicit` 兼容模式 |
 |---|---|---|
-| 应用类型 | 机密服务端 Web 客户端 | 必需；密钥由网关持有 |
-| Client ID | `dsh-workspaces`，或管理员分配的 ID | 必需；配置管理员实际分配的准确值 |
-| 授权／响应类型 | `authorization_code` / `code` | 必需；本应用不启用 implicit、password 或 client-credentials 授权 |
-| 响应模式 | 回调 GET 的查询参数 | 控制台要求选择模式时必需 |
-| PKCE | 强制使用 `S256` | 必需；网关还会校验 state 和 nonce |
-| Token 端点认证 | `client_secret_basic` | 机密客户端注册必需 |
-| Scope | `openid profile` | 必需；不请求 `email` 和 `offline_access` |
-| 本地回调 | `http://chat.localhost:8080/auth/callback` | 仅在通过此本地入口测试真实 SSO，且公司策略允许 HTTP 回环开发时需要 |
-| 公司回调 | 选定的入口 origin 后加 `/auth/callback` | 选择公司入口后必需；准确注册协议、主机、端口和路径 |
-| Issuer 与发现 | 准确的 issuer，以及匹配的发现元数据 | 必需；内部发现 URL 不能改变预期 issuer |
-| ID token 声明与签名 | 稳定的 `sub`、正确的 issuer／audience、RS256 签名、可访问的 JWKS | 必需；`name` 或 `preferred_username` 用于显示名称 |
-| 试用应用授权 | 管理员选择的测试用户或用户组 | 可选的身份提供方访问策略 |
-| 浏览器 origin 白名单 | 公司控制台要求时填写入口 origin | 可选；浏览器不调用 token 端点，因此不需要 token 端点 CORS |
-| 提供方退出回调 | 当前实现不使用 | 除非独立的提供方退出集成要求，否则留空 |
+| 应用类型 | 服务端 Web 客户端；分配密钥时使用机密客户端 | 允许 ID token 响应的 OIDC 客户端 |
+| Client ID | 管理员分配的准确值，例如 `dsh-workspaces` | 管理员分配的准确值，例如 `dsh-workspaces` |
+| 授权／响应类型 | `authorization_code` / `code` | `implicit` / `id_token`；不返回 access token |
+| 响应模式 | 回调 GET 的查询参数 | 回调页面的 URL fragment |
+| PKCE、state 和 nonce | `S256` PKCE、绑定浏览器的 state，以及 nonce | 绑定浏览器的 state 和 nonce；不使用 code verifier |
+| Token 端点认证 | 机密客户端使用 `client_secret_basic`；公开客户端不使用密钥 | 不交换 token 端点，不使用客户端密钥 |
+| Scope | `openid profile` | `openid profile` |
+| 本地回调 | `http://chat.localhost:8080/auth/callback`，仅在公司策略允许本地 HTTP 测试时使用 | `http://chat.localhost:8080/auth/callback`，仅在公司策略允许本地 HTTP 测试时使用 |
+| 公司回调 | 选定的入口 origin 后加 `/auth/callback`；准确注册协议、主机、端口和路径 | 选定的入口 origin 后加 `/auth/callback`；准确注册协议、主机、端口和路径 |
+| Issuer 与发现 | 准确的 issuer，以及匹配的发现元数据 | 准确的 issuer，以及匹配的发现元数据 |
+| ID token 声明与签名 | 稳定的 `sub`、正确的 issuer／audience、RS256 签名、可访问的 JWKS | 稳定的 `sub`、正确的 issuer／audience、RS256 签名、可访问的 JWKS |
+| 试用应用授权 | 管理员选择的测试用户或用户组 | 管理员选择的测试用户或用户组 |
+| 浏览器 origin 白名单 | 公司控制台要求时填写入口 origin | 公司控制台要求时填写入口 origin |
+| 提供方退出回调 | 当前实现不使用 | 当前实现不使用 |
 
 例如入口为 `https://chat.example.com` 时，回调必须是 `https://chat.example.com/auth/callback`。不注册通配回调，也不为每个个人子域名单独注册回调：所有 OIDC 回调都到达入口，再由网关完成个人 origin 交接。
 
-身份管理员通过获准的密钥通道提供 issuer、client ID 和机密客户端密钥。网关通过 JWKS 验证 ID token 签名，并检查 issuer、audience、nonce 和一次性登录流程。显示名称不能选择账号或运行实例。
+管理员提供 issuer、client ID、支持的流程和可访问的 JWKS；授权码机密客户端还需要通过获准的密钥通道提供客户端密钥。`name` 或 `preferred_username` 用作显示名称，不能选择账号或运行实例。两种模式下，网关均验证 ID token 签名、issuer、audience、有效期、nonce，以及绑定浏览器的一次性 state。
+
+implicit 模式的回调页面从地址栏移除 fragment，再通过同源 POST 将其中的字段提交给网关。网关通过提供方的 JWKS 验证 token 后，才创建浏览器会话；浏览器解码但未经验证的 token 不能用于认证。DSH 仅请求用于识别身份的 ID token，不请求 EMR 业务 access token 或 refresh token。不使用密码授权，也不将 SSO token 保存到 localStorage。浏览器不调用 token 端点，因此不需要 token 端点 CORS。
 
 **退出仅影响本应用。** 它撤销浏览器会话并关闭对应连接。个人文件和后台任务会保留，公司的全局 SSO 会话仍有效。因此，后续公司账号登录可能无需再次输入密码。
 
@@ -108,7 +110,7 @@ docker compose -f deploy/hosted-workspaces/compose.yml -f deploy/hosted-workspac
 <a id="company-services"></a>
 ## 连接公司服务
 
-在明确服务器和 TLS 入口后选择入口 origin。公司组合不使用 mock 覆盖配置。网关需要访问 SSO 发现、token 和 JWKS 端点、已配置的模型上游，以及 Docker。
+在明确服务器和 TLS 入口后选择入口 origin。公司组合不使用 mock 覆盖配置。网关需要访问 SSO 发现和 JWKS 端点、已配置的模型上游，以及 Docker。授权码模式还需要 token 端点；implicit 模式不使用它。
 
 参考[环境变量示例](../../../deploy/hosted-workspaces/.env.example)设置非密钥配置。将密钥路径指向 checkout 之外已有且访问受限的文件。Compose 仅将这些文件挂载到网关；个人容器获得独立、受限制的模型凭据。
 
@@ -117,9 +119,12 @@ HOSTED_PUBLIC_ORIGIN=https://chat.example.com
 HOSTED_ALLOW_HTTP=false
 HOSTED_OIDC_ISSUER=https://sso.example.com
 HOSTED_OIDC_CLIENT_ID=dsh-workspaces
+HOSTED_OIDC_FLOW=authorization-code
 HOSTED_OIDC_CLIENT_SECRET_PATH=/srv/dsh-secrets/oidc_client_secret
 HOSTED_DEEPSEEK_KEY_PATH=/srv/dsh-secrets/deepseek_api_key
 ```
+
+implicit 应用设置 `HOSTED_OIDC_FLOW=implicit`。此模式不读取 `clientSecretFile`。基础 Compose 文件保留默认授权码流程的密钥挂载；不提供客户端密钥文件时，须在公司组合中同时移除网关挂载的 `oidc_client_secret` 及其顶层 secret 定义。DeepSeek 密钥仍仅挂载到网关。
 
 这些值是需要替换的示例，不是既有公司部署。已配置的 issuer 可以直接访问时，`HOSTED_OIDC_DISCOVERY_URL` 可省略；若使用内部 URL，其元数据仍须返回该 issuer。密钥值不得写入 `.env`、命令参数、浏览器设置或已提交文件。
 
@@ -159,9 +164,10 @@ HOSTED_DEEPSEEK_KEY_PATH=/srv/dsh-secrets/deepseek_api_key
 | 网关或个人运行实例重启 | 正确账号恢复自己的历史和文件；其他账号不能认领 |
 | 工具检查环境变量及可读文件 | 不出现真实上游模型 Key；只能获得该运行实例受限制的凭据 |
 | 运行实例测试网络和 Docker 访问 | 无法访问其他个人运行实例或 Docker 控制 socket |
+| implicit 回调中的 ID token 被伪造、已到期、audience 不符或被重放 | 网关拒绝认证，不创建浏览器会话 |
 | SSO、运行实例启动、模型上游或配额失败 | 操作明确失败，不选择其他账号，也不声称成功 |
 
-入口不可用时，检查 Compose 服务状态和日志。登录失败时，检查准确回调、issuer、客户端认证方式和密钥文件挂载。启动冲突或清理失败时，检查报告的 Docker 资源并保留数据卷；不得重命名其他用户的容器或绕过隔离检查来使启动成功。
+入口不可用时，检查 Compose 服务状态和日志。登录失败时，检查准确回调、issuer、所配置的流程，以及 JWKS 是否可访问。授权码客户端还须检查 token 端点认证和已有的客户端密钥挂载。启动冲突或清理失败时，检查报告的 Docker 资源并保留数据卷；不得重命名其他用户的容器或绕过隔离检查来使启动成功。
 
 mock 流程完成仅验证本地代码路径。公司验收仍需要已注册的真实 SSO 应用、真实 DeepSeek 流式请求、两个测试身份、计划采用的 Linux 网络／存储控制，以及独立用户验收。这不授权使用真实患者数据。
 

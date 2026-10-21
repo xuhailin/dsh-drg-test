@@ -1,9 +1,30 @@
 /** Localized gateway pages and the authenticated workspace logout control. */
+import { createHash } from 'node:crypto'
 
 const copy = {
-  en: { title: 'Private DSH workspace', intro: 'Sign in with your company account to open your private workspace.', login: 'Company sign in', logout: 'Sign out', failure: 'The workspace request failed. Return to the entry page and try again.', signedOut: 'Signed out. Background tasks and private files are retained.', retry: 'Return to entry', handoff: 'Opening your private workspace…', continue: 'Continue to workspace' },
-  zh: { title: '个人 DSH 工作区', intro: '使用公司账号登录，进入自己的聊天与工具工作区。', login: '公司账号登录', logout: '退出登录', failure: '工作区请求失败。请返回入口后重试。', signedOut: '已退出登录。后台任务和私有文件予以保留。', retry: '返回入口', handoff: '正在进入你的个人工作区……', continue: '进入工作区' },
+  en: { title: 'Private DSH workspace', intro: 'Sign in with your company account to open your private workspace.', login: 'Company sign in', logout: 'Sign out', failure: 'The workspace request failed. Return to the entry page and try again.', signedOut: 'Signed out. Background tasks and private files are retained.', retry: 'Return to entry', handoff: 'Opening your private workspace…', continue: 'Continue to workspace', authenticating: 'Verifying company sign in…' },
+  zh: { title: '个人 DSH 工作区', intro: '使用公司账号登录，进入自己的聊天与工具工作区。', login: '公司账号登录', logout: '退出登录', failure: '工作区请求失败。请返回入口后重试。', signedOut: '已退出登录。后台任务和私有文件予以保留。', retry: '返回入口', handoff: '正在进入你的个人工作区……', continue: '进入工作区', authenticating: '正在验证公司登录……' },
 } as const
+
+const callbackScript = `const fragment = location.hash;
+history.replaceState(null, '', location.pathname);
+const fields = new URLSearchParams(fragment.slice(1));
+if (fields.has('state')) {
+  const notice = document.getElementById('notice');
+  notice.textContent = notice.dataset.pending;
+  const form = document.createElement('form');
+  form.method = 'post';
+  form.action = '/auth/callback';
+  for (const [name, value] of fields) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  HTMLFormElement.prototype.submit.call(form);
+}`
 
 /**
  * Escape a plain label before HTML interpolation.
@@ -19,14 +40,27 @@ export function escapeHtml(value: string): string {
  * @param locale - browser language header.
  * @param state - page purpose.
  * @param entry - validated public gateway origin.
+ * @param handoffTarget - server-created handoff URL, or a fresh navigation within the current private origin.
  * @returns complete document.
  */
-export function page(locale: string | undefined, state: 'entry' | 'failure' | 'signedOut' | 'handoff', entry: string): string {
+export function page(locale: string | undefined, state: 'entry' | 'failure' | 'signedOut' | 'handoff', entry: string, handoffTarget = '/'): string {
   const c = locale?.toLowerCase().includes('zh') ? copy.zh : copy.en
   const signIn = state === 'entry' || state === 'signedOut'
-  const link = signIn ? '/auth/login' : state === 'handoff' ? '/' : entry
-  const refresh = state === 'handoff' ? '<meta http-equiv="refresh" content="0;url=/">' : ''
+  const link = signIn ? '/auth/login' : state === 'handoff' ? handoffTarget : entry
+  const refresh = state === 'handoff' ? `<meta http-equiv="refresh" content="0;url=${escapeHtml(handoffTarget)}">` : ''
   return `<!doctype html><html lang="${c === copy.zh ? 'zh-CN' : 'en'}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${refresh}<title>${c.title}</title><style>body{font:16px system-ui;background:#f7f8fa;color:#17202a;margin:0;display:grid;min-height:100vh;place-items:center}main{max-width:420px;padding:40px;border:1px solid #e0e4ea;border-radius:16px;background:white}h1{font-size:25px}p{line-height:1.7;color:#52606d}a{display:inline-block;background:#255de5;color:white;padding:12px 18px;border-radius:8px;text-decoration:none}</style><main><h1>${c.title}</h1><p>${c[state === 'entry' ? 'intro' : state === 'handoff' ? 'handoff' : state === 'failure' ? 'failure' : 'signedOut']}</p><a href="${escapeHtml(link)}">${signIn ? c.login : state === 'handoff' ? c.continue : c.retry}</a></main></html>`
+}
+
+/**
+ * Bridge a fragment response to the gateway without browser storage or third-party scripts.
+ * @param locale - browser language header.
+ * @returns document and the exact script hash required by its CSP; the fragment is cleared before submission.
+ */
+export function implicitCallbackPage(locale: string | undefined): { html: string; scriptHash: string } {
+  const c = locale?.toLowerCase().includes('zh') ? copy.zh : copy.en
+  const html = page(locale, 'failure', '/').replace('<p>', `<p id="notice" data-pending="${escapeHtml(c.authenticating)}">`)
+    .replace('</html>', `<script>${callbackScript}</script></html>`)
+  return { html, scriptHash: createHash('sha256').update(callbackScript).digest('base64') }
 }
 
 /**

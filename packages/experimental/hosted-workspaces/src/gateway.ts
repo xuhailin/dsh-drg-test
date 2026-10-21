@@ -5,12 +5,14 @@ import { Config, publicOrigin } from './config.ts'
 import { DockerRuntimes } from './docker.ts'
 import { ModelProxy } from './model.ts'
 import { OidcLogin } from './oidc.ts'
-import { page } from './pages.ts'
+import { implicitCallbackPage, page } from './pages.ts'
 import { WorkspaceProxy } from './proxy.ts'
 import { HostedState, randomCredential, sessionKey, type HostedLogin, type HostedUser } from './state.ts'
 
 /** A short-lived, single-use transition between the portal and a private origin. */
 interface Handoff { readonly login: HostedLogin; readonly expiresAt: number; readonly origin: string }
+
+type CallbackBody = { readonly status: 200; readonly parameters: URLSearchParams } | { readonly status: 400 | 408 | 413 }
 
 /**
  * Read a unique opaque cookie; ambiguous duplicate cookies are rejected.
@@ -32,6 +34,7 @@ export class HostedGateway {
   private readonly proxy: WorkspaceProxy
   private readonly userConnections = new Map<string, Set<ServerResponse | Duplex>>()
   private readonly pending = new Set<Promise<void>>()
+  private readonly callbackRequests = new Set<IncomingMessage>()
   private closed = false
 
   /**
@@ -105,19 +108,41 @@ export class HostedGateway {
       this.cookie(res, `${this.cookieName}-flow`, flow.flowCookie, this.config.flowTtlMs)
       this.redirect(res, flow.authorizationUrl); return
     }
-    if (url.pathname === '/auth/callback' && req.method === 'GET' && origin === this.entry.origin) {
+    if (url.pathname === '/auth/callback' && origin === this.entry.origin) {
       const flowCookie = readCookie(req.headers.cookie, `${this.cookieName}-flow`)
+      if (this.config.oidcFlow === 'implicit') {
+        if (url.search !== '') { this.html(res, 400, 'failure', req); return }
+        if (req.method === 'GET') {
+          const bridge = implicitCallbackPage(req.headers['accept-language'])
+          res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'same-origin', 'x-content-type-options': 'nosniff', 'content-security-policy': `default-src 'none'; script-src 'sha256-${bridge.scriptHash}'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'` })
+          res.end(bridge.html); return
+        }
+        if (req.method !== 'POST') { res.writeHead(405, { allow: 'GET, POST' }); res.end(); return }
+        if (req.headers.origin !== origin || req.headers['sec-fetch-site'] === 'cross-site') { res.writeHead(403); res.end(); return }
+        if (req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/x-www-form-urlencoded') { res.writeHead(415); res.end(); return }
+        if (flowCookie === undefined) { this.cookie(res, `${this.cookieName}-flow`, '', 0); this.html(res, 400, 'failure', req); return }
+        if (this.callbackRequests.size >= this.config.maxPendingFlows) { res.writeHead(503, { connection: 'close' }); res.end(); return }
+        const body = await this.callbackBody(req)
+        if (body.status !== 200) {
+          if (!res.destroyed) { res.setHeader('connection', 'close'); this.html(res, body.status, 'failure', req) }
+          return
+        }
+        url.hash = body.parameters.toString()
+      } else if (req.method !== 'GET') { res.writeHead(405, { allow: 'GET' }); res.end(); return }
       this.cookie(res, `${this.cookieName}-flow`, '', 0)
       let completed: Awaited<ReturnType<OidcLogin['finish']>>
       try { completed = await this.oidc.finish(url, flowCookie) }
       catch (_failedLogin) { this.html(res, 400, 'failure', req); return }
+      if (this.callbackAbandoned(res)) return
       const user = await this.state.user(completed.identity)
+      if (this.callbackAbandoned(res)) return
       if (completed.returnOrigin !== this.entry.origin && completed.returnOrigin !== this.userOrigin(user)) {
         res.writeHead(403); res.end(); return
       }
       const created = await this.state.login(user, this.config.sessionTtlMs)
+      if (this.callbackAbandoned(res)) { await this.state.logout(created.token); return }
       this.cookie(res, this.cookieName, created.token, this.config.sessionTtlMs)
-      this.handoff(res, created); return
+      this.handoff(res, created, this.config.oidcFlow === 'implicit' ? req : undefined); return
     }
     if (url.pathname === '/auth/handoff' && req.method === 'GET' && origin !== this.entry.origin) {
       const ticket = url.searchParams.get('ticket') ?? ''
@@ -137,6 +162,36 @@ export class HostedGateway {
       this.redirect(res, `${this.entry.origin}/?signedout=1`); return
     }
     res.writeHead(404); res.end()
+  }
+
+  private callbackAbandoned(res: ServerResponse): boolean {
+    if (this.closed) res.destroy()
+    return res.destroyed
+  }
+
+  private callbackBody(req: IncomingMessage): Promise<CallbackBody> {
+    return new Promise((resolve) => {
+      const chunks: Buffer[] = []
+      let bytes = 0
+      const finish = (result: CallbackBody): void => {
+        clearTimeout(timer)
+        req.off('data', data); req.off('end', end); req.off('error', failed); req.off('aborted', failed)
+        this.callbackRequests.delete(req)
+        if (result.status !== 200) req.pause()
+        resolve(result)
+      }
+      const data = (chunk: Buffer): void => {
+        bytes += chunk.length
+        if (bytes > this.config.maxCallbackBytes) finish({ status: 413 })
+        else chunks.push(chunk)
+      }
+      const end = (): void => { finish({ status: 200, parameters: new URLSearchParams(Buffer.concat(chunks).toString('utf8')) }) }
+      const failed = (): void => { finish({ status: 400 }) }
+      const timer = setTimeout(() => { finish({ status: 408 }) }, this.config.requestTimeoutMs)
+      timer.unref()
+      this.callbackRequests.add(req)
+      req.on('data', data); req.once('end', end); req.once('error', failed); req.once('aborted', failed)
+    })
   }
 
   /**
@@ -184,14 +239,16 @@ export class HostedGateway {
     return url.origin
   }
 
-  private handoff(res: ServerResponse, login: HostedLogin): void {
+  private handoff(res: ServerResponse, login: HostedLogin, callback?: IncomingMessage): void {
     const now = Date.now()
     for (const [key, value] of this.handoffs) if (value.expiresAt <= now) this.handoffs.delete(key)
     if (this.handoffs.size >= this.config.maxPendingFlows) { res.writeHead(503); res.end(); return }
     const ticket = randomCredential()
     const origin = this.userOrigin(login.user)
     this.handoffs.set(ticket, { login, expiresAt: now + this.config.flowTtlMs, origin })
-    this.redirect(res, `${origin}/auth/handoff?ticket=${encodeURIComponent(ticket)}`)
+    const target = `${origin}/auth/handoff?ticket=${encodeURIComponent(ticket)}`
+    if (callback === undefined) this.redirect(res, target)
+    else this.html(res, 200, 'handoff', callback, target)
   }
 
   private cookie(res: ServerResponse, name: string, value: string, ttl: number): void {
@@ -204,9 +261,9 @@ export class HostedGateway {
     res.writeHead(303, { location: target, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' }); res.end()
   }
 
-  private html(res: ServerResponse, status: number, state: 'entry' | 'failure' | 'handoff' | 'signedOut', req: IncomingMessage): void {
+  private html(res: ServerResponse, status: number, state: 'entry' | 'failure' | 'handoff' | 'signedOut', req: IncomingMessage, handoffTarget?: string): void {
     res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" })
-    res.end(page(req.headers['accept-language'], state, this.entry.origin))
+    res.end(page(req.headers['accept-language'], state, this.entry.origin, handoffTarget))
   }
 
   private track(login: HostedLogin, connection: ServerResponse | Duplex): boolean {
@@ -236,6 +293,7 @@ export class HostedGateway {
   /** Stop entry and model work, close browser connections, and preserve user containers. @returns quiescent completion. */
   async dispose(): Promise<void> {
     this.closed = true
+    for (const request of this.callbackRequests) request.destroy()
     for (const connections of this.connections.values()) for (const connection of connections) connection.destroy()
     this.handoffs.clear()
     await this.oidc.dispose()

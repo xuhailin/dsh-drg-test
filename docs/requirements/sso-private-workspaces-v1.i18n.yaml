@@ -12,8 +12,8 @@
   en: 5713ffe17320c3c4
   zh: def32193536b278a
 /sso-and-private-dsh-workspaces-v1/confirmed-scope:
-  en: 4c6074fa048e9aab
-  zh: 14df492f41f182c0
+  en: fc5853469013fa73
+  zh: 9b048b4c8e8dc138
 /sso-and-private-dsh-workspaces-v1/current-implementation:
   en: 9a885559698e9ab0
   zh: afa58bf988441e6d
@@ -21,17 +21,17 @@
   en: 9e32c0ba4d2c2ff9
   zh: 0feb912e14218149
 /sso-and-private-dsh-workspaces-v1/identity-and-private-data:
-  en: 33e9454b59c01fbd
-  zh: 3c1bdedbb725c8ae
+  en: 00003fd3adf892f8
+  zh: 0dc4b405dd6c5a75
 /sso-and-private-dsh-workspaces-v1/execution-and-credentials:
   en: 43810bcc668b8dc2
   zh: 6ec5517127aa42e4
 /sso-and-private-dsh-workspaces-v1/acceptance:
-  en: 4df7d84382bae14c
-  zh: 903e95982e56ab62
+  en: e0d141e14a8967bb
+  zh: 24257d3faf639622
 /sso-and-private-dsh-workspaces-v1/dependencies-and-verification:
-  en: 5560f3fd656b6d0e
-  zh: 390c72eec845029a
+  en: f1f9bdac59d70c73
+  zh: 6726cb2596351655
 /sso-and-private-dsh-workspaces-v1/dev-note:
-  en: fe443d4e035f417f
-  zh: d2d142edc286ff36
+  en: a23879621bd2d1f0
+  zh: 230fb436c048c12a

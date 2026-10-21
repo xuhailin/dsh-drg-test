@@ -1,5 +1,6 @@
 /** Deployment settings for the private Docker workspace gateway. */
 import z from '@deepseek-ai/schemastery'
+import type { OidcFlow } from './oidc.ts'
 
 /** Gateway, identity-provider, Docker and model-proxy deployment inputs. */
 export interface Config {
@@ -15,7 +16,9 @@ export interface Config {
   discoveryUrl?: string
   /** Client identifier assigned to this gateway's OIDC application. */
   clientId: string
-  /** Gateway-only secret-file path for client_secret_basic; omission selects a public client. */
+  /** OIDC response flow; implicit accepts a signed ID token through the portal callback. */
+  oidcFlow: OidcFlow
+  /** Gateway-only client_secret_basic secret file for authorization-code; implicit does not read it. */
   clientSecretFile?: string
   /** Gateway-only file containing the upstream model API key. */
   deepseekKeyFile: string
@@ -35,8 +38,10 @@ export interface Config {
   sessionTtlMs: number
   /** Pending OIDC login and private-origin handoff lifetime in milliseconds. */
   flowTtlMs: number
-  /** Maximum entries in each pending-login or private-origin handoff collection. */
+  /** Maximum entries per pending-login/handoff collection and concurrent implicit callback body reads. */
   maxPendingFlows: number
+  /** Maximum implicit callback body bytes before token parsing and verification. */
+  maxCallbackBytes: number
   /** Maximum enrolled accounts and personal Docker runtime reservations. */
   maxUsers: number
   /** Maximum live browser sessions across all accounts; expired sessions are reclaimed at login. */
@@ -79,6 +84,7 @@ export const Config: z<Partial<Config>, Config> = z.object({
   issuer: z.string().required(),
   discoveryUrl: z.string(),
   clientId: z.string().required(),
+  oidcFlow: z.union(['authorization-code', 'implicit']).default('authorization-code'),
   clientSecretFile: z.string(),
   deepseekKeyFile: z.string().required(),
   deepseekBaseUrl: z.string().default('https://api.deepseek.com/anthropic'),
@@ -90,6 +96,7 @@ export const Config: z<Partial<Config>, Config> = z.object({
   sessionTtlMs: z.natural().min(1).max(2147483647).default(43200000),
   flowTtlMs: z.natural().min(1).max(2147483647).default(300000),
   maxPendingFlows: z.natural().min(1).default(100),
+  maxCallbackBytes: z.natural().min(1).default(65536),
   maxUsers: z.natural().min(1).default(20),
   maxBrowserSessions: z.natural().min(1).default(200),
   maxProxyConnectionsPerUser: z.natural().min(1).default(64),

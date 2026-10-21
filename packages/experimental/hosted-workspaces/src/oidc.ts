@@ -1,14 +1,18 @@
-/** OIDC authorization-code login with browser binding and instance-owned, one-use flows. */
+/** OIDC code or ID-token login with browser binding and instance-owned, one-use flows. */
 import { timingSafeEqual } from 'node:crypto'
 import * as client from 'openid-client'
 
+/** Explicitly selected OIDC response flow; neither mode falls back to the other. */
+export type OidcFlow = 'authorization-code' | 'implicit'
+
 /** Deployment settings for one OIDC relying party. */
 export interface OidcLoginOptions {
+  flow: OidcFlow
   issuer: string
   /** Omit to discover through issuer; an internal discovery URL must report the same issuer. */
   discoveryUrl?: string
   clientId: string
-  /** Omit only for a registered public client; confidential clients use client_secret_basic. */
+  /** Code flow uses client_secret_basic when present, otherwise a public client; implicit ignores this value. */
   clientSecret?: string
   redirectUri: string
   /** Permit HTTP only in explicitly configured development environments. */
@@ -62,6 +66,7 @@ export class OidcLogin {
     private readonly allowInsecureHttp: boolean,
     private readonly flowTtlMs: number,
     private readonly maxPendingFlows: number,
+    private readonly flow: OidcFlow,
   ) {}
 
   /**
@@ -85,12 +90,13 @@ export class OidcLogin {
       // openid-client permits ArrayBufferLike views and explicit undefined fields accepted by Node fetch.
     } as RequestInit)
     let configuration: client.Configuration
+    const clientSecret = options.flow === 'authorization-code' ? options.clientSecret : undefined
     try {
       configuration = await client.discovery(
         discoveryUrl,
         options.clientId,
-        options.clientSecret,
-        options.clientSecret === undefined ? client.None() : client.ClientSecretBasic(options.clientSecret),
+        clientSecret,
+        clientSecret === undefined ? client.None() : client.ClientSecretBasic(clientSecret),
         {
           timeout: options.requestTimeoutMs / 1000,
           [client.customFetch]: fetchProvider,
@@ -109,10 +115,11 @@ export class OidcLogin {
       lifetime.abort()
       throw new OidcLoginError('configuration', 'OIDC discovery issuer does not match the configured issuer.')
     }
+    if (options.flow === 'implicit') client.useIdTokenResponseType(configuration)
     for (const [name, value] of [
       ['authorization_endpoint', metadata.authorization_endpoint],
-      ['token_endpoint', metadata.token_endpoint],
       ['jwks_uri', metadata.jwks_uri],
+      ...(options.flow === 'authorization-code' ? [['token_endpoint', metadata.token_endpoint] as const] : []),
     ] as const) {
       if (value === undefined) {
         lifetime.abort()
@@ -128,6 +135,7 @@ export class OidcLogin {
       options.allowInsecureHttp,
       options.flowTtlMs,
       options.maxPendingFlows,
+      options.flow,
     )
   }
 
@@ -159,14 +167,14 @@ export class OidcLogin {
     }
     this.flows.set(state, flow)
     try {
-      const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier)
+      const response = this.flow === 'implicit'
+        ? { response_type: 'id_token', response_mode: 'fragment' }
+        : { response_type: 'code', code_challenge: await client.calculatePKCECodeChallenge(codeVerifier), code_challenge_method: 'S256' }
       this.assertActive()
       const authorizationUrl = client.buildAuthorizationUrl(this.configuration, {
         scope: 'openid profile',
-        response_type: 'code',
+        ...response,
         redirect_uri: this.redirectUri,
-        code_challenge: codeChallenge,
-        code_challenge_method: 'S256',
         nonce,
         state,
       }).href
@@ -178,8 +186,8 @@ export class OidcLogin {
   }
 
   /**
-   * Consumes an authorization attempt before exchanging its code and verifying its ID token.
-   * @param callbackUrl Browser callback on the exact configured callback origin and path.
+   * Consumes an authorization attempt before validating its ID token, exchanging a code only in code mode.
+   * @param callbackUrl Exact registered callback; code responses use query parameters, implicit responses use only a fragment.
    * @param flowCookie Cookie issued by begin; missing, incorrect, expired, and replayed cookies are rejected.
    * @returns Validated identity and original return origin; a matched attempt is consumed on success or failure.
    */
@@ -194,7 +202,7 @@ export class OidcLogin {
   }
 
   /**
-   * Stops new login operations, clears pending attempts, and aborts and awaits active code exchanges.
+   * Stops new logins, clears pending attempts, and aborts and awaits provider requests.
    * @returns Completion after this owner can no longer authenticate a request.
    */
   async dispose(): Promise<void> {
@@ -205,7 +213,8 @@ export class OidcLogin {
 
   private async finishOnce(callbackUrl: URL, flowCookie: string | undefined): Promise<{ identity: OidcIdentity; returnOrigin: string }> {
     this.assertActive()
-    const stateValues = callbackUrl.searchParams.getAll('state')
+    const response = this.flow === 'implicit' ? new URLSearchParams(callbackUrl.hash.slice(1)) : callbackUrl.searchParams
+    const stateValues = response.getAll('state')
     const state = stateValues.length === 1 ? stateValues[0] : undefined
     if (state === undefined) {
       throw new OidcLoginError('invalid-flow', 'OIDC authorization response must identify one pending login attempt.')
@@ -216,18 +225,20 @@ export class OidcLogin {
       throw new OidcLoginError('invalid-flow', 'OIDC login attempt is missing, expired, or belongs to another browser; sign in again.')
     }
     const redirectUri = new URL(this.redirectUri)
-    if (callbackUrl.origin !== redirectUri.origin || callbackUrl.pathname !== redirectUri.pathname || callbackUrl.hash) {
+    if (callbackUrl.origin !== redirectUri.origin || callbackUrl.pathname !== redirectUri.pathname
+      || callbackUrl.username || callbackUrl.password || (this.flow === 'implicit' ? callbackUrl.search : callbackUrl.hash)) {
       throw new OidcLoginError('invalid-flow', 'OIDC callback does not match the registered redirect URI; sign in again.')
     }
     try {
-      const tokens = await client.authorizationCodeGrant(this.configuration, callbackUrl, {
-        expectedState: state,
-        expectedNonce: flow.nonce,
-        pkceCodeVerifier: flow.codeVerifier,
-        idTokenExpected: true,
-      })
+      const claims = this.flow === 'implicit'
+        ? await client.implicitAuthentication(this.configuration, callbackUrl, flow.nonce, { expectedState: state })
+        : (await client.authorizationCodeGrant(this.configuration, callbackUrl, {
+          expectedState: state,
+          expectedNonce: flow.nonce,
+          pkceCodeVerifier: flow.codeVerifier,
+          idTokenExpected: true,
+        })).claims()
       this.assertActive()
-      const claims = tokens.claims()
       if (claims === undefined || typeof claims.sub !== 'string' || !claims.sub.trim()) {
         throw new OidcLoginError('provider', 'OIDC provider did not return a usable subject claim.')
       }

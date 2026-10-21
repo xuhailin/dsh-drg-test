@@ -43,12 +43,14 @@ The [configuration schema](src/config.ts) owns the complete field list. The patc
 | `publicOrigin` | Required | Bare portal origin; personal origins are its direct subdomains |
 | `issuer`, `clientId` | Required | Registered OIDC provider and application |
 | `discoveryUrl` | Issuer discovery | Optional internal discovery URL; the returned issuer must still match |
-| `clientSecretFile` | Unset | Confidential-client secret file; required for the recommended company registration |
+| `oidcFlow` | `authorization-code` | Authorization-code login, or `implicit` for providers that return only an ID token |
+| `clientSecretFile` | Unset | Gateway-only secret for confidential authorization-code clients; ignored in implicit mode |
 | `deepseekKeyFile` | Required | Upstream key file mounted only into the gateway |
 | `deepseekBaseUrl` | `https://api.deepseek.com/anthropic` | Messages-compatible upstream |
 | `allowedModels` | `deepseek-flash`, `deepseek-v4-pro` | Models admitted by the shared-key proxy |
 | `allowHttp` | `false` | Explicit development-only HTTP permission; the local Compose trial enables it |
 | `sessionTtlMs`, `flowTtlMs` | 12 hours, 5 minutes | Absolute browser-session and login-attempt lifetimes |
+| `maxCallbackBytes` | 64 KiB | Maximum implicit callback body before token parsing and verification |
 | `maxUsers`, `maxBrowserSessions` | `20`, `200` | Durable account and live browser-session admission limits |
 | `containerMemoryBytes`, `containerNanoCpus`, `containerPidsLimit` | 2 GiB, 2 CPUs, `256` | Limits applied to every personal container |
 | `containerTmpBytes` | 256 MiB | Personal-container `/tmp` tmpfs size |
@@ -70,7 +72,9 @@ Signing out revokes that browser session and closes its admitted connections. It
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The gateway completes authorization-code login with PKCE, nonce, and browser-bound state. It transfers the resulting browser session to the account's separate origin through a short-lived, single-use handoff. The handoff returns a document that starts a fresh same-origin navigation, ending the identity provider's redirect chain. The account/logout row reserves space above the DSH application. HTTP and WebSocket requests reach only the runtime selected by that live session.
+The gateway defaults to authorization-code login with PKCE, nonce, and browser-bound state. Its implicit compatibility mode requests only `id_token`; the callback page removes the URL fragment and sends it by same-origin POST for server-side signature, issuer, audience, expiry, nonce, and state validation. Neither mode uses a password grant or requests an EMR business access token. DSH stores neither ID nor access tokens in localStorage. The [registration guide](../../../docs/user/guide/hosted-workspaces.md#sso-registration) owns provider settings.
+
+The gateway transfers the verified browser session to the account's separate origin through a short-lived, single-use handoff. The implicit fragment bridge restricts forms to CSP `form-action 'self'`. Its POST returns an HTTP 200 portal page with `form-action 'none'` and a meta refresh to that handoff. The handoff returns a document that starts a fresh same-origin navigation, ending the identity provider's redirect chain. The account/logout row reserves space above the DSH application. HTTP and WebSocket requests reach only the runtime selected by that live session.
 
 Docker control requests use the configured `dockerSocket` even when the environment defines `DOCKER_HOST` or Docker TLS settings. Docker owns one named home volume and bridge network per account. Startup checks existing resource ownership and isolation settings before reuse. The model proxy listens on the gateway's concrete personal-network addresses and enforces request limits outside the user container. Failed startup removes resources created by that operation; a cleanup failure requires operator inspection.
 

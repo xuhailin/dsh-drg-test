@@ -43,12 +43,14 @@ kind: "package-bundle"
 | `publicOrigin` | 必填 | 不带路径的入口 origin；个人 origin 使用其直接子域名 |
 | `issuer`, `clientId` | 必填 | 已注册的 OIDC 提供方和应用 |
 | `discoveryUrl` | 从 issuer 发现 | 可选的内部发现 URL；返回的 issuer 仍须匹配 |
-| `clientSecretFile` | 未设置 | 机密客户端的密钥文件；推荐的公司应用注册需要提供 |
+| `oidcFlow` | `authorization-code` | 授权码登录；仅返回 ID token 的提供方可使用 `implicit` |
+| `clientSecretFile` | 未设置 | 仅网关读取的授权码机密客户端密钥；implicit 模式忽略此项 |
 | `deepseekKeyFile` | 必填 | 仅挂载到网关的上游 Key 文件 |
 | `deepseekBaseUrl` | `https://api.deepseek.com/anthropic` | 兼容 Messages 的上游接口 |
 | `allowedModels` | `deepseek-flash`, `deepseek-v4-pro` | 共享 Key 代理允许使用的模型 |
 | `allowHttp` | `false` | 显式允许仅供开发的 HTTP；本地 Compose 试用会启用 |
 | `sessionTtlMs`, `flowTtlMs` | 12 小时、5 分钟 | 浏览器会话和登录尝试的绝对有效期 |
+| `maxCallbackBytes` | 64 KiB | token 解析与验证前允许的 implicit 回调请求体上限 |
 | `maxUsers`, `maxBrowserSessions` | `20`, `200` | 持久化账号数和有效浏览器会话数限制 |
 | `containerMemoryBytes`, `containerNanoCpus`, `containerPidsLimit` | 2 GiB、2 CPU、`256` | 应用于每个个人容器的限制 |
 | `containerTmpBytes` | 256 MiB | 个人容器 `/tmp` tmpfs 大小 |
@@ -70,7 +72,9 @@ kind: "package-bundle"
 <details>
 <summary>实现细节——点击展开</summary>
 
-网关使用 PKCE、nonce 和绑定浏览器的 state 完成授权码登录。它通过短时、一次性的交接，将生成的浏览器会话转移到该账号独立的 origin。交接返回一个文档，由该文档发起新的同源导航，结束身份提供方的重定向链。账号／退出栏在 DSH 应用上方预留空间。HTTP 和 WebSocket 请求只会到达该有效会话所选择的运行实例。
+网关默认使用 PKCE、nonce 和绑定浏览器的 state 完成授权码登录。implicit 兼容模式仅请求 `id_token`；回调页面移除 URL fragment，再通过同源 POST 提交，由服务端验证签名、issuer、audience、有效期、nonce 和 state。两种模式均不使用密码授权，也不请求 EMR 业务 access token。DSH 不将 ID token 或 access token 保存到 localStorage。[注册指南](../../../docs/user/guide/hosted-workspaces.zh.md#sso-registration)拥有提供方设置。
+
+网关通过短时、一次性的交接，将验证后的浏览器会话转移到该账号独立的 origin。implicit fragment 中转页将表单限制为 CSP `form-action 'self'`。其 POST 返回使用 `form-action 'none'` 的入口 HTTP 200 页面，由 meta refresh 导航到该交接地址。交接返回一个文档，由该文档发起新的同源导航，结束身份提供方的重定向链。账号／退出栏在 DSH 应用上方预留空间。HTTP 和 WebSocket 请求只会到达该有效会话所选择的运行实例。
 
 Docker 控制请求使用配置的 `dockerSocket`，即使环境定义了 `DOCKER_HOST` 或 Docker TLS 设置。Docker 为每个账号分配一个命名 home 数据卷和桥接网络。启动流程在复用资源前检查既有资源的归属和隔离配置。模型代理监听网关在个人网络中的具体地址，并在用户容器之外执行请求限制。启动失败会删除本次操作创建的资源；清理失败需要运维人员检查。
 

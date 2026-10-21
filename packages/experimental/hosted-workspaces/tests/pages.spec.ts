@@ -1,7 +1,8 @@
 /** Browser-facing account pages keep localization, logout semantics, and identity labels safe. */
 import { JSDOM } from 'jsdom'
-import { describe, expect, it, onTestFinished } from 'vitest'
-import { escapeHtml, page, withLogout } from '../src/pages.ts'
+import { createHash } from 'node:crypto'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { escapeHtml, implicitCallbackPage, page, withLogout } from '../src/pages.ts'
 
 function document(html: string): Document {
   const dom = new JSDOM(html)
@@ -10,6 +11,43 @@ function document(html: string): Document {
 }
 
 describe('hosted account pages', () => {
+  it.each([
+    [undefined, 'Verifying company sign in…'],
+    ['zh-CN', '正在验证公司登录……'],
+  ])('clears implicit tokens before same-origin form submission and pins the exact script (%s)', (locale, pending) => {
+    const bridge = implicitCallbackPage(locale)
+    const dom = new JSDOM(bridge.html, { url: 'http://chat.localhost:8080/auth/callback#id_token=sensitive&state=bound&submit=clobber', runScripts: 'outside-only' })
+    onTestFinished(() => { dom.window.close() })
+    let submittedUrl: string | undefined
+    const submit = vi.spyOn(dom.window.HTMLFormElement.prototype, 'submit').mockImplementation(() => { submittedUrl = dom.window.location.href })
+    onTestFinished(() => { submit.mockRestore() })
+    const script = dom.window.document.querySelector('script')?.textContent ?? ''
+    expect(createHash('sha256').update(script).digest('base64')).toBe(bridge.scriptHash)
+    dom.window.eval(script)
+    const submitted = dom.window.document.querySelector('form')
+    expect(submit).toHaveBeenCalledOnce()
+    expect(submittedUrl).toBe('http://chat.localhost:8080/auth/callback')
+    expect(submitted?.action).toBe('http://chat.localhost:8080/auth/callback')
+    expect(submitted?.method).toBe('post')
+    expect(submitted?.querySelector('input[name="id_token"]')?.getAttribute('value')).toBe('sensitive')
+    expect(dom.window.document.querySelector('#notice')?.textContent).toBe(pending)
+    expect(dom.window.localStorage.length).toBe(0)
+    expect(dom.window.sessionStorage.length).toBe(0)
+    expect(bridge.html).not.toContain('sensitive')
+  })
+
+  it('leaves a localized retry action without submitting an absent or unbound fragment', () => {
+    for (const fragment of ['', '#id_token=unbound']) {
+      const dom = new JSDOM(implicitCallbackPage('zh-CN').html, { url: `http://chat.localhost:8080/auth/callback${fragment}`, runScripts: 'outside-only' })
+      onTestFinished(() => { dom.window.close() })
+      dom.window.eval(dom.window.document.querySelector('script')?.textContent ?? '')
+      expect(dom.window.location.hash).toBe('')
+      expect(dom.window.document.querySelector('form')).toBeNull()
+      expect(dom.window.document.querySelector('#notice')?.textContent).toContain('工作区请求失败')
+      expect(dom.window.document.querySelector('a')?.textContent).toBe('返回入口')
+    }
+  })
+
   it.each([
     [undefined, 'en', 'Company sign in'],
     ['en-US', 'en', 'Company sign in'],

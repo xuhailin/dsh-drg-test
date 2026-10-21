@@ -4,6 +4,7 @@ services:
       HOSTED_OIDC_ISSUER: http://localhost:8090
       HOSTED_OIDC_DISCOVERY_URL: http://mock-oidc:8090/.well-known/openid-configuration
       HOSTED_OIDC_CLIENT_ID: dsh-workspaces
+      HOSTED_OIDC_FLOW: ${HOSTED_TEST_OIDC_FLOW:-authorization-code}
       HOSTED_ALLOW_HTTP: 'true'
       HOSTED_DEEPSEEK_BASE_URL: http://mock-model:8091/anthropic
     depends_on:

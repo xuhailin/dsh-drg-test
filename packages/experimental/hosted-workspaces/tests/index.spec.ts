@@ -150,7 +150,7 @@ describe('hosted workspace profile activation', () => {
     expect(beginning.headers.location).toBe('http://identity.test/authorize')
     const callback = await call(world.target, world.origin, '/auth/callback?code=fixture')
     expect(callback.status).toBe(303)
-    expect(external.createOidc.mock.calls[0]?.[0]).toMatchObject({ clientSecret: 'synthetic-oidc-secret' })
+    expect(external.createOidc.mock.calls[0]?.[0]).toMatchObject({ flow: 'authorization-code', clientSecret: 'synthetic-oidc-secret' })
     const cookie = callback.headers['set-cookie']?.find(value => value.startsWith('dsh-sso-dev='))?.split(';', 1)[0]
     if (cookie === undefined || callback.headers.location === undefined) throw new Error('Login did not publish its browser handoff')
     const privateUrl = new URL(callback.headers.location)
@@ -187,6 +187,19 @@ describe('hosted workspace profile activation', () => {
     const reopened = await world.ctx.storageDomain.open((await import('../src/state.ts')).hostedDomain)
     expect([...reopened.table('users').entries()]).toHaveLength(1)
     await reopened.close()
+  })
+
+  it('activates implicit login without reading a configured client-secret file', async () => {
+    const world = await harness()
+    world.config.oidcFlow = 'implicit'
+    world.config.clientSecretFile = join(world.root, 'absent-implicit-secret')
+    const mounted = await world.ctx.plugin(Hosted, world.config)
+    try {
+      const options = external.createOidc.mock.calls[0]?.[0]
+      expect(options).toMatchObject({ flow: 'implicit', clientId: 'fixture-client' })
+      expect(options).not.toHaveProperty('clientSecret')
+      expect((await call(world.target, world.origin, '/')).status).toBe(200)
+    } finally { await mounted.dispose() }
   })
 
   it.each(['missing', 'empty'])('rejects a %s model key before exposing any login route', async (kind) => {

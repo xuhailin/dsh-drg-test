@@ -78,28 +78,30 @@ Protect the intended default branch. The [image build script](../../../deploy/ho
 <a id="sso-registration"></a>
 ## Register the company SSO application
 
-Ask the company identity administrator to create a separate confidential Web application. Reuse the company's SSO provider and login experience, while keeping this application's client registration distinct from EMR. No company application registration is needed for the local mock trial.
+Ask the company identity administrator for a separate OIDC application and the flow it supports. The default `authorization-code` mode uses a server-side code exchange. Select `implicit` when the provider supports the existing EMR-style ID-token response without a code exchange; the company does not need to enable authorization-code flow for this integration. Reuse its login experience while keeping this application's registration distinct from EMR. The local mock trial needs no company registration.
 
-| Setting | Required value | Requirement |
+| Setting | `authorization-code` (default) | `implicit` compatibility |
 |---|---|---|
-| Application type | Confidential server-side Web client | Required; the gateway holds the secret |
-| Client ID | `dsh-workspaces`, or the administrator-assigned ID | Required; configure the exact assigned value |
-| Grant / response type | `authorization_code` / `code` | Required; do not enable implicit, password, or client-credentials grants for this application |
-| Response mode | Query parameters on the callback GET | Required when the console asks for a mode |
-| PKCE | Required, `S256` | Required; the gateway also verifies state and nonce |
-| Token endpoint authentication | `client_secret_basic` | Required for the confidential registration |
-| Scopes | `openid profile` | Required; `email` and `offline_access` are not requested |
-| Local callback | `http://chat.localhost:8080/auth/callback` | Required only if real SSO will be tested at this local entry and company policy permits HTTP loopback development |
-| Company callback | The chosen portal origin followed by `/auth/callback` | Required when a company entry is chosen; register the exact scheme, host, port, and path |
-| Issuer and discovery | Exact issuer with matching discovery metadata | Required; an internal discovery URL cannot change the expected issuer |
-| ID-token claims and signing | Stable `sub`, correct issuer/audience, RS256 signature, reachable JWKS | Required; `name` or `preferred_username` supplies a display label |
-| Pilot application assignment | Administrator-selected test users or groups | Optional identity-provider access policy |
-| Browser-origin allowlist | Portal origin, if the company console requires it | Optional; browsers do not call the token endpoint, so token-endpoint CORS is unnecessary |
-| Provider logout callbacks | Unused by this implementation | Leave unset unless a separate provider-logout integration requires them |
+| Application type | Server-side Web client; confidential when a secret is issued | OIDC client permitting an ID-token response |
+| Client ID | Exact administrator-assigned value, such as `dsh-workspaces` | Exact administrator-assigned value, such as `dsh-workspaces` |
+| Grant / response type | `authorization_code` / `code` | `implicit` / `id_token`; no access-token response |
+| Response mode | Query parameters on the callback GET | URL fragment on the callback page |
+| PKCE, state, and nonce | `S256` PKCE, browser-bound state, and nonce | Browser-bound state and nonce; no code verifier |
+| Token endpoint authentication | `client_secret_basic` for a confidential client; no secret for a public client | No token-endpoint exchange or client secret |
+| Scopes | `openid profile` | `openid profile` |
+| Local callback | `http://chat.localhost:8080/auth/callback`, only when company policy permits local HTTP testing | `http://chat.localhost:8080/auth/callback`, only when company policy permits local HTTP testing |
+| Company callback | Chosen portal origin followed by `/auth/callback`; exact scheme, host, port, and path | Chosen portal origin followed by `/auth/callback`; exact scheme, host, port, and path |
+| Issuer and discovery | Exact issuer with matching discovery metadata | Exact issuer with matching discovery metadata |
+| ID-token claims and signing | Stable `sub`, correct issuer/audience, RS256 signature, reachable JWKS | Stable `sub`, correct issuer/audience, RS256 signature, reachable JWKS |
+| Pilot application assignment | Administrator-selected test users or groups | Administrator-selected test users or groups |
+| Browser-origin allowlist | Portal origin if required by the company console | Portal origin if required by the company console |
+| Provider logout callbacks | Unused by this implementation | Unused by this implementation |
 
 For a portal such as `https://chat.example.com`, the callback is exactly `https://chat.example.com/auth/callback`. Do not register a wildcard callback or a separate callback for every personal subdomain: every OIDC callback arrives at the portal, and the gateway performs the subsequent private-origin handoff.
 
-The identity administrator supplies the issuer, client ID, and confidential client secret through the approved secret channel. The gateway validates the ID-token signature through JWKS, issuer, audience, nonce, and the one-use login flow. Display names never select an account or runtime.
+The administrator supplies the issuer, client ID, supported flow, and reachable JWKS; a confidential authorization-code client also needs its secret through the approved secret channel. `name` or `preferred_username` supplies a display label and never selects an account or runtime. The gateway validates the signed ID token, issuer, audience, expiry, nonce, and one-use browser-bound state in either mode.
+
+In implicit mode, the callback page removes the fragment from the address bar and sends its fields to the gateway by same-origin POST. The gateway verifies the token through the provider's JWKS before creating a browser session; an unverified browser-decoded token cannot authenticate. DSH requests only an ID token for identity, not EMR business access or refresh tokens. It uses no password grant and stores no SSO token in localStorage. Browsers do not call the token endpoint, so token-endpoint CORS is unnecessary.
 
 **Logout is application-local.** It revokes the browser session and closes its connections. It retains personal files and background jobs and leaves the company's global SSO session active. A later company sign-in can therefore complete without another password prompt.
 
@@ -108,7 +110,7 @@ The identity administrator supplies the issuer, client ID, and confidential clie
 <a id="company-services"></a>
 ## Connect company services
 
-Choose the portal origin when the server and TLS entry are known. Keep the mock overlay out of the company composition. The gateway needs network access to SSO discovery, token and JWKS endpoints, the configured model upstream, and Docker.
+Choose the portal origin when the server and TLS entry are known. Keep the mock overlay out of the company composition. The gateway needs network access to SSO discovery and JWKS endpoints, the configured model upstream, and Docker. Authorization-code mode also needs the token endpoint; implicit mode does not use it.
 
 Use [the environment example](../../../deploy/hosted-workspaces/.env.example) for non-secret settings. Configure secret paths to existing, access-restricted files outside the checkout. Compose mounts those files only into the gateway; personal containers receive a separate restricted model credential.
 
@@ -117,9 +119,12 @@ HOSTED_PUBLIC_ORIGIN=https://chat.example.com
 HOSTED_ALLOW_HTTP=false
 HOSTED_OIDC_ISSUER=https://sso.example.com
 HOSTED_OIDC_CLIENT_ID=dsh-workspaces
+HOSTED_OIDC_FLOW=authorization-code
 HOSTED_OIDC_CLIENT_SECRET_PATH=/srv/dsh-secrets/oidc_client_secret
 HOSTED_DEEPSEEK_KEY_PATH=/srv/dsh-secrets/deepseek_api_key
 ```
+
+For an implicit application, set `HOSTED_OIDC_FLOW=implicit`. This mode does not read `clientSecretFile`. The base Compose file retains the default code-flow secret mount; remove `oidc_client_secret` from the gateway's mounted secrets and top-level secret definitions in the company composition when no client-secret file is supplied. Keep the DeepSeek secret mounted only in the gateway.
 
 These are replacement examples, not an existing company deployment. `HOSTED_OIDC_DISCOVERY_URL` is optional when the configured issuer is directly reachable; if an internal URL is used, its metadata must still report that issuer. Keep secret values out of `.env`, command arguments, browser settings, and committed files.
 
@@ -159,9 +164,10 @@ Use synthetic data for the local trial. Run the following scenarios through the 
 | Gateway or personal runtime restarts | The correct account recovers its own history and files; another account cannot claim them |
 | A tool inspects environment and readable files | The real upstream model Key is absent; only that runtime's restricted credential is available |
 | A runtime tests its network and Docker access | It cannot reach another personal runtime or the Docker control socket |
+| An implicit callback has a forged, expired, wrong-audience, or replayed ID token | The gateway rejects authentication and creates no browser session |
 | SSO, runtime startup, model upstream, or quota fails | The operation visibly fails without selecting another account or claiming success |
 
-If the portal is unavailable, inspect Compose service status and logs. If login fails, verify the exact callback, issuer, client authentication method, and secret-file mount. For startup conflicts or cleanup failures, inspect the reported Docker resources and preserve volumes; do not rename another user's container or bypass isolation checks to make startup succeed.
+If the portal is unavailable, inspect Compose service status and logs. If login fails, verify the exact callback, issuer, configured flow, and JWKS access. For authorization-code clients, also verify token-endpoint authentication and any client-secret mount. For startup conflicts or cleanup failures, inspect the reported Docker resources and preserve volumes; do not rename another user's container or bypass isolation checks to make startup succeed.
 
 Mock completion verifies the local code path only. Company acceptance still requires the registered real SSO application, a real DeepSeek streaming request, two test identities, the intended Linux networking/storage controls, and independent user acceptance. It does not authorize real patient data.
 

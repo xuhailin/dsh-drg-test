@@ -17,6 +17,19 @@ describe('hosted deployment configuration', () => {
     expect(config.allowHttp).toBe(false)
     expect(config.gatewayPort).toBe(8443)
     expect(config.runtimePort).toBe(3081)
+    expect(config.oidcFlow).toBe('authorization-code')
+    expect(config.maxCallbackBytes).toBe(65536)
+  })
+
+  it('accepts implicit ID-token login without a client-secret file', () => {
+    const config = deployment({ oidcFlow: 'implicit', maxCallbackBytes: 8192 })
+    expect(config.oidcFlow).toBe('implicit')
+    expect(config.clientSecretFile).toBeUndefined()
+    expect(config.maxCallbackBytes).toBe(8192)
+  })
+
+  it('rejects an unrecognized OIDC flow at configuration parsing', () => {
+    expect(() => deployment({ oidcFlow: 'password' as Config['oidcFlow'] })).toThrow()
   })
 
   it('requires an explicit development opt-in before accepting HTTP services', () => {
@@ -66,6 +79,8 @@ describe('hosted deployment configuration', () => {
     { sessionTtlMs: 2147483648 },
     { containerMemoryBytes: 0 },
     { maxConcurrentModelRequests: 0 },
+    { maxCallbackBytes: 0 },
+    { maxCallbackBytes: 1.5 },
   ])('rejects invalid deployment limits at configuration parsing (%j)', (overrides) => {
     expect(() => deployment(overrides)).toThrow()
   })

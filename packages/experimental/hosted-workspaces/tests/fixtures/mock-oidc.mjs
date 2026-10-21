@@ -34,14 +34,20 @@ async function main() {
 
   function authorization(parameters) {
     const values = {}
-    for (const name of ['client_id', 'response_type', 'redirect_uri', 'scope', 'state', 'nonce', 'code_challenge', 'code_challenge_method']) {
+    const required = ['client_id', 'response_type', 'redirect_uri', 'scope', 'state', 'nonce']
+    if (parameters.get('response_type') === 'code') required.push('code_challenge', 'code_challenge_method')
+    else required.push('response_mode')
+    for (const name of required) {
       const candidates = parameters.getAll(name)
       if (candidates.length !== 1 || !candidates[0]) throw new Error(`Missing or duplicated ${name}`)
       values[name] = candidates[0]
     }
-    if (values.client_id !== clientId || values.response_type !== 'code' || values.redirect_uri !== redirectUri
-      || !values.scope.split(' ').includes('openid') || values.code_challenge_method !== 'S256'
-      || !/^[A-Za-z0-9_-]{43}$/u.test(values.code_challenge)) {
+    const code = values.response_type === 'code' && values.code_challenge_method === 'S256'
+      && /^[A-Za-z0-9_-]{43}$/u.test(values.code_challenge)
+      && (parameters.get('response_mode') === null || parameters.get('response_mode') === 'query')
+    const implicit = values.response_type === 'id_token' && values.response_mode === 'fragment'
+    if (values.client_id !== clientId || values.redirect_uri !== redirectUri
+      || !values.scope.split(' ').includes('openid') || (!code && !implicit)) {
       throw new Error('Unsupported authorization request')
     }
     return values
@@ -67,8 +73,9 @@ async function main() {
         authorization_endpoint: `${issuer}/authorize`,
         token_endpoint: `${internalOrigin}/token`,
         jwks_uri: `${internalOrigin}/jwks`,
-        response_types_supported: ['code'],
-        grant_types_supported: ['authorization_code'],
+        response_types_supported: ['code', 'id_token'],
+        response_modes_supported: ['query', 'fragment'],
+        grant_types_supported: ['authorization_code', 'implicit'],
         subject_types_supported: ['public'],
         id_token_signing_alg_values_supported: ['RS256'],
         token_endpoint_auth_methods_supported: ['client_secret_basic'],
@@ -92,11 +99,20 @@ async function main() {
       }
       const user = parameters.get('user')
       if (!Object.hasOwn(users, user)) return json(response, 400, { error: 'invalid_test_user' })
+      const callback = new URL(values.redirect_uri)
+      if (values.response_type === 'id_token') {
+        const now = Math.floor(Date.now() / 1000)
+        callback.hash = new URLSearchParams({
+          id_token: token({ iss: issuer, aud: clientId, sub: user, name: users[user], preferred_username: user, nonce: values.nonce, iat: now, exp: now + 300 }),
+          state: values.state, iss: issuer,
+        }).toString()
+        response.writeHead(303, { location: callback.href, 'cache-control': 'no-store' })
+        return response.end()
+      }
       for (const [code, record] of codes) if (record.expiresAt <= Date.now()) codes.delete(code)
       if (codes.size >= 256) return json(response, 503, { error: 'too_many_pending_codes' })
       const code = randomBytes(32).toString('base64url')
       codes.set(code, { ...values, user, expiresAt: Date.now() + 120_000 })
-      const callback = new URL(values.redirect_uri)
       callback.searchParams.set('code', code)
       callback.searchParams.set('state', values.state)
       callback.searchParams.set('iss', issuer)

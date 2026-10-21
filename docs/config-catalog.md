@@ -1049,7 +1049,7 @@ export type Config = CuaConfig
 ## `@deepseek-ai/dsh-experimental-hosted-workspaces`
 
 - `inject`: `webServer` · `storageDomain`
-- `source`: [`packages/experimental/hosted-workspaces/src/config.ts:5`](../packages/experimental/hosted-workspaces/src/config.ts)
+- `source`: [`packages/experimental/hosted-workspaces/src/config.ts:6`](../packages/experimental/hosted-workspaces/src/config.ts)
 
 ```ts config-catalog
 /** Gateway, identity-provider, Docker and model-proxy deployment inputs. */
@@ -1066,7 +1066,9 @@ export interface Config {
   discoveryUrl?: string
   /** Client identifier assigned to this gateway's OIDC application. */
   clientId: string
-  /** Gateway-only secret-file path for client_secret_basic; omission selects a public client. */
+  /** OIDC response flow; implicit accepts a signed ID token through the portal callback. */
+  oidcFlow: OidcFlow
+  /** Gateway-only client_secret_basic secret file for authorization-code; implicit does not read it. */
   clientSecretFile?: string
   /** Gateway-only file containing the upstream model API key. */
   deepseekKeyFile: string
@@ -1086,8 +1088,10 @@ export interface Config {
   sessionTtlMs: number
   /** Pending OIDC login and private-origin handoff lifetime in milliseconds. */
   flowTtlMs: number
-  /** Maximum entries in each pending-login or private-origin handoff collection. */
+  /** Maximum entries per pending-login/handoff collection and concurrent implicit callback body reads. */
   maxPendingFlows: number
+  /** Maximum implicit callback body bytes before token parsing and verification. */
+  maxCallbackBytes: number
   /** Maximum enrolled accounts and personal Docker runtime reservations. */
   maxUsers: number
   /** Maximum live browser sessions across all accounts; expired sessions are reclaimed at login. */
@@ -1121,6 +1125,9 @@ export interface Config {
   /** Maximum active model requests per account, including body reads and upstream streaming. */
   maxConcurrentModelRequests: number
 }
+
+/** Explicitly selected OIDC response flow; neither mode falls back to the other. */
+export type OidcFlow = 'authorization-code' | 'implicit'
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-hosted-workspaces -->
 

@@ -46,6 +46,7 @@ function call(port: number, host: string | undefined, path: string, options: {
   cookie?: string
   origin?: string
   headers?: Record<string, string>
+  body?: string | Buffer
 } = {}) {
   return new Promise<{ status: number; headers: IncomingHttpHeaders; body: string }>((resolve, reject) => {
     const req = request({ host: '127.0.0.1', port, path, setHost: false, method: options.method ?? 'GET', headers: {
@@ -58,7 +59,7 @@ function call(port: number, host: string | undefined, path: string, options: {
       res.on('error', reject)
     })
     req.on('error', reject)
-    req.end()
+    req.end(options.body)
   })
 }
 
@@ -122,8 +123,9 @@ async function harness(ttlMs = 60000, connectionLimit = 64, overrides: Partial<C
     async begin(returnOrigin: string) { return { authorizationUrl: `https://issuer.test/login?target=${encodeURIComponent(returnOrigin)}`, flowCookie: 'flow-binding' } },
     async finish(url: URL, cookie: string | undefined) {
       if (cookie !== 'flow-binding') throw new Error('invalid flow cookie')
-      const subject = url.searchParams.get('user') ?? 'alice'
-      return { identity: { issuer: 'http://issuer.test', subject, name: subject }, returnOrigin: url.searchParams.get('target') ?? origin }
+      const parameters = url.hash ? new URLSearchParams(url.hash.slice(1)) : url.searchParams
+      const subject = parameters.get('user') ?? 'alice'
+      return { identity: { issuer: 'http://issuer.test', subject, name: subject }, returnOrigin: parameters.get('target') ?? origin }
     },
     async dispose() {},
   }
@@ -157,6 +159,180 @@ async function harness(ttlMs = 60000, connectionLimit = 64, overrides: Partial<C
 }
 
 describe('HostedGateway', () => {
+  it('bridges an implicit fragment using a hash-pinned script before creating a verified browser session', async () => {
+    const h = await harness(60000, 64, { oidcFlow: 'implicit' })
+    const host = new URL(h.origin).host
+    const finish = vi.spyOn(h.oidc, 'finish')
+    onTestFinished(() => { finish.mockRestore() })
+    const bridge = await call(h.port, host, '/auth/callback', { cookie: 'dsh-sso-dev-flow=flow-binding', headers: { 'accept-language': 'zh-CN' } })
+    expect(bridge.status).toBe(200)
+    expect(bridge.headers['cache-control']).toBe('no-store')
+    expect(bridge.headers['referrer-policy']).toBe('same-origin')
+    expect(bridge.headers['content-security-policy']).toMatch(/script-src 'sha256-[^']+';.*form-action 'self'/u)
+    expect(bridge.body).toContain('正在验证公司登录')
+    expect(bridge.headers['set-cookie']).toBeUndefined()
+    expect(finish).not.toHaveBeenCalled()
+    const callback = await call(h.port, host, '/auth/callback', {
+      method: 'POST', cookie: 'dsh-sso-dev-flow=flow-binding', origin: h.origin,
+      headers: { 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8', 'sec-fetch-site': 'same-origin' },
+      body: 'id_token=private-token&state=state&user=alice',
+    })
+    expect(callback.status).toBe(200)
+    expect(callback.headers.location).toBeUndefined()
+    expect(callback.headers['content-security-policy']).toContain("form-action 'none'")
+    expect(callback.body).not.toContain('private-token')
+    expect(finish).toHaveBeenCalledOnce()
+    expect(finish.mock.calls[0]?.[0].search).toBe('')
+    expect(finish.mock.calls[0]?.[0].hash).toContain('id_token=private-token')
+    expect(finish.mock.calls[0]?.[1]).toBe('flow-binding')
+    expect(callback.headers['set-cookie']?.[0]).toContain('Max-Age=0')
+    const handoff = new URL(callback.body.match(/<a href="([^"]+)"/u)?.[1] ?? '')
+    expect(callback.body).toContain(`<meta http-equiv="refresh" content="0;url=${handoff.href}">`)
+    const landed = await call(h.port, handoff.host, handoff.pathname + handoff.search)
+    expect(landed.status).toBe(200)
+    const cookie = landed.headers['set-cookie']?.find(value => value.startsWith('dsh-sso-dev='))?.split(';')[0]
+    if (cookie === undefined) throw new Error('missing private origin cookie')
+    expect((await call(h.port, handoff.host, '/', { cookie })).status).toBe(200)
+  })
+
+  it('rejects implicit query tokens, foreign POST origins, wrong methods and content types before login validation', async () => {
+    const h = await harness(60000, 64, { oidcFlow: 'implicit' })
+    const host = new URL(h.origin).host
+    const finish = vi.spyOn(h.oidc, 'finish')
+    onTestFinished(() => { finish.mockRestore() })
+    expect((await call(h.port, host, '/auth/callback?id_token=untrusted')).status).toBe(400)
+    expect((await call(h.port, host, '/auth/callback', { method: 'PUT' })).status).toBe(405)
+    for (const origin of [undefined, 'null', 'https://attacker.test']) {
+      expect((await call(h.port, host, '/auth/callback', { method: 'POST', ...origin === undefined ? {} : { origin } })).status).toBe(403)
+    }
+    expect((await call(h.port, host, '/auth/callback', { method: 'POST', origin: h.origin, headers: { 'sec-fetch-site': 'cross-site' } })).status).toBe(403)
+    for (const contentType of [undefined, 'application/json', 'text/plain']) {
+      expect((await call(h.port, host, '/auth/callback', { method: 'POST', origin: h.origin, headers: contentType === undefined ? {} : { 'content-type': contentType } })).status).toBe(415)
+    }
+    expect(finish).not.toHaveBeenCalled()
+    expect([...h.domain.table('sessions').entries()]).toEqual([])
+    const invalid = await call(h.port, host, '/auth/callback', { method: 'POST', origin: h.origin, headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'state=invalid' })
+    expect(invalid.status).toBe(400)
+    expect(invalid.headers['set-cookie']?.[0]).toContain('Max-Age=0')
+    const code = await harness()
+    expect((await call(code.port, new URL(code.origin).host, '/auth/callback', { method: 'POST' })).status).toBe(405)
+  })
+
+  it('counts streamed implicit callback bytes and rejects an oversized body without creating a session', async () => {
+    const h = await harness(60000, 64, { oidcFlow: 'implicit', maxCallbackBytes: 10 })
+    const finish = vi.spyOn(h.oidc, 'finish')
+    onTestFinished(() => { finish.mockRestore() })
+    const response = await call(h.port, new URL(h.origin).host, '/auth/callback', {
+      method: 'POST', origin: h.origin, cookie: 'dsh-sso-dev-flow=flow-binding', headers: { 'content-type': 'application/x-www-form-urlencoded', 'transfer-encoding': 'chunked' }, body: 'state=医医生',
+    })
+    expect(response.status).toBe(413)
+    expect(response.headers.connection).toBe('close')
+    expect(response.headers['set-cookie']).toBeUndefined()
+    expect(finish).not.toHaveBeenCalled()
+    expect([...h.domain.table('sessions').entries()]).toEqual([])
+  })
+
+  it('bounds an unfinished callback and cancels its body reader during gateway disposal', async () => {
+    const h = await harness(60000, 64, { oidcFlow: 'implicit', requestTimeoutMs: 25 })
+    const headers = { host: new URL(h.origin).host, origin: h.origin, cookie: 'dsh-sso-dev-flow=flow-binding', 'content-type': 'application/x-www-form-urlencoded' }
+    const timedOut = new Promise<number | undefined>((resolve, reject) => {
+      const browser = request({ host: '127.0.0.1', port: h.port, path: '/auth/callback', method: 'POST', headers }, (res) => { res.resume(); res.once('end', () => { resolve(res.statusCode) }) })
+      onTestFinished(() => { browser.destroy() })
+      browser.once('error', reject)
+      browser.write('state=')
+    })
+    expect(await timedOut).toBe(408)
+    h.config.requestTimeoutMs = 60000
+    const reading = deferred()
+    h.server.on('request', () => { reading.resolve() })
+    const browser = request({ host: '127.0.0.1', port: h.port, path: '/auth/callback', method: 'POST', headers })
+    onTestFinished(() => { browser.destroy() })
+    const closed = new Promise<void>((resolve) => { browser.on('error', () => {}); browser.once('close', resolve) })
+    browser.write('state=')
+    await reading.promise
+    await h.gateway.dispose()
+    await closed
+    expect([...h.domain.table('sessions').entries()]).toEqual([])
+  })
+
+  it('settles a callback after the browser disconnects during its body upload', async () => {
+    const h = await harness(60000, 64, { oidcFlow: 'implicit' })
+    const entered = deferred()
+    const serverClosed = deferred()
+    h.server.on('request', (req, res) => { req.once('data', () => { entered.resolve() }); res.once('close', () => { serverClosed.resolve() }) })
+    const browser = request({ host: '127.0.0.1', port: h.port, path: '/auth/callback', method: 'POST', headers: {
+      host: new URL(h.origin).host, origin: h.origin, cookie: 'dsh-sso-dev-flow=flow-binding', 'content-type': 'application/x-www-form-urlencoded',
+    } })
+    browser.on('error', () => {})
+    onTestFinished(() => { browser.destroy() })
+    browser.write('state=')
+    await entered.promise
+    browser.destroy()
+    await serverClosed.promise
+    await Promise.allSettled(h.gateway['pending'])
+    expect([...h.domain.table('sessions').entries()]).toEqual([])
+  })
+
+  it.each(['identity', 'user', 'login'] as const)('abandons %s completion after a callback browser disconnects or the gateway stops', async (stage) => {
+    for (const dispose of [false, true]) {
+      const h = await harness()
+      const entered = deferred()
+      const release = deferred()
+      onTestFinished(() => { release.resolve() })
+      if (stage === 'identity') {
+        const original = h.oidc.finish.bind(h.oidc)
+        const spy = vi.spyOn(h.oidc, 'finish').mockImplementation(async (...args) => { const result = await original(...args); entered.resolve(); await release.promise; return result })
+        onTestFinished(() => { spy.mockRestore() })
+      } else if (stage === 'user') {
+        const original = h.state.user.bind(h.state)
+        const spy = vi.spyOn(h.state, 'user').mockImplementation(async (...args) => { const result = await original(...args); entered.resolve(); await release.promise; return result })
+        onTestFinished(() => { spy.mockRestore() })
+      } else {
+        const original = h.state.login.bind(h.state)
+        const spy = vi.spyOn(h.state, 'login').mockImplementation(async (...args) => { const result = await original(...args); entered.resolve(); await release.promise; return result })
+        onTestFinished(() => { spy.mockRestore() })
+      }
+      const serverClosed = deferred()
+      h.server.on('request', (_req, res) => { res.once('close', () => { serverClosed.resolve() }) })
+      const browser = request({ host: '127.0.0.1', port: h.port, path: '/auth/callback?user=alice', headers: { host: new URL(h.origin).host, cookie: 'dsh-sso-dev-flow=flow-binding' } })
+      browser.on('error', () => {})
+      onTestFinished(() => { browser.destroy() })
+      browser.end()
+      await entered.promise
+      if (dispose) {
+        const disposing = h.gateway.dispose()
+        release.resolve()
+        await disposing
+      } else {
+        browser.destroy()
+        await serverClosed.promise
+        release.resolve()
+        await Promise.allSettled(h.gateway['pending'])
+      }
+      expect([...h.domain.table('sessions').entries()]).toEqual([])
+      expect(h.gateway['handoffs'].size).toBe(0)
+    }
+  })
+
+  it('bounds concurrent callback readers and releases capacity when an upload completes', async () => {
+    const h = await harness(60000, 64, { oidcFlow: 'implicit', maxPendingFlows: 1 })
+    const entered = deferred()
+    h.server.on('request', (req) => { req.once('data', () => { entered.resolve() }) })
+    const host = new URL(h.origin).host
+    const headers = { host, origin: h.origin, cookie: 'dsh-sso-dev-flow=flow-binding', 'content-type': 'application/x-www-form-urlencoded' }
+    const browser = request({ host: '127.0.0.1', port: h.port, path: '/auth/callback', method: 'POST', headers })
+    browser.on('error', () => {})
+    onTestFinished(() => { browser.destroy() })
+    const complete = new Promise<string>((resolve) => { browser.on('response', (res) => { const chunks: Buffer[] = []; res.on('data', (chunk: Buffer) => { chunks.push(chunk) }); res.once('end', () => { resolve(Buffer.concat(chunks).toString()) }) }) })
+    browser.write('state=')
+    await entered.promise
+    expect((await call(h.port, host, '/auth/callback', { method: 'POST', origin: h.origin, headers, body: 'state=another' })).status).toBe(503)
+    browser.end('bound')
+    const handoff = new URL((await complete).match(/<a href="([^"]+)"/u)?.[1] ?? '')
+    expect((await call(h.port, handoff.host, handoff.pathname + handoff.search)).status).toBe(200)
+    expect((await call(h.port, host, '/auth/callback', { method: 'POST', origin: h.origin, headers, body: 'state=again' })).status).toBe(200)
+  })
+
   it('serves health, rejects malformed authority/request targets, and stops new admission after disposal', async () => {
     const h = await harness()
     const host = new URL(h.origin).host

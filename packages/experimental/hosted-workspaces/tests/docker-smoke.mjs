@@ -42,6 +42,7 @@ function credential(response, name) {
 }
 
 async function login(user) {
+  const id = createHash('sha256').update(JSON.stringify(['http://localhost:8090', user])).digest('hex')
   const start = await http(`${portal}/auth/login`)
   assert.equal(start.status, 303)
   const flow = credential(start, 'dsh-sso-dev-flow')
@@ -52,15 +53,63 @@ async function login(user) {
     method: 'POST', body: form.toString(), headers: { 'content-type': 'application/x-www-form-urlencoded' },
   })
   assert.equal(grant.status, 303)
-  const callback = await http(grant.headers.location, { cookie: flow })
-  assert.equal(callback.status, 303, `OIDC callback failed: ${callback.status}`)
-  const handoff = await http(callback.headers.location, { origin: authorization.origin, headers: { "sec-fetch-site": "cross-site" } })
+  const responseType = authorization.searchParams.get('response_type')
+  let callback
+  let handoffTarget
+  if (responseType === 'id_token') {
+    assert.equal(authorization.searchParams.get('response_mode'), 'fragment')
+    const target = new URL(grant.headers.location)
+    assert.equal(target.origin, portal)
+    assert.equal(target.pathname, '/auth/callback')
+    assert.equal(target.search, '')
+    const fragment = new URLSearchParams(target.hash.slice(1))
+    assert.ok(fragment.get('id_token'), 'Implicit response includes an ID token')
+    assert.ok(!fragment.has('access_token'), 'Implicit response must not issue an access token')
+    assert.ok(fragment.get('state') === authorization.searchParams.get('state'), 'Implicit response returns the requested state')
+    target.hash = ''
+    const bridge = await http(target, { cookie: flow })
+    assert.equal(bridge.status, 200)
+    assert.equal(bridge.headers['referrer-policy'], 'same-origin')
+    assert.match(bridge.text, /history\.replaceState/u)
+    assert.match(bridge.text, /location\.hash/u)
+    const script = /<script>([\s\S]*?)<\/script>/u.exec(bridge.text)?.[1]
+    assert.ok(script, 'The implicit callback bridge includes its static script')
+    const scriptHash = createHash('sha256').update(script).digest('base64')
+    assert.ok(bridge.headers['content-security-policy']?.includes(`script-src 'sha256-${scriptHash}'`), 'The callback CSP permits the exact static bridge script')
+    assert.match(bridge.headers['content-security-policy'], /form-action 'self'/u)
+    assert.ok(script.indexOf('history.replaceState') < script.indexOf('HTMLFormElement.prototype.submit.call'), 'The callback bridge clears the URL fragment before form submission')
+    assert.ok(!bridge.text.includes(fragment.get('id_token')), 'The callback bridge must not embed the ID token')
+    callback = await http(target, {
+      method: 'POST', cookie: flow, origin: portal, body: fragment.toString(),
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    })
+    assert.equal(callback.status, 200, `Implicit OIDC callback failed: ${callback.status}`)
+    assert.ok(callback.headers.location === undefined, 'The completed callback must end the form redirect chain')
+    assert.equal(callback.headers['referrer-policy'], 'no-referrer')
+    assert.match(callback.headers['content-security-policy'], /form-action 'none'/u)
+    assert.ok(!callback.text.includes(fragment.get('id_token')), 'The completed callback page must not embed the ID token')
+    const refresh = /<meta http-equiv="refresh" content="0;url=([^"]+)">/u.exec(callback.text)?.[1]
+    assert.ok(refresh, 'The completed callback page includes its personal handoff target')
+    handoffTarget = new URL(refresh)
+    const expected = new URL(portal)
+    expected.hostname = `u-${id.slice(0, 40)}.${expected.hostname}`
+    assert.equal(handoffTarget.origin, expected.origin)
+    assert.equal(handoffTarget.pathname, '/auth/handoff')
+    assert.equal(handoffTarget.hash, '')
+    assert.deepEqual([...handoffTarget.searchParams.keys()], ['ticket'])
+    assert.ok(handoffTarget.searchParams.get('ticket'), 'The handoff ticket must be nonempty')
+  } else {
+    assert.equal(responseType, 'code')
+    callback = await http(grant.headers.location, { cookie: flow })
+    assert.equal(callback.status, 303, `OIDC callback failed: ${callback.status}`)
+    handoffTarget = new URL(callback.headers.location)
+  }
+  const handoff = await http(handoffTarget, { origin: authorization.origin, headers: { "sec-fetch-site": "cross-site" } })
   assert.equal(handoff.status, 200)
   assert.match(handoff.text, /<meta http-equiv="refresh" content="0;url=\/">/u)
-  const origin = new URL(callback.headers.location).origin
+  const origin = handoffTarget.origin
   const cookie = credential(handoff, 'dsh-sso-dev')
-  const id = createHash('sha256').update(JSON.stringify(['http://localhost:8090', user])).digest('hex')
-  return { origin, cookie, id, container: `${prefix}-${id}` }
+  return { origin, cookie, id, container: `${prefix}-${id}`, flow: responseType === 'code' ? 'code + PKCE' : 'implicit ID token' }
 }
 
 async function rpc(user, method, args) {
@@ -127,7 +176,8 @@ async function main() {
     assert.equal(index.status, 200, 'Personal runtime index')
     assert.match(index.text, /\/auth\/logout/u)
   }
-  passed('OIDC code + PKCE login and separate personal origins: PASS')
+  assert.equal(alice.flow, bob.flow)
+  passed(`OIDC ${alice.flow} login and separate personal origins: PASS`)
   assert.equal((await http(`${bob.origin}/api/session/list`, { cookie: alice.cookie, method: 'POST' })).status, 403)
   assert.equal((await http(`${alice.origin}/api/session/list`, { method: 'POST' })).status, 401)
   assert.equal((await http(`${alice.origin}/api/session/list`, { cookie: alice.cookie, method: 'POST', origin: bob.origin })).status, 403)

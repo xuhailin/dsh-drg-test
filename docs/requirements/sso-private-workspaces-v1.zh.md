@@ -24,6 +24,8 @@
 
 用户选择公司 stable SSO、多人登录且各自私有聊天、保留 DSH 工具能力，以及公司内网 Linux 部署。随后，用户授权在选择服务器和域名前完成 Docker 实现与本地验证。首批交付不依赖真实 SSO 应用注册；本地 mock 提供方用于验证登录流程。
 
+用户确认公司 SSO 不支持授权码流程，并选择兼容现有 EMR 登录方式的 implicit 流程。实现保留授权码作为默认选项，并允许此公司应用使用仅返回 ID token 的 implicit 响应；公司提供方启用授权码流程不是前置条件。
+
 每人需要私有工作区、执行权限和工具交互。本次范围包含现有聊天界面及其支持的命令、文件、终端、审批和子 Agent 流程。平台专属或外部工具是否可用，取决于部署镜像及集成；保留工具不表示所有桌面能力都能在 Linux 使用。
 
 用户选择第一版使用服务端持久化私有数据卷。将聊天迁入 EMR PostgreSQL 数据库或新增 OceanBase 不属于本次交付。验收必须验证重启后保留历史、在另一个浏览器重新登录后看到相同历史，以及跨账号访问被拒绝。用户已批准使用私有 GitLab 项目 [xu.hailin/dsh-drg-test](http://git.sy/xu.hailin/dsh-drg-test)运行 CI 和发布。公司镜像仓库的匿名发起上传探测成功且已取消后，用户选择 CI 仅构建镜像、不上传。服务器和公司域名仍延后选择。
@@ -58,6 +60,8 @@
 
 通过已验证的 issuer 和 subject 解析内部用户身份。显示名、浏览器提供的工号、URL 参数或转发的客户端请求头，不能选择其他用户的运行实例。同一身份重复登录恢复原私有数据；不同 issuer 下相同的 subject 保持区分。
 
+两种已配置的登录流程均须先验证已签名的 ID token，才能创建会话。implicit 模式通过同源 POST 接收 fragment，由网关验证签名、issuer、audience、有效期、nonce 和绑定浏览器的 state。DSH 不需要 EMR 业务 access token，不使用密码授权，也不将 SSO token 保存到 localStorage。
+
 网关拥有身份与实例映射、浏览器会话记录。每个实例拥有自己的 DSH_HOME、DSH_AGENTS_HOME、聊天、附件、设置、用户安装的插件、工作区和终端状态。实例管理器拥有数据卷分配和容器生命周期；私有卷不得挂载到其他用户容器。
 
 index 响应、API、上传、下载、日志导出、预览及 WebSocket 升级采用相同授权。个人运行实例端口不向宿主机发布。网关使用不带路径的入口 origin 及每账号子域名；公司反向代理须保留 Host 并支持升级，详见[部署指南](../user/guide/hosted-workspaces.zh.md#company-services)。
@@ -91,6 +95,7 @@ index 响应、API、上传、下载、日志导出、预览及 WebSocket 升级
 | 容器或服务器重启。 | 从所属数据卷恢复身份映射、私有聊天及文件；另一身份不能认领它们。 |
 | A 检查环境变量、凭据文件或模型错误。 | 不出现上游 DeepSeek Key；最多能看到 A 自己的受限代理凭据；额度仍在 A 的实例之外强制执行。 |
 | A 在后台工具运行时退出。 | 浏览器访问权被撤销，工具仍限制在 A 的运行实例内，界面说明后台工作和文件会保留。 |
+| implicit ID token 被伪造、已到期、audience 不符或被重放。 | 认证失败，不创建浏览器会话，也不选择运行实例。 |
 | SSO、容器启动、模型请求或资源分配失败。 | 相关操作明确报错，不转向其他运行实例、不声称成功，也不删除私有数据。 |
 
 本地验收要求使用两个 mock 身份，经真实 DSH 运行实例完成流式聊天和真实文件／命令工具结果，并观察隔离、持久化、退出及失败结果。单元检查和仅启动容器不能满足该阶段。公司验收还须经过计划采用的入口，完成真实 SSO 和真实 DeepSeek 流式聊天；两个阶段都需要独立用户验收。
@@ -100,7 +105,7 @@ index 响应、API、上传、下载、日志导出、预览及 WebSocket 升级
 
 Docker 是当前实现目标；Kubernetes 不在本次交付范围内。具体 Linux 主机、公司入口域名／TLS、网络／防火墙控制、持久存储配额及运维恢复均延后确定。这些选择均不阻塞本地 mock 组合。
 
-公司集成需要独立的机密 Web 客户端，使用授权码流程、S256 PKCE、`client_secret_basic`、`openid profile`，以及准确的入口 `/auth/callback`；个人子域名无需注册回调。网关不调用提供方退出。[注册清单](../user/guide/hosted-workspaces.zh.md#sso-registration)拥有面向管理员的完整设置。尚未执行真实客户端注册、密钥配置或公司部署。
+公司集成需要管理员为所选流程分配的 OIDC 客户端、匹配的发现／JWKS 元数据，以及准确的入口 `/auth/callback`；个人子域名无需注册回调。用户确认的公司路径使用不需要客户端密钥的 implicit 登录。支持授权码的提供方仍可选择授权码流程。网关不调用提供方退出。[注册清单](../user/guide/hosted-workspaces.zh.md#sso-registration)拥有管理员设置及各流程的密钥要求。真实公司 SSO 验证和部署仍待完成。
 
 <a id="dev-note"></a>
 ## 开发备注
@@ -108,13 +113,21 @@ Docker 是当前实现目标；Kubernetes 不在本次交付范围内。具体 L
 <details>
 <summary>验证工作上下文——点击展开</summary>
 
-本地验证使用 Colima 中 Linux arm64 的 Docker 29.5.2、镜像内 Node 24.21.0，以及 Alice／Bob 合成身份。本记录对应 `codex/sso-private-workspaces` 分支的本次工作区改动；精确修订信息保留在本地验证证据中。
+2026-10-21 的授权码验证基线使用 Colima 中 Linux arm64 的 Docker 29.5.2、镜像内 Node 24.21.0，以及 Alice／Bob 合成身份。本记录对应 `codex/sso-private-workspaces` 分支的本次工作区改动；精确修订信息保留在本地验证证据中。
 
-此包九个文件共 210 项测试通过，语句、分支、函数及行覆盖率均为 100%。Host 构建、聚合检查、定向 lint、包约束、Shell 语法、Compose 配置及已有 Bash 会话的无密钥快照通过。`pnpm run test:docs` 通过 21 项中的 20 项；未修改的 `python/sdk/uv.lock:113` 提交引用触发仓库引用检查失败。
+该基线中，此包九个文件共 210 项测试通过，语句、分支、函数及行覆盖率均为 100%。Host 构建、聚合检查、定向 lint、包约束、Shell 语法、Compose 配置及已有 Bash 会话的无密钥快照通过。`pnpm run test:docs` 通过 21 项中的 20 项；未修改的 `python/sdk/uv.lock:113` 提交引用触发仓库引用检查失败。
 
 Docker smoke 使用真实 Web profile 和 Bash，覆盖模拟模型流式响应、独立账号 origin／历史／卷／网络、拒绝跨账号 Cookie 和会话 ID、默认工作区权限、阻断同伴网络、运行实例与网关重启、重启后模型访问、新登录恢复历史，以及退出登录撤销访问且 Bob 保持连接。浏览器验证确认 SSO 自动跳转、审批仅发给 Alice 且允许后才创建标记文件、正常退出、新登录恢复，以及账号栏不遮挡工具栏；Bob 页面控制台无错误或警告。最终本地镜像在没有开发代码挂载的情况下通过相同 Docker smoke；保留 home 卷并替换容器后，Alice 已审批创建的文件也仍然存在。
 
 单独经过受限模型代理的真实 DeepSeek 请求返回 HTTP 200，SSE 正常结束并包含指定标记，未暴露上游密钥。这与经过公司部署入口的真实模型对话分别验证。Linux 制品使用受限内存构建器生成，修复最后一步 Web 构建调用后从构建检查点恢复；本地镜像更新使用这些 Linux 制品及重建的网关 JavaScript。最终 Dockerfile 的干净构建由 GitLab CI 独立验证，实际运行结果另行报告。
+
+2026-10-21 的 implicit 验证中，九个文件共 253 项测试通过，语句、分支、函数及行覆盖率均为 100%。完整 `pnpm run build` 的九项检查全部通过。新的本地 Linux arm64 镜像通过全部 12 项 implicit Docker smoke 检查，覆盖真实 Bash、并发模型流、跨账号拒绝、独立数据卷与网络、运行实例／网关重启、新登录恢复历史，以及退出仅撤销 Alice 而 Bob 保持连接。授权码 Docker 回归也通过全部 12 项检查并正常退出。
+
+真实 Chromium 浏览器完成 mock implicit 登录，并自动进入个人 DSH URL。浏览器复现了此前回调 POST 后跨 origin 重定向被 CSP 拒绝的问题。验证后的流程在 fragment 中转页保留 `form-action 'self'`，并返回使用 `form-action 'none'` 的 HTTP 200 完成页，再导航至个人 origin 交接地址。个人 URL 不含 fragment，浏览器存储检查未发现名称含 token 的键。
+
+最终 `doc-sync` 通过 43 项中的 41 项，包含文档构建、配对、目录及链接检查。CLI 帮助检查因继承的 SOCKS `ALL_PROXY` 设置产生诊断而失败；仅取消 `ALL_PROXY` 和 `all_proxy` 后，原检查通过。另一项失败仍是未修改的 `python/sdk/uv.lock:113` 仓库引用。
+
+公司 SSO 发现端点可访问，但 `response_type=id_token` 和 `response_type=id_token token` 的授权请求均返回 `invalid_request`。准确回调和应用注册仍待用户确认。现有证据不能说明公司 SSO 已接通；已分配的 scope／回调、JWKS token 验证及公司浏览器独立验收仍待完成。
 
 公司 SSO 注册、公司服务器／TLS 入口、磁盘硬配额、部署防火墙控制、图片附件回退、实际第二台电脑访问、备份恢复及独立用户验收均未验证。Kubernetes、共享 SQL 数据库及生产患者数据使用不属于此次交付。
 
