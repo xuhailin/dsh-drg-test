@@ -29,10 +29,20 @@ chmod 700 "$hosted_builder_dir"
 mkdir -m 700 "$hosted_builder_dir/tools" "$hosted_builder_dir/run"
 export PATH="$hosted_builder_dir/tools:$PATH"
 export XDG_RUNTIME_DIR="$hosted_builder_dir/run"
+# Build state can contain mapped UIDs; the job container owns its removal.
+hosted_state_dir=$(mktemp -d /tmp/dsh-hosted-state.XXXXXX)
+chmod 700 "$hosted_state_dir"
+export XDG_DATA_HOME="$hosted_state_dir"
 unset DOCKER_HOST DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 
 echo 'Hosted image: checking rootless user namespaces'
-rootlesskit sh -c 'test "$(id -u)" -eq 0'
+rootlesskit sh -c '
+  set -eu
+  test "$(id -u)" -eq 0
+  mkdir -p "$XDG_DATA_HOME/buildkit"
+  touch "$XDG_DATA_HOME/buildkit/.write-check"
+  rm "$XDG_DATA_HOME/buildkit/.write-check"
+'
 
 echo 'Hosted image: downloading pinned BuildKit tools'
 # These linux/amd64 layers belong to moby/buildkit:v0.34.1-rootless.

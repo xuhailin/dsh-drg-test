@@ -67,7 +67,7 @@ docker compose -f deploy/hosted-workspaces/compose.yml -f deploy/hosted-workspac
 
 使用 Linux amd64、Docker executor 的 Runner，标签由 `HOSTED_CI_RUNNER_TAG` 指定（默认 `rm-executor`，匹配公司共享 Linux Runner）。使用其他 Runner 时覆盖此变量。镜像构建使用 rootless BuildKit，任务中不挂载 Docker socket，也不启动 DinD 服务。Runner 必须允许其用户命名空间与挂载操作；按 Runner 配置核对 [GitLab BuildKit 要求](https://docs.gitlab.com/ci/docker/using_buildkit/)，并检查镜像任务结果。
 
-镜像任务将官方 Docker rootless 镜像用作 shell 环境，不启动 `dockerd` 或 DinD 服务。它通过 `HOSTED_DOCKER_MIRROR` 获取官方 `moby/buildkit` 镜像中按 SHA-256 固定的层，校验归档后，仅提取 BuildKit 二进制和上游 daemonless 脚本，再以镜像中的非 root 用户运行 BuildKit。启动脚本显式将 `USER` 设为该账号，使 BuildKit 采用其可写的 home 目录。临时工具和运行文件位于构建上下文之外，退出时清理。任务先检查命名空间和构建支持，再构建应用。
+镜像任务将官方 Docker rootless 镜像用作 shell 环境，不启动 `dockerd` 或 DinD 服务。它通过 `HOSTED_DOCKER_MIRROR` 获取官方 `moby/buildkit` 镜像中按 SHA-256 固定的层，校验归档后，仅提取 BuildKit 二进制和上游 daemonless 脚本，再以镜像中的非 root 用户运行 BuildKit。启动脚本显式将 `USER` 设为该账号，并在构建上下文之外分配私有的 `XDG_DATA_HOME` 和 `XDG_RUNTIME_DIR` 目录。工具和运行文件在退出时清理；BuildKit 状态可能含映射后的用户 ID，由任务容器销毁时回收。任务先检查命名空间和构建支持，再构建应用。
 
 `HOSTED_DOCKER_MIRROR` 默认为 `docker-mirror.sh.synyi.com`。两个 CI 任务的镜像，以及 BuildKit 对 Docker Hub 的解析，都使用该拉取代理，包括 Dockerfile 前端与基础镜像。临时 BuildKit 配置位于 Docker 构建上下文之外，任务结束时清理。
 
