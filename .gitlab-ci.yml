@@ -19,6 +19,7 @@ variables:
   # These jobs configure no Docker socket mount or DinD service. Administrator
   # runner policies must permit rootless BuildKit user namespaces and mounts.
   HOSTED_CI_RUNNER_TAG: rm-executor
+  HOSTED_DOCKER_MIRROR: docker-mirror.sh.synyi.com
 
 .python-release:
   rules:
@@ -26,7 +27,7 @@ variables:
 
 hosted-workspaces-check:
   stage: validate
-  image: node:24.21.0-bookworm
+  image: ${HOSTED_DOCKER_MIRROR}/node:24.21.0-bookworm
   tags: [$HOSTED_CI_RUNNER_TAG]
   interruptible: true
   variables:
@@ -49,7 +50,7 @@ hosted-workspaces-check:
 hosted-workspaces-image:
   stage: build
   image:
-    name: moby/buildkit:v0.34.1-rootless
+    name: ${HOSTED_DOCKER_MIRROR}/moby/buildkit:v0.34.1-rootless
     entrypoint: [""]
   tags: [$HOSTED_CI_RUNNER_TAG]
   needs: [hosted-workspaces-check]

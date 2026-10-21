@@ -65,7 +65,9 @@ docker compose -f deploy/hosted-workspaces/compose.yml -f deploy/hosted-workspac
 
 仓库的 [GitLab 流水线](../../../.gitlab-ci.yml)在分支推送和合并请求中检查 hosted-workspaces。受保护的默认分支构建以提交标识为标签的镜像，但不上传；其他受保护分支提供手动镜像任务。既有 Python 发包任务仍仅由 Python 发布标签触发。服务器部署与 SSO 注册须单独配置。
 
-使用 Linux amd64、Docker executor 的 Runner，标签由 `HOSTED_CI_RUNNER_TAG` 指定（默认 `rm-executor`，匹配公司共享 Linux Runner）。使用其他 Runner 时覆盖此变量。镜像构建使用 rootless BuildKit，任务中不挂载 Docker socket，也不启动 DinD 服务。Runner 必须允许其用户命名空间与挂载操作；按 Runner 配置核对 [GitLab BuildKit 要求](https://docs.gitlab.com/ci/docker/using_buildkit/)。既有 EMR 构建已证明 Docker executor 可用；本流水线仍须首次实跑，确认 BuildKit 兼容性。
+使用 Linux amd64、Docker executor 的 Runner，标签由 `HOSTED_CI_RUNNER_TAG` 指定（默认 `rm-executor`，匹配公司共享 Linux Runner）。使用其他 Runner 时覆盖此变量。镜像构建使用 rootless BuildKit，任务中不挂载 Docker socket，也不启动 DinD 服务。Runner 必须允许其用户命名空间与挂载操作；按 Runner 配置核对 [GitLab BuildKit 要求](https://docs.gitlab.com/ci/docker/using_buildkit/)，并检查镜像任务结果。
+
+`HOSTED_DOCKER_MIRROR` 默认为 `docker-mirror.sh.synyi.com`。两个 CI 任务的镜像，以及 BuildKit 对 Docker Hub 的解析，都使用该拉取代理，包括 Dockerfile 前端与基础镜像。临时 BuildKit 配置位于 Docker 构建上下文之外，任务结束时清理。
 
 保护计划采用的默认分支。[镜像构建脚本](../../../deploy/hosted-workspaces/ci-image.sh)将构建元数据保留为 GitLab 任务产物；镜像留在任务的临时 BuildKit 存储中。此过程无需 Registry、公司 SSO 或模型凭据。部署所需的镜像分发须另行选定目标，并满足项目的访问权限要求。
 
