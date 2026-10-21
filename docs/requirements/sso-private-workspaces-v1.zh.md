@@ -110,7 +110,7 @@ Docker 是当前实现目标；Kubernetes 不在本次交付范围内。具体 L
 
 本地验证使用 Colima 中 Linux arm64 的 Docker 29.5.2、镜像内 Node 24.21.0，以及 Alice／Bob 合成身份。本记录对应 `codex/sso-private-workspaces` 分支的本次工作区改动；精确修订信息保留在本地验证证据中。
 
-此包九个文件共 209 项测试通过，语句、分支、函数及行覆盖率均为 100%。Host 构建、聚合检查、定向 lint、包约束、Shell 语法、Compose 配置及已有 Bash 会话的无密钥快照通过。`pnpm run test:docs` 通过 21 项中的 20 项；未修改的 `python/sdk/uv.lock:113` 提交引用触发仓库引用检查失败。
+此包九个文件共 210 项测试通过，语句、分支、函数及行覆盖率均为 100%。Host 构建、聚合检查、定向 lint、包约束、Shell 语法、Compose 配置及已有 Bash 会话的无密钥快照通过。`pnpm run test:docs` 通过 21 项中的 20 项；未修改的 `python/sdk/uv.lock:113` 提交引用触发仓库引用检查失败。
 
 Docker smoke 使用真实 Web profile 和 Bash，覆盖模拟模型流式响应、独立账号 origin／历史／卷／网络、拒绝跨账号 Cookie 和会话 ID、默认工作区权限、阻断同伴网络、运行实例与网关重启、重启后模型访问、新登录恢复历史，以及退出登录撤销访问且 Bob 保持连接。浏览器验证确认 SSO 自动跳转、审批仅发给 Alice 且允许后才创建标记文件、正常退出、新登录恢复，以及账号栏不遮挡工具栏；Bob 页面控制台无错误或警告。最终本地镜像在没有开发代码挂载的情况下通过相同 Docker smoke；保留 home 卷并替换容器后，Alice 已审批创建的文件也仍然存在。
 

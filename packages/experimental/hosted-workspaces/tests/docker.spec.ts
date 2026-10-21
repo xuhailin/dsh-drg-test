@@ -204,6 +204,32 @@ describe('personal Docker runtimes', () => {
     } finally { await owner.dispose() }
   })
 
+  it('uses the configured Docker socket despite ambient remote-host and TLS settings', async () => {
+    const fake = fakeDocker()
+    const daemon = await dockerDaemon(fake.docker)
+    const previous = ['DOCKER_HOST', 'DOCKER_TLS_VERIFY'].map(name => [name, process.env[name]] as const)
+    // Docker reads environment defaults synchronously; restore them before any asynchronous work.
+    const owner = (() => {
+      try {
+        process.env.DOCKER_HOST = 'tcp://127.0.0.1:0'
+        process.env.DOCKER_TLS_VERIFY = '1'
+        return new DockerRuntimes({ ...OPTIONS, socketPath: daemon.socketPath }, { request: fake.request })
+      } finally {
+        for (const [name, value] of previous) {
+          if (value === undefined) Reflect.deleteProperty(process.env, name)
+          else process.env[name] = value
+        }
+      }
+    })()
+    try {
+      for (const [name, value] of previous) expect(process.env[name]).toBe(value)
+      await expect(owner.ensure(USER)).resolves.toMatchObject({ cookie: 'dsh-auth-test=signed-cookie' })
+      expect(daemon.calls.some(call => call.path === '/containers/json')).toBe(true)
+      expect(fake.created).toHaveLength(1)
+      expect(daemon.failures).toEqual([])
+    } finally { await owner.dispose() }
+  })
+
   it('provisions and reuses persistent resources through the real dockerode HTTP client', async () => {
     const fake = fakeDocker()
     const daemon = await dockerDaemon(fake.docker)

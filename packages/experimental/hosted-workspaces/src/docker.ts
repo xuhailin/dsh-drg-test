@@ -182,7 +182,8 @@ function logSince(startedAt: string): string {
 }
 
 function backend(options: DockerRuntimeOptions): DockerRuntimeBackend {
-  const docker = new Docker({ socketPath: options.socketPath, timeout: options.startupTimeoutMs })
+  // dockerode otherwise lets an ambient DOCKER_HOST take precedence over socketPath.
+  const docker = new Docker({ host: undefined, protocol: 'http', socketPath: options.socketPath, timeout: options.startupTimeoutMs })
   const container = (value: Docker.Container): RuntimeContainer => ({
     inspect: () => value.inspect(),
     start: () => value.start(),

@@ -72,7 +72,7 @@ Signing out revokes that browser session and closes its admitted connections. It
 
 The gateway completes authorization-code login with PKCE, nonce, and browser-bound state. It transfers the resulting browser session to the account's separate origin through a short-lived, single-use handoff. The handoff returns a document that starts a fresh same-origin navigation, ending the identity provider's redirect chain. The account/logout row reserves space above the DSH application. HTTP and WebSocket requests reach only the runtime selected by that live session.
 
-Docker owns one named home volume and bridge network per account. Startup checks existing resource ownership and isolation settings before reuse. The model proxy listens on the gateway's concrete personal-network addresses and enforces request limits outside the user container. Failed startup removes resources created by that operation; a cleanup failure requires operator inspection.
+Docker control requests use the configured `dockerSocket` even when the environment defines `DOCKER_HOST` or Docker TLS settings. Docker owns one named home volume and bridge network per account. Startup checks existing resource ownership and isolation settings before reuse. The model proxy listens on the gateway's concrete personal-network addresses and enforces request limits outside the user container. Failed startup removes resources created by that operation; a cleanup failure requires operator inspection.
 
 | Source | Responsibility |
 |---|---|
