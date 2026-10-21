@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for sso-private-workspaces-v1.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/sso-private-workspaces-v1.md
+/sso-and-private-dsh-workspaces-v1:
+  en: 67ce51defda6e8a8
+  zh: 8a832c7c4efb5e79
+/sso-and-private-dsh-workspaces-v1/summary:
+  en: 3d355ea2e7dd50a9
+  zh: 48b62f2f218bc6e1
+/sso-and-private-dsh-workspaces-v1/table-of-contents:
+  en: 5713ffe17320c3c4
+  zh: def32193536b278a
+/sso-and-private-dsh-workspaces-v1/confirmed-scope:
+  en: 4c6074fa048e9aab
+  zh: 14df492f41f182c0
+/sso-and-private-dsh-workspaces-v1/current-implementation:
+  en: 9a885559698e9ab0
+  zh: afa58bf988441e6d
+/sso-and-private-dsh-workspaces-v1/architecture:
+  en: 9e32c0ba4d2c2ff9
+  zh: 0feb912e14218149
+/sso-and-private-dsh-workspaces-v1/identity-and-private-data:
+  en: 33e9454b59c01fbd
+  zh: 3c1bdedbb725c8ae
+/sso-and-private-dsh-workspaces-v1/execution-and-credentials:
+  en: 43810bcc668b8dc2
+  zh: 6ec5517127aa42e4
+/sso-and-private-dsh-workspaces-v1/acceptance:
+  en: 4df7d84382bae14c
+  zh: 903e95982e56ab62
+/sso-and-private-dsh-workspaces-v1/dependencies-and-verification:
+  en: 5560f3fd656b6d0e
+  zh: 390c72eec845029a
+/sso-and-private-dsh-workspaces-v1/dev-note:
+  en: d1a82321d4d218a1
+  zh: 19cb521f005a98bd

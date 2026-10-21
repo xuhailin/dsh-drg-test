@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for hosted-workspaces.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/user/guide/hosted-workspaces.md
+/:
+  en: 74d331bfb6ca6387
+  zh: 363139b05d24e458
+/company-login-and-private-docker-workspaces:
+  en: e8934bacc76c11de
+  zh: a19c636f203dbe8e
+/company-login-and-private-docker-workspaces/summary:
+  en: a56a15df87d12518
+  zh: be6c2ee1a27061c1
+/company-login-and-private-docker-workspaces/table-of-contents:
+  en: 55189cc2d2de34cc
+  zh: e4af2be0e22eeed7
+/company-login-and-private-docker-workspaces/run-the-local-trial:
+  en: 0a1fe1d787dc0666
+  zh: d4069f79f7196ecf
+/company-login-and-private-docker-workspaces/run-the-local-trial/build-and-start:
+  en: e6886a8993f2db84
+  zh: 78fd73c349380b13
+/company-login-and-private-docker-workspaces/run-the-local-trial/try-two-accounts:
+  en: e71f249760191f5f
+  zh: c771a2a2cbbf2508
+/company-login-and-private-docker-workspaces/run-the-local-trial/stop-the-local-portal:
+  en: 6cb2cb8029433be6
+  zh: acd57366d011e177
+/company-login-and-private-docker-workspaces/build-images-with-gitlab-ci:
+  en: 617fc39887e9e1e3
+  zh: e08d559273755b3a
+/company-login-and-private-docker-workspaces/register-the-company-sso-application:
+  en: 02e7246d0a5ec717
+  zh: ab94be79897f86aa
+/company-login-and-private-docker-workspaces/connect-company-services:
+  en: 97098d4548c06a17
+  zh: fd827f76a846a450
+/company-login-and-private-docker-workspaces/isolation-and-operating-limits:
+  en: a32bc10be72bc7e0
+  zh: b6f972f1f8f4ccd2
+/company-login-and-private-docker-workspaces/verify-and-recover:
+  en: ecdba8e0423fa6ad
+  zh: a773c473940681a4
+/company-login-and-private-docker-workspaces/further-exploration:
+  en: cea45aeed7e7dc98
+  zh: eea651712893b47f
+/company-login-and-private-docker-workspaces/dev-note:
+  en: 1a1d039ae378e92f
+  zh: 7cb8c46721d1bbb4

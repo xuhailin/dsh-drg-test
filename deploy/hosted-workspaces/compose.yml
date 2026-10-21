@@ -1,0 +1,72 @@
+name: dsh-hosted-workspaces
+
+services:
+  gateway:
+    image: ${HOSTED_IMAGE:-dsh-hosted-workspaces:local}
+    build:
+      context: ../..
+      dockerfile: deploy/hosted-workspaces/Dockerfile
+      args:
+        DSH_SOURCE_COMMIT: ${DSH_SOURCE_COMMIT:-}
+        NODE_IMAGE: ${NODE_IMAGE:-node:24.21.0-bookworm-slim}
+    command: [gateway]
+    user: '0:0'
+    working_dir: /opt/dsh
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - '127.0.0.1:${HOSTED_PORT:-8080}:8080'
+    networks:
+      default:
+        aliases:
+          - ${HOSTED_ENTRY_HOST:-dsh-hosted-entry}
+    environment:
+      HOME: /data
+      DSH_HOME: /data/dsh
+      DSH_AGENTS_HOME: /data/agents
+      HOSTED_PUBLIC_ORIGIN: ${HOSTED_PUBLIC_ORIGIN:-http://chat.localhost:8080}
+      HOSTED_GATEWAY_PORT: '8080'
+      HOSTED_ENTRY_HOST: ${HOSTED_ENTRY_HOST:-dsh-hosted-entry}
+      HOSTED_IMAGE: ${HOSTED_IMAGE:-dsh-hosted-workspaces:local}
+      HOSTED_PREFIX: ${HOSTED_PREFIX:-dsh-workspace}
+      HOSTED_OIDC_ISSUER: ${HOSTED_OIDC_ISSUER:-}
+      HOSTED_OIDC_DISCOVERY_URL: ${HOSTED_OIDC_DISCOVERY_URL:-}
+      HOSTED_OIDC_CLIENT_ID: ${HOSTED_OIDC_CLIENT_ID:-dsh-workspaces}
+      HOSTED_OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc_client_secret
+      HOSTED_DEEPSEEK_KEY_FILE: /run/secrets/deepseek_api_key
+      HOSTED_ALLOW_HTTP: ${HOSTED_ALLOW_HTTP:-true}
+    volumes:
+      - gateway-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    tmpfs:
+      - /tmp:mode=1777
+    secrets:
+      - oidc_client_secret
+      - deepseek_api_key
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - --input-type=module
+        - -e
+        - >-
+          import { lookup } from 'node:dns/promises';
+          const { address } = await lookup(process.env.HOSTED_ENTRY_HOST, { family: 4 });
+          const response = await fetch('http://' + address + ':8080/healthz');
+          if (!response.ok) process.exit(1);
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  gateway-data:
+
+secrets:
+  oidc_client_secret:
+    file: ${HOSTED_OIDC_CLIENT_SECRET_PATH:-./secrets/oidc_client_secret}
+  deepseek_api_key:
+    file: ${HOSTED_DEEPSEEK_KEY_PATH:-./secrets/deepseek_api_key}

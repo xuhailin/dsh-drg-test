@@ -29,6 +29,9 @@ peerDependencyRules:
 # default and only allow scripts we need. esbuild (native binary) and lefthook
 # (git hooks) genuinely need theirs.
 allowBuilds:
+  # Dockerode uses the local Unix socket; its optional SSH native helpers are unused.
+  cpu-features: false
+  ssh2: false
   esbuild: true
   lefthook: true
   # Cross-platform boundary for the persistent PTY backend, including ConPTY on Windows.

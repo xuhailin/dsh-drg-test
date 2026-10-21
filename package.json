@@ -290,6 +290,7 @@
     "@deepseek-ai/dsh-working-directory": "workspace:*",
     "@deepseek-ai/dsh-experimental-worktree": "workspace:*",
     "@deepseek-ai/dsh-experimental-tool-worktree": "workspace:*",
-    "@deepseek-ai/dsh-experimental-cua-macos": "workspace:*"
+    "@deepseek-ai/dsh-experimental-cua-macos": "workspace:*",
+    "@deepseek-ai/dsh-experimental-hosted-workspaces": "workspace:*"
   }
 }

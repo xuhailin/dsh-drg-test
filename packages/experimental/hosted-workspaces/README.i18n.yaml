@@ -1,0 +1,55 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/hosted-workspaces/README.md
+/:
+  en: 46207ab1604930ac
+  zh: 72b422696b6e708f
+/deepseek-ai-dsh-experimental-hosted-workspaces:
+  en: e623987671e7b0bf
+  zh: 11ed6756780c908e
+/deepseek-ai-dsh-experimental-hosted-workspaces/summary:
+  en: a3af92abe78f71b9
+  zh: 63c4d3db68ea5d12
+/deepseek-ai-dsh-experimental-hosted-workspaces/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 75f067b4c4218355
+/deepseek-ai-dsh-experimental-hosted-workspaces/use-this-package:
+  en: ae8660748ad6f66e
+  zh: 1c224b0fe308b782
+/deepseek-ai-dsh-experimental-hosted-workspaces/use-this-package/profile-supplied-by-the-repository-image:
+  en: 4d2696f012e85c3c
+  zh: c33380e85a3f1afc
+/deepseek-ai-dsh-experimental-hosted-workspaces/use-this-package/configuration:
+  en: 99e8dd209865f41d
+  zh: d64df905e93d146e
+/deepseek-ai-dsh-experimental-hosted-workspaces/use-this-package/identity-and-retained-work:
+  en: c794eb19cb25d9ed
+  zh: 90ef6df7db6e8bd7
+/deepseek-ai-dsh-experimental-hosted-workspaces/understand-the-implementation:
+  en: a228bbacd4c3cff9
+  zh: 01b631e1551e3a82
+/deepseek-ai-dsh-experimental-hosted-workspaces/further-exploration:
+  en: 24893ce6a84d7b1b
+  zh: 5688c853cc9c53e7
+/deepseek-ai-dsh-experimental-hosted-workspaces/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-experimental-hosted-workspaces/model-experience/forwarded-model-requests:
+  en: d2f1d261890b413c
+  zh: 9bed5f02caa98030
+/deepseek-ai-dsh-experimental-hosted-workspaces/model-experience/forwarded-model-requests/what-the-model-sees:
+  en: fa7a3ee6307b0da6
+  zh: fd6b295380d40b48
+/deepseek-ai-dsh-experimental-hosted-workspaces/model-experience/forwarded-model-requests/token-effect:
+  en: c3de77aeab6329bb
+  zh: d1bff2228179fb79
+/deepseek-ai-dsh-experimental-hosted-workspaces/model-experience/forwarded-model-requests/kv-cache-effect:
+  en: fa6b43102a089536
+  zh: 7bf6325f5f7420b9
+/deepseek-ai-dsh-experimental-hosted-workspaces/known-limitations-and-deferred-work:
+  en: 4ce2c829fe32d40e
+  zh: f2d3eefffa9130b3
+/deepseek-ai-dsh-experimental-hosted-workspaces/known-limitations-and-deferred-work/dev-note:
+  en: 24d48cb155374d5f
+  zh: 5433a689fb55461a

@@ -1,0 +1,41 @@
+- insert:
+    - id: webserver
+      name: '@deepseek-ai/dsh-host-webserver'
+      config:
+        host: !!js process.env.HOSTED_BIND_IP
+        port: !!js Number(process.env.HOSTED_GATEWAY_PORT || 8080)
+    - id: storage
+      name: '@deepseek-ai/dsh-storage'
+    - id: storage-json
+      name: '@deepseek-ai/dsh-storage-json'
+      config:
+        root: !!js dshHomePath('storages')
+    - id: storage-domain
+      name: '@deepseek-ai/dsh-storage-domain'
+      config:
+        backend: json
+    - id: hosted-workspaces
+      name: '@deepseek-ai/dsh-experimental-hosted-workspaces'
+      config:
+        publicOrigin: !!js process.env.HOSTED_PUBLIC_ORIGIN
+        image: !!js process.env.HOSTED_IMAGE
+        prefix: !!js process.env.HOSTED_PREFIX || 'dsh-hosted'
+        issuer: !!js process.env.HOSTED_OIDC_ISSUER
+        discoveryUrl: !!js process.env.HOSTED_OIDC_DISCOVERY_URL || undefined
+        clientId: !!js process.env.HOSTED_OIDC_CLIENT_ID
+        clientSecretFile: !!js process.env.HOSTED_OIDC_CLIENT_SECRET_FILE || undefined
+        deepseekKeyFile: !!js process.env.HOSTED_DEEPSEEK_KEY_FILE
+        deepseekBaseUrl: !!js process.env.HOSTED_DEEPSEEK_BASE_URL || 'https://api.deepseek.com/anthropic'
+        allowedModels: !!js JSON.parse(process.env.HOSTED_ALLOWED_MODELS || '["deepseek-flash","deepseek-v4-pro"]')
+        allowHttp: !!js process.env.HOSTED_ALLOW_HTTP === 'true'
+        gatewayContainer: !!js process.env.HOSTED_GATEWAY_CONTAINER || process.env.HOSTNAME
+        gatewayPort: !!js Number(process.env.HOSTED_GATEWAY_PORT || 8080)
+        containerMemoryBytes: !!js Number(process.env.HOSTED_MEMORY_BYTES || 2147483648)
+        containerNanoCpus: !!js Number(process.env.HOSTED_NANO_CPUS || 2000000000)
+        containerPidsLimit: !!js Number(process.env.HOSTED_PIDS_LIMIT || 256)
+        containerTmpBytes: !!js Number(process.env.HOSTED_TMP_BYTES || 268435456)
+        maxUsers: !!js Number(process.env.HOSTED_MAX_USERS || 20)
+        sessionTtlMs: !!js Number(process.env.HOSTED_SESSION_TTL_MS || 43200000)
+        startupTimeoutMs: !!js Number(process.env.HOSTED_STARTUP_TIMEOUT_MS || 120000)
+        maxRequestsPerWindow: !!js Number(process.env.HOSTED_MODEL_REQUESTS_PER_WINDOW || 30)
+        maxConcurrentModelRequests: !!js Number(process.env.HOSTED_MODEL_CONCURRENCY || 2)

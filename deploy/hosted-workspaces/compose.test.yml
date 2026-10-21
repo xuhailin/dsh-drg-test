@@ -1,0 +1,43 @@
+services:
+  gateway:
+    environment:
+      HOSTED_OIDC_ISSUER: http://localhost:8090
+      HOSTED_OIDC_DISCOVERY_URL: http://mock-oidc:8090/.well-known/openid-configuration
+      HOSTED_OIDC_CLIENT_ID: dsh-workspaces
+      HOSTED_ALLOW_HTTP: 'true'
+      HOSTED_DEEPSEEK_BASE_URL: http://mock-model:8091/anthropic
+    depends_on:
+      - mock-oidc
+      - mock-model
+
+  mock-oidc:
+    image: ${HOSTED_IMAGE:-dsh-hosted-workspaces:local}
+    entrypoint: [node, /opt/dsh/packages/experimental/hosted-workspaces/tests/fixtures/mock-oidc.mjs]
+    volumes:
+      - ../../packages/experimental/hosted-workspaces/tests/fixtures/mock-oidc.mjs:/opt/dsh/packages/experimental/hosted-workspaces/tests/fixtures/mock-oidc.mjs:ro
+    ports:
+      - '127.0.0.1:8090:8090'
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:mode=1777
+
+  mock-model:
+    image: ${HOSTED_IMAGE:-dsh-hosted-workspaces:local}
+    entrypoint: [node, /opt/dsh/packages/experimental/hosted-workspaces/tests/fixtures/mock-model.mjs]
+    volumes:
+      - ../../packages/experimental/hosted-workspaces/tests/fixtures/mock-model.mjs:/opt/dsh/packages/experimental/hosted-workspaces/tests/fixtures/mock-model.mjs:ro
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:mode=1777
+
+secrets:
+  oidc_client_secret:
+    file: ../../packages/experimental/hosted-workspaces/tests/fixtures/oidc-client-secret.txt
+  deepseek_api_key:
+    file: ../../packages/experimental/hosted-workspaces/tests/fixtures/deepseek-api-key.txt

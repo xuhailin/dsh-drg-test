@@ -1,17 +1,73 @@
 workflow:
   rules:
     - if: '$CI_COMMIT_TAG =~ /^python-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH && ($CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "web")'
     - when: never
 
 stages:
+  - validate
   - build
   - publish
 
 variables:
   GIT_DEPTH: "0"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  # Company Linux amd64 Docker executor; override the tag for another runner.
+  # These jobs configure no Docker socket mount or DinD service. Administrator
+  # runner policies must permit rootless BuildKit user namespaces and mounts.
+  HOSTED_CI_RUNNER_TAG: rm-executor
+
+.python-release:
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^python-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$/'
+
+hosted-workspaces-check:
+  stage: validate
+  image: node:24.21.0-bookworm
+  tags: [$HOSTED_CI_RUNNER_TAG]
+  interruptible: true
+  variables:
+    ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    DSH_TELEMETRY_DISABLED: "1"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && ($CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "web")'
+  before_script:
+    - npm install --global pnpm@11.28.5
+    - pnpm install --frozen-lockfile
+  script:
+    - pnpm exec tsc -b packages/experimental/hosted-workspaces/tsconfig.json
+    - pnpm exec vitest run packages/experimental/hosted-workspaces/tests --maxWorkers=1 --coverage --coverage.include='packages/experimental/hosted-workspaces/src/**/*.ts'
+    - sh -n deploy/hosted-workspaces/entrypoint.sh
+    - sh -n deploy/hosted-workspaces/build-image.sh
+    - sh -n deploy/hosted-workspaces/ci-image.sh
+
+hosted-workspaces-image:
+  stage: build
+  image:
+    name: moby/buildkit:v0.34.1-rootless
+    entrypoint: [""]
+  tags: [$HOSTED_CI_RUNNER_TAG]
+  needs: [hosted-workspaces-check]
+  variables:
+    BUILDKITD_FLAGS: --oci-worker-no-process-sandbox
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && ($CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "web")'
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_BRANCH && ($CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "web")'
+      when: manual
+      allow_failure: true
+  script:
+    - sh deploy/hosted-workspaces/ci-image.sh
+  artifacts:
+    paths: [hosted-build.json]
+    expire_in: 1 week
 
 .python-tools:
+  extends: .python-release
   before_script:
     - python3 -m venv .ci-python
     - . .ci-python/bin/activate
@@ -116,6 +172,7 @@ runtime-macos-x64:
       artifacts: true
 
 runtime-windows-x64:
+  extends: .python-release
   stage: build
   tags: [windows-x64]
   variables:
@@ -153,6 +210,7 @@ runtime-windows-x64:
     expire_in: 1 week
 
 publish-python:
+  extends: .python-release
   stage: publish
   tags: [linux-x64]
   resource_group: python-release

@@ -1,0 +1,13 @@
+{
+  "name": "dsh-profile-gateway",
+  "private": true,
+  "type": "module",
+  "dependencies": {},
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-experimental-hosted-workspaces"
+      ]
+    }
+  }
+}
