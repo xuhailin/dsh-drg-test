@@ -9,6 +9,12 @@ if [ "$(id -u)" -eq 0 ]; then
   echo 'The image build requires a non-root job user' >&2
   exit 1
 fi
+if ! hosted_builder_user=$(id -un); then
+  echo 'The image build could not determine the current account name' >&2
+  exit 1
+fi
+# BuildKit chooses user state directories only when USER names a non-root account.
+export USER="$hosted_builder_user"
 if [ ! -w . ]; then
   echo 'The image build requires a writable project checkout' >&2
   exit 1
