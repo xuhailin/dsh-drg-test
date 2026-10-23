@@ -485,3 +485,13 @@ it.each([
   expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: manifest.files!.filter(file => file !== entry) } }))
     .toEqual([expect.stringContaining('package.json files must be')])
 })
+
+it('requires each served Synyi brand asset in the published payload', () => {
+  const dir = 'packages/client/ui-brand-synyi'
+  const manifest = JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')) as WorkspaceManifest['manifest']
+  expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
+  for (const asset of ['assets/favicon.svg', 'assets/favicon-dark.svg', 'assets/manifest.webmanifest']) {
+    expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: manifest.files!.filter(file => file !== asset) } }))
+      .toEqual([expect.stringContaining('package.json files must be')])
+  }
+})

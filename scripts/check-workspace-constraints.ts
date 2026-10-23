@@ -195,6 +195,8 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-client-ui-sidebar-terminal': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-web': ['lib/**/*.css', 'lib/apply-injections.js'],
   '@deepseek-ai/dsh-client-ui-theme': ['lib/styles'],
+  // Public Web metadata resolves these exact packaged brand resources.
+  '@deepseek-ai/dsh-client-ui-brand-synyi': ['assets/favicon.svg', 'assets/favicon-dark.svg', 'assets/manifest.webmanifest'],
   // The physical-key protocol is a public entry usable without the browser service.
   '@deepseek-ai/dsh-client-shortcuts': ['lib/protocol.js'],
   // Clinical browser consumers use neutral JSON entries without loading Host services.

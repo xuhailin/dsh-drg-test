@@ -1,6 +1,6 @@
 {
-  "name": "森亿智能",
-  "short_name": "SYNYI",
+  "name": "DeepSeek Harness",
+  "short_name": "DSH",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

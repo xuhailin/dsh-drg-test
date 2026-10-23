@@ -53,6 +53,8 @@ kind: "package-reference"
 
 [配置 schema](src/config.ts) 校验部署限制。要用 MCP 替换 HTTP 证据读取，可挂载 [EncounterReader](../emr-encounter/README.zh.md) 的实现，然后选择 `readerMode: provided`。浏览器启动授权仍使用代理。
 
+[托管临床 overlay](../../../deploy/hosted-workspaces/clinical.runtime.patch.yml) 为新建就诊 Session 选择 `clinical-review`。其 [preset 生成器](../../../deploy/hosted-workspaces/clinical-presets.mjs) 保留已安装 `standard` preset 的工具和策略，将编码角色替换为临床核查指令。profile 中对 `standard` 保存的修改不会带入此独立 preset；请直接配置 `clinical-review`。公司模型部署为此 preset 应用相同压缩策略。已有就诊 Session 保留其保存的 preset。授权、证据校验和持久化核查状态仍由 Host 负责。
+
 ### 接入、核查与刷新
 
 [EMR 接入插件](../client-emr-entry/README.zh.md) 打开就诊并提供核查操作。`/api/clinical-review/` 下的已认证 POST 路由接收 JSON：`launch` 接收经校验的 EMR 启动声明；`review` 接收 `sessionId`、`eventId` 和 `trigger`（`manual-review` 或 `discharge-order`）；`refresh` 接收 `sessionId` 和 `eventId`；`status` 接收 `sessionId`。响应不缓存。以 `trigger: open` 打开时只绑定元数据，不读取临床正文，也不唤醒模型。
@@ -111,7 +113,7 @@ Session 刷盘结果不确定时停止后续核查操作，并报告 `durability
 
 #### 模型看到的内容
 
-已绑定 Agent 获得资料清单、原文阅读、问题提交和报告读取工具。显式核查会追加持久化用户消息，要求以 `reviewLanguage` 进行有证据依据的分析。来源元数据包含覆盖范围、截止时间、版本和来源引用；原文仅通过已记录的工具结果进入会话。报告将所有问题标为 `pending-human-review`，两种计算均标为 `unavailable`。
+已绑定 Agent 获得资料清单、原文阅读、问题提交和报告读取工具。新建托管临床 Session 使用临床核查角色及既有通用工具。显式核查会追加持久化用户消息，要求以 `reviewLanguage` 进行有证据依据的分析。来源元数据包含覆盖范围、截止时间、版本和来源引用；原文仅通过已记录的工具结果进入会话。报告将所有问题标为 `pending-human-review`，两种计算均标为 `unavailable`。
 
 #### Token 影响
 

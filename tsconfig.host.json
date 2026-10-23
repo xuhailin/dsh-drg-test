@@ -9,6 +9,7 @@
   },
   "include": [
     "apps/web/tests/clinical-results.e2e.ts",
+    "apps/web/tests/synyi-presentation.e2e.ts",
     "apps/web/tests/collapse-timing.e2e.ts",
     "apps/web/tests/notice-wake-tail.e2e.ts",
     "apps/web/tests/fold-blank-matrix.e2e.ts",
@@ -477,6 +478,9 @@
     { "path": "./packages/bundle/sdk-app" },
     { "path": "./packages/bundle/sdk-minimal" },
     { "path": "./packages/bundle/web-app" },
+    { "path": "./packages/bundle/synyi-web-app" },
+    { "path": "./packages/client/ui-brand-synyi/tsconfig.host.json" },
+    { "path": "./packages/client/ui-theme-synyi/tsconfig.host.json" },
     { "path": "./packages/boot/app-boot" },
     { "path": "./packages/boot/cmdline" },
     { "path": "./packages/sdk/server" },

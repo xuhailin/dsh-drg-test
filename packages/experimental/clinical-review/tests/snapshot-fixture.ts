@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { LlmAdapter, ToolCallId, type GenerateOptions, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
@@ -12,6 +13,8 @@ import { reviewProjection } from '../src/projection.ts'
 import { resultProjection } from '../src/result-projection.ts'
 import { registerReviewTools } from '../src/tools.ts'
 import { Config as ReviewConfig } from '../src/config.ts'
+import * as Persona from '@deepseek-ai/dsh-persona'
+import { generateClinicalPreset } from '../../../../deploy/hosted-workspaces/company-presets.mjs'
 
 export const name = 'clinical-review-snapshot-fixture'
 export const inject = ['agents', 'sessions', 'sessionProjections', 'tools', 'llm']
@@ -43,6 +46,12 @@ class ScriptedModel extends LlmAdapter {
   }
   override async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     options.signal?.throwIfAborted()
+    const agent = this.ctx.agents.requireInitiator()
+    const tools = new Set(this.ctx.tools.schemas(agent).map(tool => tool.name))
+    for (const name of [process.platform === 'win32' ? 'pwsh' : 'bash', 'read', 'grep', 'web_search', 'review_load_case']) {
+      if (!tools.has(name)) throw new Error(`Clinical preset lost ${name}`)
+    }
+    if (!JSON.stringify(options.messages).includes('You are a clinical record review assistant')) throw new Error('Clinical preset persona missing from model request')
     const calls = [
       { name: 'review_load_case', args: {} },
       { name: 'review_submit_findings', args: { revision: 1, caseRevision: digest, summary: '尚需读取原文后确认。',
@@ -84,6 +93,10 @@ class ScriptedModel extends LlmAdapter {
 
 /** Mount synthetic external inputs around the production review service and scoped tools. */
 export function apply(ctx: Context, config: { scriptModel: boolean; saveResult: boolean }): void {
+  const preset = generateClinicalPreset(fileURLToPath(new URL('../../../../', import.meta.url)))
+  const persona = preset.config.plugins.find(row => row.id === 'persona')
+  if (persona === undefined) throw new Error('Clinical preset persona unavailable')
+  const personaConfig = Persona.Config(persona.config as Persona.Config)
   new SyntheticReader(ctx)
   ctx.sessionProjections.register(reviewProjection)
   ctx.sessionProjections.register(resultProjection)
@@ -96,6 +109,7 @@ export function apply(ctx: Context, config: { scriptModel: boolean; saveResult: 
   if (config.scriptModel) ctx.llm.registerAdapter(['clinical-fixture'], new ScriptedModel(ctx, config.saveResult))
   ctx.on('agent/created', async ({ agent }) => {
     if (!ctx.agents.roots().includes(agent)) return
+    await agent.ctx.plugin(Persona, personaConfig)
     appendPluginRecord(agent.session, 'plugin:clinical-review/state', {
       schemaVersion: 1, ownerSessionId: agent.id, caseRef: 'synthetic-case', binding, revision: 1, status: 'reviewing', snapshot,
       report: null, history: [], readRanges: [], operations: [{ eventId: 'synthetic-review', trigger: 'manual-review', status: 'dispatched', revision: 1 }],

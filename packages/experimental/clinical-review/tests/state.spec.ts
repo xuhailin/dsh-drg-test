@@ -52,8 +52,12 @@ async function setup(overrides: Partial<Config> = {}) {
     await ctx.agents.register(agent)
     return agent
   }
+  const create = vi.fn(async ({ sessionId }: { sessionId: ReturnType<typeof SessionId>; agentPreset?: string }) => {
+    await makeAgent(sessionId)
+    return { sessionId }
+  })
   ctx.provide('sessionController', {
-    create: async ({ sessionId }: { sessionId: ReturnType<typeof SessionId> }) => { await makeAgent(sessionId); return { sessionId } },
+    create,
     resolveAgent: async (id: ReturnType<typeof SessionId>) => { const agent = ctx.agents.get(id); return agent === undefined ? { error: new Error('missing') } : { agent } },
   })
   const flush = vi.fn(async () => {})
@@ -70,10 +74,20 @@ async function setup(overrides: Partial<Config> = {}) {
     await expect.poll(() => review.require(agent).status).toBe('reviewing')
     return receipt
   }
-  return { ctx, review, agent, followup, capture, access, attach, flush, start, signal, makeAgent, opened }
+  return { ctx, review, agent, followup, capture, access, attach, flush, start, signal, makeAgent, opened, create }
 }
 
 describe('encounter review admission and durable state', () => {
+  it('selects the configured preset only for a new encounter Session and retains an existing Session on reopen', async () => {
+    const { ctx, agent, access, attach, create, signal } = await setup({ agentPreset: 'standard' })
+    expect(create).toHaveBeenCalledExactlyOnceWith({ sessionId: agent.id, cwd: config.cwd, agentPreset: 'standard' })
+    const updated = new ClinicalReviewService(ctx, Object.assign({}, config, { agentPreset: 'clinical-review' }), access, attach)
+    await updated.launch({ ...claim, eventId: 'reopen' }, signal)
+    expect(create).toHaveBeenCalledTimes(1)
+    const fresh = await setup({ agentPreset: 'clinical-review' })
+    expect(fresh.create).toHaveBeenCalledExactlyOnceWith({ sessionId: fresh.agent.id, cwd: config.cwd, agentPreset: 'clinical-review' })
+  })
+
   it('keeps an immutable result link readable after the same encounter receives a renewed binding', async () => {
     const { review, agent, start, signal, access } = await setup()
     await start()

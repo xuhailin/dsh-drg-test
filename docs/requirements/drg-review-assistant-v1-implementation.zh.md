@@ -155,6 +155,14 @@ EMR 出院事务独立于核查执行。如果等待模型、取数、人工回�
 <a id="dev-note"></a>
 ## 开发备注
 
+临床结果查看器合并后的扩展收拢已实现。森亿品牌和主题与共享默认值分离；新临床会话使用生成的 `clinical-review` preset，并保留现有通用工具及公司模型策略。已有会话继续使用记录的 preset，不转换留存数据。
+
+独立工作单元为主题抽离、品牌抽离和临床 preset 生成；随后集成部署组合，以本地构建、Loader 组合、会话快照回放和浏览器检查验证整体结果。现有临床插件、结果查看器、患者授权、通用页面注册及共享 UI 修正继续由当前模块负责。本次实现不包含提交、推送或部署。
+
+验收要求：森亿 profile 保持外观及页面资源，普通 Web 组合使用上游默认值，新临床会话获得临床角色及现有工具，历史报告仍然可读。2026-10-23 在 macOS、`main` 的 `b4b9721a` 加本次收拢工作区改动上，本地定向测试、会话快照回放、运行时依赖检查、`build:artifacts`、随后的 `build:check` 和 lint 均通过。两个临床结果浏览器场景验证了新 preset、通用工具、报告历史及撤销访问；三个展示场景通过 CLI 依赖闭包连续验证两轮，覆盖根路径、代理前缀、首帧、深色重载、主题切换及默认 Web 隔离。经过认证的源码 CLI 冒烟验证了隔离 profile 下的品牌元数据和打包 manifest。
+
+`doc-sync` 的 42 项检查通过，仅有 `python/sdk/uv.lock` 原有的仓库引用失败；hygiene 的 20 项检查通过，仍有原有 vendor-rescope 失败。公司本地网关及活动私有实例现已使用 `dsh-hosted-workspaces:clinical-preset-20261023`，在既有 Linux 镜像上叠加已验证的可移植产物，外部依赖版本不变。网关及 home 卷已备份并保留，当前科室授权、旧容器和其他环境均保留。浏览器通过已有登录重新连接，历史会话、森亿展示、`Clinical review` 和公司 `gpt-5.5` 均可见。未发起新的模型核查；重新登录 SSO、完整 Docker 编译及外部部署仍未验证。实现完成，待用户独立验收。[升级指南](../upgrade-guide/v0.2.1-rc.2/synyi-web-composition/guide.zh.md)说明显式组合方式和旧会话行为。
+
 2026-10-22 在 `codex/sso-private-workspaces` 分支验证，采用 macOS 本地发布及端口 38080 的 Linux Docker 试验。官方 PDF 已归档为 `chs-drg-3.0-source-r1`，SHA-256 为 `82b5d179d797e2b9586b337d628c20177c85f43738529159c906fd0ef8432e41`，SQLite 仅含来源元数据，`groupingReady=false`。非 root Linux 容器内发布也已通过。试验使用合成 OIDC／模型服务，与既有公司 SSO 环境独立。
 
 资料／运行实例聚焦测试通过 375 项，新资料库及变更的配置／实例组合文件四项覆盖率均为 100%。15 项真实 Docker 流程验证了 Alice／Bob 及新 Session 读取相同原件、Bash／文件／SQLite 写入拒绝、精确只读挂载、staging／他人数据不可访问、网关重启，以及个人容器重建后保留 home／历史。离线 CLI 验证覆盖重复 ID／错误摘要拒绝、两个修订、默认回滚、撤回／恢复、原件字节不变，以及备份复制后核验。手工编写的 `shared-national-reference` Session 快照已通过发布的 headless profile 回放。

@@ -2,11 +2,11 @@
 
 [English](web-styling.md) | 中文
 
-本文规定浏览器客户端包的样式职责归属与组件规则。当前 token 值位于 [`packages/client/ui-theme/src/styles/`](../packages/client/ui-theme/src/styles/)；本文不重复这份由源码生成的清单。
+本文规定浏览器客户端包的样式职责归属与组件规则。默认 token 值位于 [`packages/client/ui-theme/src/styles/`](../packages/client/ui-theme/src/styles/)；本文不重复这份由源码生成的清单。
 
 ## 职责归属
 
-[`ui-theme`](../packages/client/ui-theme/README.zh.md) 负责 `--dsw-*` 静态色阶、语义别名、排版、动效、渐变、阴影、滚动条样式以及明暗主题偏好。[`ui-layout`](../packages/client/ui-layout/README.zh.md) 将解析后的主题快照应用到文档。功能包使用语义别名，不得另行定义全局主题。
+[`ui-theme`](../packages/client/ui-theme/README.zh.md) 负责默认的 `--dsw-*` 静态色阶、语义别名、排版、动效、渐变、阴影、滚动条样式以及明暗主题偏好。[`ui-theme-synyi`](../packages/client/ui-theme-synyi/README.zh.md) 等部署主题通过 `ctx.theme.overrideTokens` 覆盖 token 值，同时保留标准主题对偏好的管理。[`ui-layout`](../packages/client/ui-layout/README.zh.md) 将解析后的主题快照应用到文档。功能包使用语义别名，不得另行定义全局主题。
 
 全局样式表归 `ui-theme/src/styles/` 所有。组件样式以 CSS Modules 形式放在组件旁。当某个值属于该组件的布局或呈现约定时，组件可以定义局部自定义属性；共享颜色、排版、层级和动效属于主题包。
 
@@ -25,7 +25,7 @@
 - 高层级表面（菜单、浮层、对话框、面板、悬浮按钮、输入框）设 `border: 0` 并使用 `box-shadow: var(--dsw-elevation-panel)`、`var(--dsw-elevation-prominent)` 或输入框专用的 `var(--dsw-elevation-soft)`（更大模糊、更低透明度）：0.5px 发丝描边是第一层投影，`--dsw-elevation-stroke-color` 可按表面或状态重绑或抑制描边。不得将 `--dsw-alias-border-*` border 与 lv/elevation 投影配对——ui-theme 的 elevation spec 会拒绝；状态色 border（warn 面板）保持真 border。
 - 存量和新增的下拉菜单、上下文菜单、子菜单及选择菜单使用 `Menu`，自定义内容用 `MenuSurface` 包裹。材质由主题的 `--dsw-menu-surface-fill` 和 `--dsw-menu-backdrop-filter` 组成；功能及平台 CSS 不得覆盖两者。ui-theme 菜单检查拒绝未使用共享容器的 menu/listbox 渲染、材质覆盖和 token 重定义。计划任务自有的 `TaskMenu` 与 `ClockPicker` 是明确例外，保留现有容器和材质（[所属包](../packages/client/ui-schedule/README.zh.md)）。
 - 设置、确认框等模态弹窗保留黑色半透明遮罩，不模糊背景。主题将 `--dsw-mask-blur` 设为 `none`；Desktop 自有模态浮层也不对父页面施加模糊。
-- 菜单背景模糊绘制在独立图层上，保证嵌套菜单和 fixed 浮层的定位及背景采样。macOS 上，`MenuSurface` 仅在各菜单范围内、页面内容后方添加实色底层，使 Chromium 能在原生透明材质上模糊页面内容；CSS 锚点跟随位置及尺寸，卸载时移除底层。没有该底层的浮层使用 `--dsw-specific-menu`，主题在 macOS 上将其设为 96% 不透明度，防止下方文字透出。其他使用该填充的浮起表面也须配套同一模糊；包含 fixed 浮层时，将两者绘制在独立背景层上。
+- 菜单背景模糊绘制在独立图层上，保证嵌套菜单和 fixed 浮层的定位及背景采样。macOS 上，`MenuSurface` 仅在各菜单范围内、页面内容后方添加实色底层，使 Chromium 能在原生透明材质上模糊页面内容；CSS 锚点跟随位置及尺寸，卸载时移除底层。没有该底层的浮层使用 `--dsw-specific-menu`，主题在 macOS 上将其设为 94% 不透明度，防止下方文字透出。其他使用该填充的浮起表面也须配套同一模糊；包含 fixed 浮层时，将两者绘制在独立背景层上。
 - 使用中性 `--dsw-alias-border-*` token 的平面边框与分割线一律 `0.5px`——按钮、输入框、卡片、行分割线，以及以填充盒绘制的分隔线（菜单分隔、对话标题栏接缝、markdown `hr`、竖向轨道线）共用发丝线粗细，Chromium 将其绘制为一个设备像素。dashed 记号与状态色 border 保持 1px；spinner 圆环经 spec 的显式豁免保留原宽度。更宽的中性 solid border 会被 ui-theme elevation spec 拒绝。
 - 可点击产物链接（Markdown 锚点、正文文件引用、网页来源与抓取链接、产物 chips、workflow 成员链接）经 `--dsw-alias-link` 着色、`font-weight: 500`，默认无下划线，hover/focus 时为 3px offset 的点状下划线。紧凑 Thinking Markdown 保持 tertiary 文字色和默认点状下划线（[紧凑展示](../packages/client/ui-primitives/README.zh.md#rendering-agent-output)）。带文字的锚点另以 ui-primitives 的 `LinkIconMedium` 分类图形（随 `currentColor`）作前置；目的地是已知外部站点时改用该站点自己的标记而非地球；workflow 成员链接与只包图片的锚点不带图形，工具行文件链接保持其灰色点线示能。
 
@@ -36,4 +36,4 @@
 
 ## 变更系统
 
-在所属 `ui-theme` 样式表中添加或修改共享 token，然后在功能包中使用其语义别名。公共样式约定发生变化时，更新所属包的参考文档。视觉行为遵循[测试策略](testing.zh.md)；[已归档的样式系统 Agent Note](../.agents/notes/archived/process/2026-07-19-web-styling-system.md) 记录框架依据。
+在所属 `ui-theme` 样式表中添加或修改共享默认 token，然后在功能包中使用其语义别名。部署专用的配色和几何值放在独立主题插件中，token 覆盖层同时提供浅色和深色值。公共样式约定发生变化时，更新所属包的参考文档。视觉行为遵循[测试策略](testing.zh.md)；[已归档的样式系统 Agent Note](../.agents/notes/archived/process/2026-07-19-web-styling-system.md) 记录框架依据。

@@ -1,0 +1,15 @@
+{
+  "name": "森亿智能",
+  "short_name": "SYNYI",
+  "start_url": "../",
+  "scope": "../",
+  "display": "fullscreen",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

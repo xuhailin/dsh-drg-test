@@ -25,9 +25,9 @@ This package displays the Synyi logo in the sidebar and conversation welcome scr
 <a id="use-this-package"></a>
 ## Use this package
 
-The Web application bundle mounts this plugin in place of `ui-brand-official`. It applies to all client build profiles and has no configuration fields.
+Mount this plugin through a deployment bundle or profile patch, and disable `ui-brand-official` in that composition. The default Web bundle keeps the official brand. This plugin requires the Host Web server and has no configuration fields.
 
-The sidebar and welcome screen use the supplied Synyi mark from EMR. The brand name uses the shared theme's text color in light and dark mode. Browser icons and install metadata belong to `apps/web`. Complete repository builds use 森亿智能 as the document title; `DSH_CLIENT_TITLE` overrides it at build time.
+The sidebar and welcome screen use the supplied Synyi mark from EMR. The brand name uses the shared theme's text color in light and dark mode. The Host serves the package's light/dark favicons and install manifest under `synyi-brand/`, replacing the shell's brand links. Relative URLs preserve a reverse proxy's application path. Set `DSH_CLIENT_TITLE=森亿智能` for the deployment's complete default-profile build; the official build profile retains the official title.
 
 -----
 
@@ -37,7 +37,7 @@ The sidebar and welcome screen use the supplied Synyi mark from EMR. The brand n
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The browser entry waits for each owning slot declaration before contributing artwork. The sidebar mark and name register together; the welcome mark registers independently. Declaration teardown and plugin disposal remove their occupants. The node entry contributes no Host behavior. The bundled PNG preserves the supplied Synyi artwork.
+The browser entry waits for each owning slot declaration before contributing artwork. The sidebar mark and name register together; the welcome mark registers independently. Declaration teardown and plugin disposal remove their occupants. The Host loads packaged assets during activation; missing files fail activation. GET and HEAD serve those assets, other methods return 405, and plugin disposal removes their routes and index transform. The bundled PNG preserves the supplied Synyi artwork.
 
 </details>
 
@@ -68,7 +68,8 @@ None; this package neither assembles nor sends a provider request.
 Brand presentation uses one deployment identity.
 
 - **One brand plugin** — do not mount another occupant for the same brand slots.
-- **Browser metadata is separate** — slot contributions do not change the browser title, favicon, or install manifest.
+- **Title is build-time** — the deployment supplies the same `DSH_CLIENT_TITLE` to the Web shell and client plugins; loading the brand plugin alone does not change document titles.
+- **HTTP shell required** — asset routes and metadata replacement apply to the Host-served Web document; standalone static-worker shells do not run the index transform.
 
 <a id="dev-note"></a>
 ### Dev Note

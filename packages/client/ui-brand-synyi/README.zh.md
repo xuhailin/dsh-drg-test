@@ -25,9 +25,9 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-Web 应用 bundle 挂载本插件以替代 `ui-brand-official`。本插件适用于所有客户端构建 profile，没有配置字段。
+通过部署 bundle 或 profile patch 挂载本插件，并在该组合中禁用 `ui-brand-official`。默认 Web bundle 保留官方品牌。本插件依赖 Host Web 服务器，没有配置字段。
 
-侧栏和欢迎页使用 EMR 提供的森亿标志。品牌名称在浅色和深色模式下均使用共享主题的文字颜色。浏览器图标与安装元数据由 `apps/web` 持有。完整仓库构建默认使用“森亿智能”作为文档标题；构建时可通过 `DSH_CLIENT_TITLE` 覆盖。
+侧栏和欢迎页使用 EMR 提供的森亿标志。品牌名称在浅色和深色模式下均使用共享主题的文字颜色。Host 在 `synyi-brand/` 下提供本包的浅色/深色 favicon 与安装 manifest，并替换应用外壳的品牌链接。相对 URL 保留反向代理的应用路径。部署使用默认构建 profile 完整构建时设置 `DSH_CLIENT_TITLE=森亿智能`；官方构建 profile 保留官方标题。
 
 -----
 
@@ -37,7 +37,7 @@ Web 应用 bundle 挂载本插件以替代 `ui-brand-official`。本插件适用
 <details>
 <summary>实现细节——点击展开</summary>
 
-浏览器入口等待各所属 slot 声明后提供品牌图形。侧栏标志与名称一起注册，欢迎页标志独立注册。声明卸载和插件销毁都会移除相应填充。node 入口不提供 Host 行为。内置 PNG 保留所提供的森亿原始图形。
+浏览器入口等待各所属 slot 声明后提供品牌图形。侧栏标志与名称一起注册，欢迎页标志独立注册。声明卸载和插件销毁都会移除相应填充。Host 在激活时加载包内资源，缺失文件会使激活失败。GET 与 HEAD 提供这些资源，其他方法返回 405；插件销毁时移除路由和 index 转换。内置 PNG 保留所提供的森亿原始图形。
 
 </details>
 
@@ -68,7 +68,8 @@ Web 应用 bundle 挂载本插件以替代 `ui-brand-official`。本插件适用
 品牌呈现使用单一部署身份。
 
 - **一个品牌插件**——不要为相同品牌 slot 挂载其他填充。
-- **浏览器元数据独立**——slot 填充不改变浏览器标题、favicon 或安装 manifest。
+- **标题在构建时确定**——部署为 Web 外壳和客户端插件提供相同的 `DSH_CLIENT_TITLE`；仅加载品牌插件不会改变文档标题。
+- **需要 HTTP 外壳**——资源路由与元数据替换适用于 Host 提供的 Web 文档；独立静态 worker 外壳不会执行 index 转换。
 
 <a id="dev-note"></a>
 ### 开发备注

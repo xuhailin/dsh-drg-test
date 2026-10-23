@@ -16,6 +16,9 @@ export interface ProductPackagePolicy {
  * Optional integrations may be reached by an optional bundle without becoming default capabilities.
  */
 export const PRODUCT_PACKAGE_POLICY: Readonly<Record<string, ProductPackagePolicy>> = {
+  'packages/bundle/synyi-web-app': { category: 'optional', reason: 'Explicit Synyi Web deployment presentation layer.' },
+  'packages/client/ui-brand-synyi': { category: 'optional', reason: 'Brand presentation selected by the Synyi Web bundle.' },
+  'packages/client/ui-theme-synyi': { category: 'optional', reason: 'Theme tokens selected by the Synyi Web bundle.' },
   'packages/browser-use/browser-use': { category: 'optional', reason: 'Service definition used by explicitly selected browser providers.' },
   'packages/computer-use/computer-use': { category: 'optional', reason: 'Service definition used by explicitly selected computer providers.' },
   'packages/lsp/lsp': { category: 'optional', reason: 'Service definition for deployment-configured language servers.' },

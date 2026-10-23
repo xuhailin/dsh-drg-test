@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/ui-theme-synyi/README.md
+/:
+  en: 31c32a6de79e97f0
+  zh: 7bbab3b601d4d0a3
+/deepseek-ai-dsh-client-ui-theme-synyi:
+  en: 9b542a91df005ba7
+  zh: 72ca1f8cd4a0cfc4
+/deepseek-ai-dsh-client-ui-theme-synyi/summary:
+  en: 185e589562b076b8
+  zh: 3cf340f2a2443ea7
+/deepseek-ai-dsh-client-ui-theme-synyi/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 163a0cde788a99a5
+/deepseek-ai-dsh-client-ui-theme-synyi/use-this-package:
+  en: 64ab4cdf1d85c1ca
+  zh: 6509a2c7d54e1a6b
+/deepseek-ai-dsh-client-ui-theme-synyi/understand-the-implementation:
+  en: c72989ed1967c3b4
+  zh: 4c718ef7ba3a266a
+/deepseek-ai-dsh-client-ui-theme-synyi/further-exploration:
+  en: 92f3c4045bace7ba
+  zh: 39c4c310b3800f7a
+/deepseek-ai-dsh-client-ui-theme-synyi/model-experience:
+  en: f221b2c4014597fc
+  zh: f221b2c4014597fc
+/deepseek-ai-dsh-client-ui-theme-synyi/model-experience/kv-cache-effect:
+  en: b1339a7e8bc090f8
+  zh: 7a591ada45ab01a2
+/deepseek-ai-dsh-client-ui-theme-synyi/known-limitations-and-deferred-work:
+  en: 7f7b3f3e7eea50b3
+  zh: 25afc201f5008f5f
+/deepseek-ai-dsh-client-ui-theme-synyi/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: e88aeb617ffb74ea

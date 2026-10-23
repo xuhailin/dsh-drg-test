@@ -15,6 +15,7 @@ RUN apt-get update \
 WORKDIR /opt/dsh
 COPY . .
 ARG DSH_SOURCE_COMMIT
+ARG DSH_CLIENT_TITLE=森亿智能
 ENV CI=true \
     ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
@@ -22,7 +23,7 @@ RUN test -n "$DSH_SOURCE_COMMIT" \
     || { echo 'DSH_SOURCE_COMMIT is required; use deploy/hosted-workspaces/build-image.sh' >&2; exit 1; }
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @deepseek-ai/node-addon-system-workspace run build:native
-RUN DSH_CLIENT_COMMIT_HASH="$DSH_SOURCE_COMMIT" node deploy/hosted-workspaces/build-artifacts.mjs
+RUN DSH_CLIENT_TITLE="$DSH_CLIENT_TITLE" DSH_CLIENT_COMMIT_HASH="$DSH_SOURCE_COMMIT" node deploy/hosted-workspaces/build-artifacts.mjs
 
 FROM base AS runtime
 WORKDIR /opt/dsh

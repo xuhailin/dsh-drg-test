@@ -6,7 +6,7 @@
         runtimeTokenEnv: HOSTED_RUNTIME_API_KEY
         ownerId: !!js process.env.HOSTED_RUNTIME_OWNER_ID
         cwd: /home/node/workspace
-        agentPreset: standard
+        agentPreset: clinical-review
         timeoutMs: 30000
         maxResponseBytes: 4194304
         maxToolBytes: 65536

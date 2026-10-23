@@ -10,7 +10,7 @@ import { interpolate } from '@deepseek-ai/cordis-plugin-loader'
 import { BasicCompactionEngine } from '@deepseek-ai/dsh-compaction-basic'
 import type { BasicCompactionConfig } from '@deepseek-ai/dsh-compaction-basic'
 import { resolveCompactSpec, resolveConfig, resolveTargetPolicy } from '../packages/compaction/compaction-basic/src/config.ts'
-import { generateCompanyPresets } from '../deploy/hosted-workspaces/company-presets.mjs'
+import { generateClinicalPreset, generateCompanyPresets, requiresClinicalPreset } from '../deploy/hosted-workspaces/company-presets.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const script = join(root, 'deploy/hosted-workspaces/company-presets.mjs')
@@ -64,7 +64,7 @@ it('patches all active preset services and preserves every other plugin and defe
 })
 
 it('resolves legal pressure budgets for both deployed model capacities', () => {
-  for (const patch of generateCompanyPresets(root)) {
+  for (const patch of generateCompanyPresets(root, undefined, true)) {
     const raw = walk(patch.config.plugins).find(row => row.id === 'compaction-basic')!.config
     const interpolated: unknown = interpolate({ process: { env: { HOSTED_MODEL_ID: 'gpt-5.5' } } }, raw)
     const config = resolveConfig(BasicCompactionEngine.Config(interpolated as BasicCompactionConfig))
@@ -73,6 +73,97 @@ it('resolves legal pressure budgets for both deployed model capacities', () => {
     expect(resolveCompactSpec(policy, 32768, 8192)).toMatchObject({ thresholdTokens: 20480, retainTokens: 4096, maxTokens: 4096 })
     expect(resolveCompactSpec(policy, 65536, 32768)).toMatchObject({ thresholdTokens: 28672, retainTokens: 4096, maxTokens: 4096 })
   }
+})
+
+it('derives the clinical role while preserving all standard tools, policies, and deferred expressions', () => {
+  const original: unknown = load(readFileSync(join(root, presetPath('standard')), 'utf8'), { schema: entryListSchema })
+  const standard = record(record(list(record(list(original)[0]).insert)[0]).config)
+  const declaration = generateClinicalPreset(root)
+  expect(declaration).toMatchObject({ id: 'preset-clinical-review', name: '@deepseek-ai/dsh-agent-preset', config: { id: 'clinical-review' } })
+  const plugins = structuredClone(declaration.config.plugins)
+  const persona = walk(plugins).find(row => row.id === 'persona')!
+  expect(record(persona.config).prefix).toContain('You are a clinical record review assistant powered by the {{model}} model.')
+  const standardPersona = walk(list(standard.plugins)).find(row => row.id === 'persona')!
+  record(persona.config).prefix = record(standardPersona.config).prefix
+  expect(plugins).toEqual(standard.plugins)
+  expect(walk(plugins).map(row => row.id)).toEqual(walk(list(standard.plugins)).map(row => row.id))
+})
+
+it('keeps clinical profile edits before replacing only the company compaction policy', () => {
+  const directory = fixture()
+  const clinical = generateClinicalPreset(directory)
+  const tool = walk(clinical.config.plugins).find(row => row.id === 'tool-web')!
+  tool.config = { fetch: false, searchTimeoutMs: 1234 }
+  const profile = join(directory, 'profile.patch.yml')
+  writeFileSync(profile, dump([{ id: clinical.id, config: clinical.config }], { schema: entryListSchema }))
+  expect(generateClinicalPreset(directory, profile)).toEqual(clinical)
+  const company = generateCompanyPresets(directory, profile, true)
+  expect(company).toHaveLength(5)
+  const actual = company.find(row => row.id === clinical.id)!
+  expect(walk(actual.config.plugins).find(row => row.id === 'tool-web')?.config).toEqual(tool.config)
+  expect(walk(actual.config.plugins).find(row => row.id === 'compaction-basic')?.config)
+    .toMatchObject({ modelPolicies: [{ provider: 'company-gateway', headroomTokens: 4096 }] })
+})
+
+it('keeps saved standard-preset edits separate from the clinical composition', () => {
+  const directory = fixture()
+  const clinical = generateClinicalPreset(directory)
+  const profile = join(directory, 'profile.patch.yml')
+  writeFileSync(profile, dump([{ id: 'preset-standard', config: { id: 'standard', plugins: [] } }], { schema: entryListSchema }))
+  expect(generateClinicalPreset(directory, profile)).toEqual(clinical)
+})
+
+it('fails rather than deriving a clinical preset without its standard persona', () => {
+  const directory = fixture()
+  const path = join(directory, presetPath('standard'))
+  writeFileSync(path, readFileSync(path, 'utf8').replace('id: persona', 'id: missing-persona'))
+  expect(() => generateClinicalPreset(directory)).toThrow('Expected one persona entry')
+})
+
+it('detects clinical preset use from plugin rows and groups without evaluating deferred expressions', () => {
+  expect(requiresClinicalPreset(join(root, 'deploy/hosted-workspaces/clinical.runtime.patch.yml'))).toBe(true)
+  const directory = fixture()
+  const runtime = join(directory, 'runtime.patch.yml')
+  writeFileSync(runtime, dump([{ insert: [{ name: 'cordis:group', group: true, config: [{
+    name: '@deepseek-ai/dsh-experimental-clinical-review',
+    config: { agentPreset: 'clinical-review', ownerId: { __jsExpr: 'throw new Error("must not evaluate")' } },
+  }] }] }], { schema: entryListSchema }))
+  expect(requiresClinicalPreset(runtime)).toBe(true)
+  writeFileSync(runtime, '- insert:\n  - name: unrelated-plugin\n    config: {}\n')
+  expect(requiresClinicalPreset(runtime)).toBe(false)
+  writeFileSync(runtime, '- insert:\n  - name: "@deepseek-ai/dsh-experimental-clinical-review"\n    disabled: true\n    config:\n      agentPreset: clinical-review\n')
+  expect(requiresClinicalPreset(runtime)).toBe(false)
+  writeFileSync(runtime, '- insert:\n  - name: "@deepseek-ai/dsh-experimental-clinical-review"\n    config: {}\n')
+  expect(requiresClinicalPreset(runtime)).toBe(false)
+  writeFileSync(runtime, '- insert:\n  - name: "@deepseek-ai/dsh-experimental-clinical-review"\n    config:\n      agentPreset: !!js process.env.PRESET\n')
+  expect(() => requiresClinicalPreset(runtime)).toThrow('requires a literal agentPreset')
+  writeFileSync(runtime, '- insert: invalid\n')
+  expect(() => requiresClinicalPreset(runtime)).toThrow('Expected runtime overlay insert list')
+  writeFileSync(runtime, '- invalid\n')
+  expect(() => requiresClinicalPreset(runtime)).toThrow('Invalid runtime overlay row')
+  writeFileSync(runtime, '- unexpected: invalid\n')
+  expect(() => requiresClinicalPreset(runtime)).toThrow('Invalid runtime overlay row')
+})
+
+it('writes the clinical declaration and its matching company override through the source CLIs', () => {
+  const directory = fixture()
+  const profile = join(directory, 'profile.patch.yml')
+  const output = join(directory, 'clinical.patch.yml')
+  const clinicalScript = join(root, 'deploy/hosted-workspaces/clinical-presets.mjs')
+  const clinical = spawnSync(process.execPath, [clinicalScript, directory, output, profile], { encoding: 'utf8', cwd: root })
+  expect(clinical.signal).toBe(null)
+  expect(clinical.stderr).toBe('')
+  expect(clinical.status).toBe(0)
+  expect(load(readFileSync(output, 'utf8'), { schema: entryListSchema })).toEqual([{ insert: [generateClinicalPreset(directory)] }])
+  const company = spawnSync(process.execPath, [script, directory, output, profile, '--clinical-review'], { encoding: 'utf8', cwd: root })
+  expect(company.signal).toBe(null)
+  expect(company.stderr).toBe('')
+  expect(company.status).toBe(0)
+  expect(load(readFileSync(output, 'utf8'), { schema: entryListSchema })).toEqual(generateCompanyPresets(directory, undefined, true))
+  const detection = spawnSync(process.execPath, [clinicalScript, '--required', join(root, 'deploy/hosted-workspaces/clinical.runtime.patch.yml')], { encoding: 'utf8', cwd: root })
+  expect(detection.signal).toBe(null)
+  expect(detection.status).toBe(0)
+  expect(detection.stdout).toBe('true\n')
 })
 
 it('fails when a canonical preset loses its compaction target', () => {

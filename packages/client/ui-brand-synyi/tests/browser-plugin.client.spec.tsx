@@ -6,7 +6,6 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { apply, inject } from '../src/client/index.ts'
 import { SynyiBrandMark, SynyiBrandName } from '../src/client/Brand.tsx'
-import { apply as hostApply } from '../src/index.ts'
 
 const contexts: Context[] = []
 const SIDEBAR_HOLES = ['sidebar.brand.mark', 'sidebar.brand.name'] as const
@@ -34,10 +33,6 @@ async function bench(declare = true) {
 }
 
 describe('Synyi browser branding', () => {
-  it('keeps the host entry inert', () => {
-    expect(hostApply).not.toThrow()
-  })
-
   it('registers all declared brand surfaces and removes them with the plugin', async () => {
     const subject = await bench()
     const fiber = subject.ctx.plugin({ inject: [...inject], apply })

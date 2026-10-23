@@ -8,6 +8,9 @@ import { fileURLToPath } from 'node:url'
 import type { AddressInfo } from 'node:net'
 import { chromium, type Page } from 'playwright'
 import { expect, it, onTestFinished } from 'vitest'
+import { dump } from 'js-yaml'
+import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
+import { generateClinicalPreset } from '../../../deploy/hosted-workspaces/company-presets.mjs'
 import { LlmAdapter, ToolCallId, type GenerateOptions, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 import { resultResponseSchema, resultsResponseSchema, resultRequestSchema } from '@deepseek-ai/dsh-experimental-clinical-review/result'
@@ -39,6 +42,10 @@ class ClinicalModel extends LlmAdapter {
   }
   override async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     options.signal?.throwIfAborted()
+    expect(JSON.stringify(options.messages)).toContain('You are a clinical record review assistant')
+    expect(options.tools?.map(tool => tool.name)).toEqual(expect.arrayContaining([
+      process.platform === 'win32' ? 'pwsh' : 'bash', 'read', 'grep', 'web_search', 'review_load_case',
+    ]))
     const step = this.calls++, round = Math.floor(step / 4) + 1, stage = step % 4
     if (round > 2) throw new Error('Synthetic review script exhausted')
     const quote = 'no pneumonia', start = oldContent.indexOf(quote)
@@ -111,7 +118,11 @@ it.each([{ name: 'root', prefix: undefined }, { name: 'prefix', prefix: 'clinica
   process.env.DSH_CLINICAL_BROWSER_TOKEN = 'synthetic-browser-only'
   cleanups.push(() => { if (previous === undefined) Reflect.deleteProperty(process.env, 'DSH_CLINICAL_BROWSER_TOKEN'); else process.env.DSH_CLINICAL_BROWSER_TOKEN = previous })
   const overlay = join(fixtureRoot, 'viewer.overlay.yml')
-  await writeFile(overlay, `- insert:\n  - id: clinical-review\n    name: '@deepseek-ai/dsh-experimental-clinical-review'\n    config: ${JSON.stringify({ brokerBaseUrl: `http://127.0.0.1:${port}/runtime/emr/`, runtimeTokenEnv: 'DSH_CLINICAL_BROWSER_TOKEN', ownerId: binding.actorId, cwd: fixtureRoot, reviewLanguage: 'en' })}\n  - id: clinical-results\n    name: '@deepseek-ai/dsh-experimental-client-clinical-results'\n    config: {}\n`)
+  const clinicalPreset = generateClinicalPreset(fileURLToPath(new URL('../../../', import.meta.url)))
+  await writeFile(overlay, dump([{ insert: [clinicalPreset, { id: 'clinical-review', name: '@deepseek-ai/dsh-experimental-clinical-review',
+    config: { brokerBaseUrl: `http://127.0.0.1:${port}/runtime/emr/`, runtimeTokenEnv: 'DSH_CLINICAL_BROWSER_TOKEN', ownerId: binding.actorId,
+      cwd: fixtureRoot, reviewLanguage: 'en', agentPreset: 'clinical-review' } },
+  { id: 'clinical-results', name: '@deepseek-ai/dsh-experimental-client-clinical-results', config: {} }] }], { schema: entryListSchema }))
   const scaffold = await launchWebScaffold({ extraOverlayPath: overlay, toolsMode: 'native',
     ...prefix === undefined ? {} : { publicMount: { prefix } }, profile: { hmr: false, packages: [
       { dir: fileURLToPath(new URL('../../../packages/experimental/clinical-review', import.meta.url)) },
@@ -142,6 +153,7 @@ it.each([{ name: 'root', prefix: undefined }, { name: 'prefix', prefix: 'clinica
   const receipt: unknown = await launched.json()
   if (receipt === null || typeof receipt !== 'object' || !('sessionId' in receipt)) throw new Error('Launch receipt missing Session')
   const sessionId = resultRequestSchema.shape.sessionId.parse(receipt.sessionId)
+  expect(scaffold.ctx.agents.get(sessionId)?.session.header.agentPreset).toBe('clinical-review')
   await page.getByText('No saved report for this encounter', { exact: true }).waitFor()
   expect(model.calls).toBe(0)
   expect(captures).toBe(0)

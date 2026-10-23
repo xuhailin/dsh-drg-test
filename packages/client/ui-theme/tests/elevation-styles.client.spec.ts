@@ -64,11 +64,11 @@ describe('elevation tokens', () => {
       .filter(rule => rule.selectors.includes(selector))
       .flatMap(rule => rule.declarations)
       .findLast(([property]) => property === token)?.[1]
-    expect(value('body')).toBe('rgba(255, 255, 255, 0.96)')
-    expect(value('body[data-ds-dark-theme]')).toBe('rgba(36, 51, 75, 0.96)')
+    expect(value('body')).toBe('rgba(248, 249, 250, 0.58)')
+    expect(value('body[data-ds-dark-theme]')).toBe('rgba(67, 69, 74, 0.45)')
     expect(value('body', '--dsw-specific-menu')).toBe('var(--dsw-menu-surface-fill)')
-    expect(value("html[data-platform='darwin'] body", '--dsw-specific-menu')).toBe('rgba(255, 255, 255, 0.96)')
-    expect(value("html[data-platform='darwin'] body[data-ds-dark-theme]", '--dsw-specific-menu')).toBe('rgba(36, 51, 75, 0.96)')
+    expect(value("html[data-platform='darwin'] body", '--dsw-specific-menu')).toBe('rgba(248, 249, 250, 0.94)')
+    expect(value("html[data-platform='darwin'] body[data-ds-dark-theme]", '--dsw-specific-menu')).toBe('rgba(48, 49, 54, 0.94)')
   })
 })
 
@@ -185,7 +185,7 @@ const BORDER_EDGE = /^border(?:-top|-bottom|-left|-right)?$/
  * declarations fall outside BORDER_EDGE and are not seen; no sheet under test
  * writes either form.
  * @param css - stylesheet text.
- * @param exempt - `<selector> <property>` pairs allowed to keep their width.
+ * @param exempt - selectors allowed to keep their graphic's stroke width.
  * @returns the offending `<selectors> <property>: <value>` lines, in source order.
  */
 function wideNeutralBorders(css: string, exempt: Set<string> = new Set()): string[] {
@@ -240,6 +240,13 @@ describe('neutral solid borders are hairlines', () => {
     expect(wideFilledDividers('.a { background: var(--dsw-alias-border-l2); height: 1px; }'))
       .toEqual(['.a height: 1px'])
     expect(wideFilledDividers('.a { background: var(--dsw-alias-border-l2); height: 0.5px; }')).toEqual([])
+  })
+
+  it('exempts a named ring track while still rejecting a card outline', () => {
+    expect(wideNeutralBorders(
+      '.spinner { border: 2px solid var(--dsw-alias-border-l1); } .card { border: 2px solid var(--dsw-alias-border-l1); }',
+      new Set(['.spinner']),
+    )).toEqual(['.card border: 2px solid var(--dsw-alias-border-l1)'])
   })
 
   it('draws every solid neutral-token border at 0.5px under packages/', () => {

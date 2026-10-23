@@ -332,9 +332,9 @@
     - id: ui-chat
       name: '@deepseek-ai/dsh-client-ui-chat'
 
-    # Synyi occupants for the generic sidebar and conversation brand slots.
-    - id: ui-brand-synyi
-      name: '@deepseek-ai/dsh-client-ui-brand-synyi'
+    # Official occupants for the generic sidebar and conversation brand slots.
+    - id: ui-brand-official
+      name: '@deepseek-ai/dsh-client-ui-brand-official'
 
     - id: ui-attachment
       name: '@deepseek-ai/dsh-client-ui-attachment'

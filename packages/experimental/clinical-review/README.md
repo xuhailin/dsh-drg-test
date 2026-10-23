@@ -53,6 +53,8 @@ The hosted-workspace deployment supplies the broker URL, opaque owner identity, 
 
 The [configuration schema](src/config.ts) validates deployment bounds. To replace HTTP evidence reads with MCP, mount an implementation of [EncounterReader](../emr-encounter/README.md), then select `readerMode: provided`. Browser launch authorization still uses the broker.
 
+The [hosted clinical overlay](../../../deploy/hosted-workspaces/clinical.runtime.patch.yml) selects `clinical-review` for new encounter Sessions. Its [preset generator](../../../deploy/hosted-workspaces/clinical-presets.mjs) preserves the installed `standard` preset's tools and policies while replacing its coding persona with clinical review instructions. Saved profile edits to `standard` do not carry into this separate preset; customize `clinical-review` directly. Company model deployments apply the same compaction policy to this preset. Existing encounter Sessions retain their saved preset. Authorization, evidence validation, and durable review state remain Host responsibilities.
+
 ### Entry, review, and refresh
 
 The [EMR entry plugin](../client-emr-entry/README.md) opens an encounter and exposes review controls. The authenticated POST routes under `/api/clinical-review/` accept JSON: `launch` takes a validated EMR launch claim; `review` takes `sessionId`, `eventId`, and `trigger` (`manual-review` or `discharge-order`); `refresh` takes `sessionId` and `eventId`; `status` takes `sessionId`. Responses are not cached. Opening with `trigger: open` binds metadata without fetching clinical text or waking the model.
@@ -111,7 +113,7 @@ Disposing the plugin aborts source work, waits for admitted tasks, and removes r
 
 #### What the model sees
 
-A bound Agent receives inventory, passage-reading, finding-submission, and report-reading tools. An explicit review appends a durable user message requesting evidence-based analysis in `reviewLanguage`. Source metadata includes coverage, cutoff, revisions, and source references; original content appears only in logged tool results. Reports mark every finding `pending-human-review` and both calculations `unavailable`.
+A bound Agent receives inventory, passage-reading, finding-submission, and report-reading tools. New hosted clinical Sessions use a clinical review persona with the existing general tools. An explicit review appends a durable user message requesting evidence-based analysis in `reviewLanguage`. Source metadata includes coverage, cutoff, revisions, and source references; original content appears only in logged tool results. Reports mark every finding `pending-human-review` and both calculations `unavailable`.
 
 #### Token effect
 

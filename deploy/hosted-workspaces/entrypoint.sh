@@ -48,6 +48,7 @@ case "$mode" in
     fi
     cd /home/node/workspace
     runtime_profile=web
+    clinical_review=false
     if [ -n "${HOSTED_RUNTIME_PATCH_FILE:-}" ]; then
       test -r "$HOSTED_RUNTIME_PATCH_FILE" \
         || { echo "Configured runtime patch is unavailable." >&2; exit 1; }
@@ -60,15 +61,30 @@ case "$mode" in
         ln -s /opt/dsh/node_modules "$DSH_HOME/profiles/hosted/node_modules"
       fi
       set -- --patch "$HOSTED_RUNTIME_PATCH_FILE" "$@"
+      clinical_review=$(node /opt/dsh/deploy/hosted-workspaces/clinical-presets.mjs \
+        --required "$HOSTED_RUNTIME_PATCH_FILE")
     fi
     if [ "${HOSTED_MODEL_PROTOCOL:-}" = openai-responses ]; then
-      node /opt/dsh/deploy/hosted-workspaces/company-presets.mjs \
-        /opt/dsh /tmp/dsh-company-presets.patch.yml \
-        "$DSH_HOME/profiles/$runtime_profile/cordis.patch.yml"
+      if [ "$clinical_review" = true ]; then
+        node /opt/dsh/deploy/hosted-workspaces/company-presets.mjs \
+          /opt/dsh /tmp/dsh-company-presets.patch.yml \
+          "$DSH_HOME/profiles/$runtime_profile/cordis.patch.yml" --clinical-review
+      else
+        node /opt/dsh/deploy/hosted-workspaces/company-presets.mjs \
+          /opt/dsh /tmp/dsh-company-presets.patch.yml \
+          "$DSH_HOME/profiles/$runtime_profile/cordis.patch.yml"
+      fi
       set -- --patch /opt/dsh/deploy/hosted-workspaces/company-model.runtime.patch.yml \
         --patch /tmp/dsh-company-presets.patch.yml "$@"
     fi
-    exec node /opt/dsh/apps/cli/lib/bin.js --profile "$runtime_profile" "$@" \
+    if [ "$clinical_review" = true ]; then
+      node /opt/dsh/deploy/hosted-workspaces/clinical-presets.mjs \
+        /opt/dsh /tmp/dsh-clinical-presets.patch.yml \
+        "$DSH_HOME/profiles/$runtime_profile/cordis.patch.yml"
+      set -- --patch /tmp/dsh-clinical-presets.patch.yml "$@"
+    fi
+    exec node /opt/dsh/apps/cli/lib/bin.js --profile "$runtime_profile" \
+      --patch /opt/dsh/packages/bundle/synyi-web-app/cordis.patch.yml "$@" \
       --host "$HOSTED_BIND_IP" \
       --port "${HOSTED_RUNTIME_PORT:-3080}" \
       --no-open \

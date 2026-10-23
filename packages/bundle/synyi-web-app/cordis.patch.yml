@@ -1,0 +1,7 @@
+- id: ui-brand-official
+  disabled: true
+- insert:
+    - id: ui-theme-synyi
+      name: '@deepseek-ai/dsh-client-ui-theme-synyi'
+    - id: ui-brand-synyi
+      name: '@deepseek-ai/dsh-client-ui-brand-synyi'

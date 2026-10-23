@@ -29,7 +29,7 @@
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .empty { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; min-height: 160px; max-width: 640px; margin: 0 auto; padding: 24px 12px; text-align: center; color: var(--dsw-alias-label-secondary); }
 .empty .selector { width: 100%; text-align: left; }
-.spinner { width: 20px; height: 20px; border: 2px solid var(--dsw-alias-border-l1); border-top-color: var(--dsw-alias-label-secondary); border-radius: 50%; animation: spin 900ms linear infinite; }
+.spinner { width: 20px; height: 20px; border: 2px solid var(--dsw-alias-border-l1); border-top-color: var(--dsw-alias-label-secondary); border-radius: 50%; corner-shape: round; animation: spin 900ms linear infinite; }
 .cards { display: grid; gap: 8px; }
 .card { display: flex; align-items: start; gap: 12px; width: 100%; box-sizing: border-box; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-lg); padding: 12px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font: inherit; text-align: left; cursor: pointer; }
 .cardIcon { flex: none; margin-top: 2px; }
