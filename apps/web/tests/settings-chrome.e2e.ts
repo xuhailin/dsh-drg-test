@@ -217,6 +217,46 @@ describe('web e2e: settings modal and General preferences', () => {
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
+  it('keeps navigation and settings controls readable at 390px without losing focus', async () => {
+    onTestFinished(async () => {
+      await page.setViewportSize({ width: 1680, height: 1000 })
+      const dialog = page.getByRole('dialog', { name: '设置' })
+      if (await dialog.isVisible()) await page.keyboard.press('Escape')
+    })
+    await openSettings(page, 'zh')
+    const dialog = page.getByRole('dialog', { name: '设置' })
+    const general = dialog.getByRole('button', { name: '通用设置', exact: true })
+    await general.focus()
+    await page.setViewportSize({ width: 390, height: 844 })
+    expect(await general.evaluate(element => element === document.activeElement)).toBe(true)
+    const geometry = await dialog.evaluate((element) => {
+      const nav = element.querySelector('nav')!
+      const options = element.querySelector('[class*="options"]')!
+      const navRect = nav.getBoundingClientRect()
+      const optionsRect = options.getBoundingClientRect()
+      const panel = element.getBoundingClientRect()
+      return {
+        contentWidth: optionsRect.width,
+        contentBelowNavigation: optionsRect.top >= navRect.bottom,
+        controlsInsidePanel: [...element.querySelectorAll('button')].every((button) => {
+          const rect = button.getBoundingClientRect()
+          return rect.left >= panel.left && rect.right <= panel.right
+        }),
+        documentWidth: document.documentElement.scrollWidth,
+      }
+    })
+    expect(geometry.contentWidth).toBeGreaterThanOrEqual(300)
+    expect(geometry.contentBelowNavigation).toBe(true)
+    expect(geometry.controlsInsidePanel).toBe(true)
+    expect(geometry.documentWidth).toBe(390)
+    await selectTheme(dialog.getByRole('button', { name: '深色', exact: true }), 'dark')
+    await expect.poll(() => page.evaluate(() => document.body.hasAttribute('data-ds-dark-theme'))).toBe(true)
+    await selectTheme(dialog.getByRole('button', { name: '浅色', exact: true }), 'light')
+    await expect.poll(() => page.evaluate(() => document.body.hasAttribute('data-ds-dark-theme'))).toBe(false)
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+    await dialog.waitFor({ state: 'hidden' })
+  })
+
   it('scrolls overflowing section navigation independently of the title and settings content', async () => {
     const overflowPage = await browser.newPage({ viewport: { width: 1280, height: 768 }, locale: ZH_BROWSER_LOCALE })
     onTestFinished(() => overflowPage.close())

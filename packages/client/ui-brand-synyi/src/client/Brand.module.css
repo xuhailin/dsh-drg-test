@@ -1,0 +1,12 @@
+.mark {
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.name {
+  color: var(--dsw-alias-label-primary);
+  font-size: 18px;
+  font-weight: 500;
+  white-space: nowrap;
+}

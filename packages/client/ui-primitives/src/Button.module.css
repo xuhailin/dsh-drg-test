@@ -21,12 +21,12 @@
 }
 
 .md {
-  height: 36px;
+  height: 32px;
 }
 
 /* Compact controls retain their dimensions across filled and outlined variants. */
 .sm {
-  height: 28px;
+  height: 24px;
   font-size: 12px;
   line-height: 18px;
   padding: 0 10px;
