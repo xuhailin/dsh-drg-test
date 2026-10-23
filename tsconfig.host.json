@@ -8,6 +8,7 @@
     "rewriteRelativeImportExtensions": false
   },
   "include": [
+    "apps/web/tests/clinical-results.e2e.ts",
     "apps/web/tests/collapse-timing.e2e.ts",
     "apps/web/tests/notice-wake-tail.e2e.ts",
     "apps/web/tests/fold-blank-matrix.e2e.ts",
@@ -238,6 +239,7 @@
   ],
   "references": [
     { "path": "./packages/experimental/client-emr-entry/tsconfig.host.json" },
+    { "path": "./packages/experimental/client-clinical-results/tsconfig.host.json" },
     { "path": "./packages/experimental/hosted-workspaces" },
     { "path": "./packages/experimental/emr-encounter" },
     { "path": "./packages/experimental/emr-reader-broker" },

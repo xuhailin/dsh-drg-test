@@ -33,7 +33,7 @@ kind: "package-reference"
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `brokerBaseUrl` | 必填 | 代理 `launch`、`consume` 和 `capture` 请求的 HTTP(S) 基址 |
+| `brokerBaseUrl` | 必填 | 代理 `launch`、`consume`、`authorize` 和 `capture` 请求的 HTTP(S) 基址 |
 | `runtimeTokenEnv` | 必填 | 私人运行时令牌的凭据／环境变量名 |
 | `ownerId` | 必填 | 网关提供的固定已认证所有者身份 |
 | `cwd` | 必填 | 新建就诊 Session 的私人工作目录 |
@@ -57,9 +57,17 @@ kind: "package-reference"
 
 [EMR 接入插件](../client-emr-entry/README.zh.md) 打开就诊并提供核查操作。`/api/clinical-review/` 下的已认证 POST 路由接收 JSON：`launch` 接收经校验的 EMR 启动声明；`review` 接收 `sessionId`、`eventId` 和 `trigger`（`manual-review` 或 `discharge-order`）；`refresh` 接收 `sessionId` 和 `eventId`；`status` 接收 `sessionId`。响应不缓存。以 `trigger: open` 打开时只绑定元数据，不读取临床正文，也不唤醒模型。
 
-核查和刷新在持久化受理后返回 `sessionId`、`revision`、`status: accepted | duplicate` 和 `dischargeBlocked: false`。资料采集在后台异步继续。重复事件 ID 不会启动第二次核查。新的操作意图需要新的事件 ID。核查在已授权快照持久化后唤醒既有 DSH Agent；刷新只采集证据并使旧报告失效，不唤醒模型。状态接口只返回进度和报告是否存在；临床报告正文通过重新校验授权的聊天工具读取。
+核查和刷新在持久化受理后返回 `sessionId`、`revision`、`status: accepted | duplicate` 和 `dischargeBlocked: false`。资料采集在后台异步继续。重复事件 ID 不会启动第二次核查。新的操作意图需要新的事件 ID。核查在已授权快照持久化后唤醒既有 DSH Agent；刷新只采集证据并使旧报告失效，不唤醒模型。状态接口只返回进度和当前报告是否存在；保存报告正文可通过已授权的结果 API 读取。
 
 同一所有者／来源／医院／住院标识对应一个私人 Session。Session 不能切换患者。重新打开同一就诊时，如果已授权绑定发生变化，旧快照、已读范围和报告均失效。分叉会话保留历史文本，但不继承就诊读取权限。其他会话不会获得临床工具或核查指令。
+
+### 保存结果
+
+浏览器安全的 [`/result` 入口](src/result.ts)拥有带版本的请求与响应 schema。已认证的 `results` 按 `sessionId` 列出保存引用；`result` 按 `sessionId`、`resultId` 和确切的已接受报告 `revision` 读取。可选的 `encounterRef` 必须匹配当前绑定。结果包含原始 `reportId`、生成及证据时间、带保留来源元数据的精确引文、覆盖范围，以及分别不可用的 DRG／DIP 状态。列表允许为空；不存在的引用返回 `result-not-found`。读取通过代理的纯授权路由重新核验签名绑定和当前就诊策略，不采集证据，也不请求模型。精确就诊授权不查询来源；科室授权还会核验当前科室归属，无法核验时拒绝读取。后续明确刷新或核查采集会比较完整的已接受来源目录与覆盖范围，包括新增和删除；结果给出 `unchanged`、`changed` 或 `unknown`、检查时间及 `accepted-snapshot` 范围。此比较不对提供方覆盖之外的来源作出判断。
+
+逻辑 `resultId` 在同一 Session 内稳定。修订按已接受的唯一报告计数，失败或取消的核查不产生报告修订。独立投影从完整保留的 Session 记录恢复各报告的原始快照。刷新后旧引文保持不变。缺失的保留元数据使用 null 或明确的不可用状态；旧格式疑点仅将已校验的原分类映射到三个注册问题编码（`inconsistency`、`missing-information`、`needs-verification`），不推断临床规则、语义字段或导航目标。生成时间取自原报告记录；仅存于历史数组的旧报告不推断生成时间。
+
+`rerun` 接收确切的结果选择、必填的 `encounterRef` 和 `requestId`，然后确认异步核查受理。每次重试都重新核验当前授权。同 ID 同参数返回原受理修订，不重复执行；同 ID 改变所选修订或其他参数会被拒绝。当前核查进度独立于所选报告，核查失败保留此前已接受的报告。此 API 不导航或写回 EMR 记录。
 
 ### 失败与恢复
 
@@ -77,7 +85,7 @@ Session 刷盘结果不确定时停止后续核查操作，并报告 `durability
 <details>
 <summary>实现内部细节 — 点击展开</summary>
 
-[桥接入口](src/bridge.ts) 使用 Connection 的已认证 fetch 注册表。[读取器](src/reader.ts) 获取一次性启动授权，消费得到绑定，并按固定所有者核验有大小限制的证据响应。[协调器](src/state.ts) 串行执行每个 Session 的写入，在异步工作前持久化受理状态，并拒绝已被替代的结果。[投影](src/projection.ts) 通过完整插件记录重建状态。[作用域工具](src/tools.ts) 只暴露对应 Agent 已接受的快照和建议；标准 Session Controller 和 Agent followup 机制负责模型执行。
+[桥接入口](src/bridge.ts) 使用 Connection 的已认证 fetch 注册表。[读取器](src/reader.ts) 获取一次性启动授权，消费得到绑定，并按固定所有者核验有大小限制的证据响应。[协调器](src/state.ts) 串行执行每个 Session 的写入，在异步工作前持久化受理状态，并拒绝已被替代的结果。[状态投影](src/projection.ts) 重建活动核查状态；[结果投影](src/result-projection.ts) 在刷新和重启后保留不可变的报告与证据关联。[作用域工具](src/tools.ts) 只暴露对应 Agent 已接受的快照和建议；标准 Session Controller 和 Agent followup 机制负责模型执行。
 
 卸载插件会中止取数，等待已受理任务结束，并移除路由和作用域工具。绑定、快照、已读范围、建议和事件结果保存在私人 Session 日志中。运行时令牌和数据库凭据不会写入日志。
 
@@ -122,7 +130,7 @@ Session 刷盘结果不确定时停止后续核查操作，并报告 `durability
 - 不计算 DRG 分组、DIP 分值、医保支付、已确认编码或出院资格，也不写回 EMR。
 - 当前每次临床工具调用都会重新采集完整已授权快照以确认时效。提供方可在保留版本和授权保证的前提下替换此实现。
 - 中断或持久化不确定后不会自动重试，也不提供跨患者选择工具。保留上限需要运维人员评估容量。
-- 已保存报告和原文保留在私人会话历史中；重新授权限制新的来源／报告工具读取，不移除此前已显示的消息。
+- 已保存报告和原文保留在私人会话历史中；重新授权限制新的 API 与工具读取，不移除此前已显示的消息。保存结果读取不重新采集证据或启动新鲜度比较，也不提供已验证的 EMR 导航映射。
 
 <a id="dev-note"></a>
 ### 开发备注

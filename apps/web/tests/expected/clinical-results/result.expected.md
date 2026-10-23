@@ -1,0 +1,89 @@
+- article:
+  - text: Pending human review
+  - heading "Pre-discharge review result" [level=1]
+  - paragraph: SYNTHETIC-123
+  - text: Revision 1 Historical revision
+  - paragraph: Review guidance does not approve discharge or reimbursement and never blocks discharge
+  - term: Generated
+  - definition: {{timestamp}}
+  - term: Evidence captured
+  - definition: {{timestamp}}
+  - term: Evidence cutoff
+  - definition: {{timestamp}}
+  - term: Evidence revision
+  - definition: d0b35c161df8c431117aeb3de6bcc8dc9b353214788b4bf0bf3465a498821f9c
+  - term: Report ID
+  - definition: {{reportId}}
+  - term: Source freshness
+  - definition: Changed · differs from the latest complete capture
+  - term: Last compared
+  - definition: {{timestamp}}
+  - term: Comparison scope
+  - definition: Complete accepted catalog, source revisions, and coverage
+  - text: Select saved revision
+  - combobox "Select saved revision":
+    - option "Choose a revision" [disabled]
+    - option "Revision 2 · {{timestamp}} · 0 findings"
+    - option "Revision 1 · {{timestamp}} · 1 findings" [selected]
+  - region "Review summary":
+    - heading "Review summary" [level=2]
+    - paragraph: Synthetic saved review 1
+  - region "Findings":
+    - heading "1 findings" [level=2]
+    - text: Cross-record inconsistency
+    - heading "Synthetic diagnosis inconsistency" [level=3]
+    - paragraph: Legacy format · original classification, no mapped field
+    - heading "Model interpretation" [level=4]
+    - paragraph: Compare the retained original records
+    - heading "Suggested action" [level=4]
+    - paragraph: Verify the original document
+    - group:
+      - text: Saved evidence (1)
+      - heading "Exact source quotation" [level=4]
+      - blockquote: no pneumonia
+      - term: Source reference
+      - definition: synthetic-source
+      - term: Source ID
+      - definition: synthetic-document
+      - term: Source revision
+      - definition: source-1
+      - term: Record state
+      - definition: signed
+      - term: Source category
+      - definition: Documents
+      - term: Record time
+      - definition: {{timestamp}}
+      - term: Available time
+      - definition: Unknown
+      - term: Quotation range
+      - definition: 50–62
+    - paragraph: "EMR navigation unavailable: record and field mappings have not been verified"
+  - region "Coverage":
+    - heading "Coverage" [level=2]
+    - list:
+      - listitem: Encounter Unsupported
+      - listitem: Diagnoses Unsupported
+      - listitem: Orders Unsupported
+      - listitem: Documents Read
+      - listitem:
+        - text: Laboratory Unread
+        - paragraph: Synthetic lab gap
+      - listitem: Examinations Unsupported
+      - listitem: Procedures Unsupported
+      - listitem: Administration Unsupported
+    - heading "Reviewed sources" [level=3]
+    - list:
+      - listitem: synthetic-source
+    - heading "Unreviewed sources" [level=3]
+    - paragraph: No unreviewed source in the saved catalog; this does not establish that current encounter data is complete
+  - region "Calculation availability":
+    - heading "Calculation availability" [level=2]
+    - term: DRG
+    - definition: Unavailable · no calculation engine configured
+    - term: DIP
+    - definition: Unavailable · no calculation engine configured
+  - region "New review progress":
+    - heading "New review progress" [level=2]
+    - status: Report generated, pending human review
+    - button "Update result and progress"
+    - button "Request another review"

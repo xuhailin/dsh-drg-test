@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/client-clinical-results/README.md
+/:
+  en: 3583ed4cb441a4ac
+  zh: d62a8605c5334f2f
+/deepseek-ai-dsh-experimental-client-clinical-results:
+  en: f8a7a40fbdae9c1c
+  zh: fd52d158dbe54368
+/deepseek-ai-dsh-experimental-client-clinical-results/summary:
+  en: 608f85a8ecb88707
+  zh: 32084421b8666441
+/deepseek-ai-dsh-experimental-client-clinical-results/table-of-contents:
+  en: 65663b0d5dfa1600
+  zh: 55b2121ae6059425
+/deepseek-ai-dsh-experimental-client-clinical-results/use-this-package:
+  en: cd3b6d366d1d9752
+  zh: 3954077f4f7a812d
+/deepseek-ai-dsh-experimental-client-clinical-results/use-this-package/embed-a-result:
+  en: adbfc568a299179f
+  zh: 0e396ff0e47d1093
+/deepseek-ai-dsh-experimental-client-clinical-results/understand-the-implementation:
+  en: d7b01e3e57748b60
+  zh: 529df21e196c8514
+/deepseek-ai-dsh-experimental-client-clinical-results/further-exploration:
+  en: 3826410ea3cf96de
+  zh: fac96b270a5e7850
+/deepseek-ai-dsh-experimental-client-clinical-results/model-experience:
+  en: 2d8264d9acca4a20
+  zh: cd6a55e6fa2e6b46
+/deepseek-ai-dsh-experimental-client-clinical-results/model-experience/kv-cache-effect:
+  en: c0cbd202ebd2addc
+  zh: 71f0a1397ecde2c2
+/deepseek-ai-dsh-experimental-client-clinical-results/known-limitations-and-deferred-work:
+  en: 3ebd7df120ca53c2
+  zh: 7ec8bb3d1897f689
+/deepseek-ai-dsh-experimental-client-clinical-results/known-limitations-and-deferred-work/dev-note:
+  en: 91198df070b111b1
+  zh: f2967c6cb198cd57

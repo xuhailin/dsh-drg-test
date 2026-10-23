@@ -17,3 +17,7 @@
         allowedOrigins: []
         defaultSourceSystem: emr
         defaultHospitalCode: ''
+    - id: client-clinical-results
+      name: '@deepseek-ai/dsh-experimental-client-clinical-results'
+      config:
+        allowedOrigins: []

@@ -230,6 +230,7 @@
     "@deepseek-ai/dsh-experimental-browser-use-stagehand-native": "workspace:*",
     "@deepseek-ai/dsh-experimental-claude-code-mods": "workspace:*",
     "@deepseek-ai/dsh-experimental-client-emr-entry": "workspace:*",
+    "@deepseek-ai/dsh-experimental-client-clinical-results": "workspace:*",
     "@deepseek-ai/dsh-experimental-clinical-review": "workspace:*",
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp": "workspace:*",
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native": "workspace:*",

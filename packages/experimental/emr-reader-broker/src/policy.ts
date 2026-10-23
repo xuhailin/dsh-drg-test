@@ -9,9 +9,17 @@ const entrySchema = z.strictObject({
   issuer: text, subject: text, sourceSystem: text, hospitalCode: text,
   inpatId: z.string().regex(/^[1-9][0-9]{0,18}$/), inpatCode: text.optional(), sourceVisitId: text.optional(),
 })
-const policySchema = z.strictObject({ schemaVersion: z.literal(1), entries: z.array(entrySchema) })
+const departmentSchema = z.strictObject({ issuer: text, subject: text, sourceSystem: text, hospitalCode: text, departmentCode: text })
+const policySchema = z.strictObject({
+  schemaVersion: z.literal(1), entries: z.array(entrySchema), departments: z.array(departmentSchema).optional(),
+})
 /** One configured synthetic, deidentified, or explicitly authorized test encounter. */
 export type AccessEntry = z.infer<typeof entrySchema>
+/** Operator-authorized department for one exact authenticated account and hospital. */
+export type DepartmentAccess = z.infer<typeof departmentSchema>
+/** Current grants for one transport-authenticated actor and configured source. */
+export interface ActorAccess { readonly entries: readonly AccessEntry[]; readonly departments: readonly DepartmentAccess[] }
+type EncounterClaim = Pick<LaunchClaim, 'sourceSystem' | 'hospitalCode' | 'inpatId' | 'inpatCode' | 'sourceVisitId'>
 
 /** Authorizes each read against the current operator-owned allowlist. */
 export class EncounterPolicy {
@@ -32,27 +40,60 @@ export class EncounterPolicy {
         entry.issuer, entry.subject, entry.sourceSystem, entry.hospitalCode, entry.inpatId,
       ]))
       if (new Set(identities).size !== identities.length) throw new Error('Duplicate clinical access entry')
+      const departments = (policy.departments ?? []).map(entry => JSON.stringify([
+        entry.issuer, entry.subject, entry.sourceSystem, entry.hospitalCode, entry.departmentCode,
+      ]))
+      if (new Set(departments).size !== departments.length) throw new Error('Duplicate clinical department grant')
       return policy
     } catch (error) {
       throw new EncounterReadError('source-unavailable', 'Clinical access policy is unavailable or invalid; ask the operator to repair it.', { cause: error })
     }
   }
   /**
-   * Re-read policy so removal takes effect before the next protected operation.
+   * Read current grants for one authenticated account and this configured source.
+   * @param actor - Verified runtime actor.
+   * @returns Exact encounter and department grants; an empty set grants no access.
+   */
+  async grants(actor: ClinicalActor): Promise<ActorAccess> {
+    const policy = await this.load()
+    const own = (entry: AccessEntry | DepartmentAccess): boolean => entry.issuer === actor.issuer
+      && entry.subject === actor.subject && entry.sourceSystem === this.sourceSystem
+    return { entries: policy.entries.filter(own), departments: (policy.departments ?? []).filter(own) }
+  }
+  /** Reject unrelated accounts and scopes before SQL; department admission still needs current source verification.
    * @param actor - Verified runtime actor.
    * @param claim - Requested encounter identifiers.
-   * @returns Exactly one matching grant, otherwise forbidden or invalid policy.
+   * @returns Exact encounter grant, or undefined when a current department must be checked.
    */
-  async authorize(actor: ClinicalActor, claim: Pick<LaunchClaim, 'sourceSystem' | 'hospitalCode' | 'inpatId' | 'inpatCode' | 'sourceVisitId'>): Promise<AccessEntry> {
-    const policy = await this.load()
-    const matches = policy.entries.filter(entry => entry.issuer === actor.issuer && entry.subject === actor.subject
-      && entry.sourceSystem === this.sourceSystem
-      && entry.sourceSystem === claim.sourceSystem && entry.hospitalCode === claim.hospitalCode && entry.inpatId === claim.inpatId)
-    const match = matches[0]
-    if (matches.length !== 1 || match === undefined) throw new EncounterReadError('forbidden', 'This account has no unique authorization for the requested encounter.')
+  async admission(actor: ClinicalActor, claim: EncounterClaim): Promise<AccessEntry | undefined> {
+    const grants = await this.grants(actor)
+    if (claim.sourceSystem !== this.sourceSystem) throw new EncounterReadError('forbidden', 'This clinical source is not authorized.')
+    const match = grants.entries.find(entry => entry.hospitalCode === claim.hospitalCode && entry.inpatId === claim.inpatId)
+    if (match === undefined) {
+      if (!grants.departments.some(entry => entry.hospitalCode === claim.hospitalCode)) throw new EncounterReadError('forbidden', 'This account has no authorization for the requested encounter or department.')
+      if (claim.sourceVisitId !== undefined) throw new EncounterReadError('source-mismatch', 'No source visit alias is configured for this department grant.')
+      return undefined
+    }
     if ((match.inpatCode !== undefined && claim.inpatCode !== undefined && match.inpatCode !== claim.inpatCode)
       || (claim.sourceVisitId !== undefined && match.sourceVisitId !== claim.sourceVisitId)) throw new EncounterReadError('source-mismatch', 'Encounter identifiers disagree with the approved mapping.')
     return match
+  }
+  /** Re-read the policy and require the current department when no exact encounter grant exists.
+   * @param actor - Verified runtime actor.
+   * @param claim - Requested encounter identifiers.
+   * @param departmentCode - Current source department, required for department grants.
+   * @returns Authorized encounter mapping, otherwise a typed denial.
+   */
+  async authorize(actor: ClinicalActor, claim: EncounterClaim, departmentCode?: string): Promise<AccessEntry> {
+    const exact = await this.admission(actor, claim)
+    if (exact !== undefined) return exact
+    const grants = await this.grants(actor)
+    if (departmentCode === undefined || !grants.departments.some(entry => entry.hospitalCode === claim.hospitalCode
+      && entry.departmentCode === departmentCode)) {
+      throw new EncounterReadError('forbidden', 'The encounter is outside this account’s authorized departments. Reopen an authorized inpatient.')
+    }
+    return { issuer: actor.issuer, subject: actor.subject, sourceSystem: claim.sourceSystem,
+      hospitalCode: claim.hospitalCode, inpatId: claim.inpatId }
   }
   /**
    * Create a restart-verifiable binding after source identifier checks.

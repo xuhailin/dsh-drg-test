@@ -29,11 +29,14 @@
     // under its own tsconfig boundary.
     "paths": {
       "@deepseek-ai/dsh-experimental-emr-encounter/wire": ["./packages/experimental/emr-encounter/src/wire.ts"],
+      "@deepseek-ai/dsh-experimental-client-clinical-results": ["./packages/experimental/client-clinical-results/src/index.ts"],
+      "@deepseek-ai/dsh-experimental-client-clinical-results/client": ["./packages/experimental/client-clinical-results/src/client/index.ts"],
       "@deepseek-ai/dsh-experimental-client-emr-entry": ["./packages/experimental/client-emr-entry/src/index.ts"],
       "@deepseek-ai/dsh-experimental-client-emr-entry/client": ["./packages/experimental/client-emr-entry/src/client/index.ts"],
       "@deepseek-ai/dsh-experimental-emr-encounter": ["./packages/experimental/emr-encounter/src/index.ts"],
       "@deepseek-ai/dsh-experimental-emr-reader-broker": ["./packages/experimental/emr-reader-broker/src/index.ts"],
       "@deepseek-ai/dsh-experimental-clinical-review": ["./packages/experimental/clinical-review/src/index.ts"],
+      "@deepseek-ai/dsh-experimental-clinical-review/result": ["./packages/experimental/clinical-review/src/result.ts"],
       "@deepseek-ai/dsh-experimental-hosted-workspaces": ["./packages/experimental/hosted-workspaces/src/index.ts"],
       "@deepseek-ai/dsh-experimental-drg-resources": ["./packages/experimental/drg-resources/src/index.ts"],
       "@deepseek-ai/dsh-experimental-session-search": ["./packages/experimental/session-search/src/index.ts"],

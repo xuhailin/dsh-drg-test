@@ -8,9 +8,12 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { unsupportedInbox } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { parseBinding, parseSnapshot, type LaunchClaim } from '@deepseek-ai/dsh-experimental-emr-encounter'
 import { ClinicalReviewService } from '../src/state.ts'
-import { reviewProjection } from '../src/projection.ts'
+import { reviewProjection, reportSchema } from '../src/projection.ts'
+import { resultProjection } from '../src/result-projection.ts'
+import { resultRequestSchema, resultsRequestSchema, resultResponseSchema, rerunRequestSchema, resultIdForSession } from '../src/result.ts'
 import type { Config } from '../src/config.ts'
 import type { ReviewState } from '../src/types.ts'
+import { ClinicalReviewError } from '../src/error.ts'
 
 const contexts: Context[] = []
 afterEach(async () => { for (const ctx of contexts.splice(0)) await ctx.fiber.dispose() })
@@ -35,6 +38,7 @@ async function setup(overrides: Partial<Config> = {}) {
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SessionProjectionRegistry)
   ctx.sessionProjections.register(reviewProjection)
+  ctx.sessionProjections.register(resultProjection)
   const capture = vi.fn(async () => snapshot())
   ctx.provide('encounterReader', { capture })
   ctx.provide('sessionPersistence', { stat: async () => undefined })
@@ -54,7 +58,7 @@ async function setup(overrides: Partial<Config> = {}) {
   })
   const flush = vi.fn(async () => {})
   ctx.on('session/flush', flush, { global: true })
-  const access = { authorize: vi.fn(async () => binding) }
+  const access = { authorize: vi.fn(async () => binding), reauthorize: vi.fn(async () => {}) }
   const attach = vi.fn()
   const review = new ClinicalReviewService(ctx, Object.assign({}, config, overrides), access, attach)
   const opened = await review.launch(claim, new AbortController().signal)
@@ -70,6 +74,138 @@ async function setup(overrides: Partial<Config> = {}) {
 }
 
 describe('encounter review admission and durable state', () => {
+  it('keeps an immutable result link readable after the same encounter receives a renewed binding', async () => {
+    const { review, agent, start, signal, access } = await setup()
+    await start()
+    await review.submit(agent, { revision: 1, caseRevision: snapshot().caseRevision, summary: 'Original saved report.', findings: [], reviewedSourceRefs: [] }, signal)
+    const first = (await review.results(resultsRequestSchema.parse({ sessionId: agent.id }), signal)).results[0]!
+    const request = resultRequestSchema.parse({ sessionId: first.sessionId, resultId: first.resultId,
+      revision: first.revision, encounterRef: first.encounterRef })
+    access.authorize.mockResolvedValue(parseBinding({ ...binding, bindingId: '22222222-2222-4222-8222-222222222222', inpatCode: 'updated-alias' }))
+    await review.launch({ ...claim, eventId: 'reopen', inpatCode: 'updated-alias' }, signal)
+    const saved = await review.result(request, signal)
+    expect(saved).toMatchObject({ encounterRef: first.encounterRef, reportId: first.reportId, revision: first.revision, summary: 'Original saved report.' })
+  })
+
+  it('reads retained report quotations without source capture and keeps history through failed reviews and replay', async () => {
+    const { review, agent, start, signal, capture, followup } = await setup()
+    await start()
+    await review.read(agent, 1, 'source-document-1', 0, 1000, signal)
+    await review.submit(agent, { revision: 1, caseRevision: snapshot().caseRevision, summary: 'Original report.', reviewedSourceRefs: ['source-document-1'],
+      findings: [{ kind: 'needs-verification', title: 'Original title', explanation: 'Verify original wording.', suggestion: 'Read the original.',
+        citations: [{ sourceRef: 'source-document-1', start: 0, end: 9, quote: 'Diagnosis' }] }] }, signal)
+    const before = capture.mock.calls.length
+    const list = await review.results(resultsRequestSchema.parse({ sessionId: agent.id }), signal)
+    expect(list.results).toHaveLength(1)
+    const first = list.results[0]!
+    expect(first).toMatchObject({ revision: 1, findingCount: 1 })
+    expect(typeof first.generatedAt).toBe('string')
+    const request = resultRequestSchema.parse({ sessionId: first.sessionId, resultId: first.resultId,
+      revision: first.revision, encounterRef: first.encounterRef })
+    const original = resultResponseSchema.parse(await review.result(request, signal))
+    expect(capture).toHaveBeenCalledTimes(before)
+    expect(original).toMatchObject({ freshness: { status: 'unknown' }, snapshotStatus: 'retained',
+      findings: [{ evidenceRefs: [{ quote: 'Diagnosis', source: { sourceRevision: snapshot().sources[0]?.sourceRevision } }] }] })
+    capture.mockRejectedValueOnce(new Error('source reader unavailable'))
+    await review.trigger(agent.id, 'failed-new-review', 'manual-review', signal)
+    await expect.poll(() => review.require(agent).status).toBe('failed')
+    const afterFailure = await review.result(request, signal)
+    expect(afterFailure.findings).toEqual(original.findings)
+    expect(afterFailure.progress.status).toBe('failed')
+    capture.mockResolvedValue(snapshot('Changed source text.'))
+    await start('successful-new-review')
+    await review.submit(agent, { revision: 3, caseRevision: snapshot('Changed source text.').caseRevision, summary: 'Later report.', findings: [], reviewedSourceRefs: [] }, signal)
+    const historical = await review.result(request, signal)
+    expect(historical).toMatchObject({ revision: 1, latestRevision: 2, summary: 'Original report.',
+      history: [{ revision: 2 }, { revision: 1 }], findings: [{ evidenceRefs: [{ quote: 'Diagnosis', sourceStatus: 'retained' }] }] })
+    expect(followup).toHaveBeenCalledTimes(2)
+    let replay = resultProjection.init(agent.session.header, SessionLogOffset(0))
+    for (const event of agent.session.snapshotEvents()) replay = resultProjection.apply(replay, event)
+    expect(replay.reports).toHaveLength(2)
+    expect(replay.reports[0]?.snapshot?.sources[0]?.content).toBe(snapshot().sources[0]?.content)
+    expect(replay.reports[1]?.snapshot?.sources[0]?.content).toBe('Changed source text.')
+  })
+
+  it('checks current encounter access on every saved read and rerun before exposing reports or admitting work', async () => {
+    const { review, agent, start, signal, capture, followup, access } = await setup()
+    await start()
+    await review.submit(agent, { revision: 1, caseRevision: snapshot().caseRevision, summary: 'Private report.', findings: [], reviewedSourceRefs: [] }, signal)
+    const list = await review.results(resultsRequestSchema.parse({ sessionId: agent.id }), signal)
+    const first = list.results[0]!
+    const request = resultRequestSchema.parse({ sessionId: first.sessionId, resultId: first.resultId,
+      revision: first.revision, encounterRef: first.encounterRef })
+    const captures = capture.mock.calls.length
+    access.reauthorize.mockRejectedValue(new ClinicalReviewError('forbidden', 'Access was revoked.'))
+    await expect(review.results(resultsRequestSchema.parse({ sessionId: agent.id }), signal)).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(review.result(request, signal)).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(review.rerun(rerunRequestSchema.parse({ ...request, requestId: 'rerun-denied' }), signal)).rejects.toMatchObject({ code: 'forbidden' })
+    expect(capture).toHaveBeenCalledTimes(captures)
+    expect(followup).toHaveBeenCalledTimes(1)
+    expect(review.require(agent).report?.summary).toBe('Private report.')
+  })
+
+  it('returns the original rerun admission revision after later operations and rejects conflicting selected revisions', async () => {
+    const { review, agent, start, signal, followup } = await setup()
+    await start()
+    await review.submit(agent, { revision: 1, caseRevision: snapshot().caseRevision, summary: 'First report.', findings: [], reviewedSourceRefs: [] }, signal)
+    const first = (await review.results(resultsRequestSchema.parse({ sessionId: agent.id }), signal)).results[0]!
+    const request = rerunRequestSchema.parse({ sessionId: first.sessionId, resultId: first.resultId, revision: first.revision,
+      encounterRef: first.encounterRef, requestId: 'rerun-one' })
+    expect(await review.rerun(request, signal)).toMatchObject({ status: 'accepted', revision: 2, requestId: 'rerun-one' })
+    await expect.poll(() => review.require(agent).status).toBe('reviewing')
+    await review.submit(agent, { revision: 2, caseRevision: snapshot().caseRevision, summary: 'Second report.', findings: [], reviewedSourceRefs: [] }, signal)
+    await review.trigger(agent.id, 'third-review', 'manual-review', signal)
+    await expect.poll(() => review.require(agent).status).toBe('reviewing')
+    expect(await review.rerun(request, signal)).toMatchObject({ status: 'duplicate', revision: 2 })
+    await expect(review.rerun({ ...request, revision: 2 }, signal)).rejects.toMatchObject({ code: 'request-conflict' })
+    expect(followup).toHaveBeenCalledTimes(3)
+    expect(await review.trigger(agent.id, 'review-1', 'manual-review', signal)).toMatchObject({ status: 'duplicate', revision: 1 })
+    await expect(review.trigger(agent.id, 'review-1', 'refresh', signal)).rejects.toMatchObject({ code: 'request-conflict' })
+  })
+
+  it('projects incomplete legacy history with original quotes and explicit unavailable metadata', async () => {
+    const { review, agent, signal, ctx } = await setup()
+    const report = reportSchema.parse({ reportId: 'legacy-report', revision: 4, caseRevision: snapshot().caseRevision, summary: 'Legacy report.',
+      findings: [{ kind: 'inconsistency', title: 'Legacy title', explanation: 'Legacy explanation.', suggestion: 'Review manually.',
+        citations: [{ sourceRef: 'legacy-source', start: 0, end: 6, quote: 'Old quote' }] }], reviewedSourceRefs: [],
+      assessment: 'pending-human-review', calculation: { drg: 'unavailable', dip: 'unavailable' } })
+    appendPluginRecord(agent.session, 'plugin:clinical-review/state', { ...review.require(agent), history: [report] })
+    const saved = await review.result(resultRequestSchema.parse({ sessionId: agent.id,
+      resultId: resultIdForSession(agent.id), revision: 1 }), signal)
+    expect(saved).toMatchObject({ reportId: 'legacy-report', revision: 1, generatedAt: null, capturedAt: null, cutoff: null, snapshotStatus: 'unavailable',
+      findings: [{ legacy: true, issueCode: 'inconsistency', evidenceRefs: [{ quote: 'Old quote', sourceStatus: 'unavailable', source: null }] }] })
+    await expect(review.result(resultRequestSchema.parse({ sessionId: agent.id, resultId: 'foreign-result', revision: 1 }), signal)).rejects.toMatchObject({ code: 'result-not-found' })
+    await expect(review.results(resultsRequestSchema.parse({ sessionId: agent.id, encounterRef: 'foreign-binding' }), signal)).rejects.toMatchObject({ code: 'forbidden' })
+    expect(ctx.sessionProjections.stateOf(agent.session, 'clinicalResults')?.reports).toHaveLength(1)
+  })
+
+  it('compares the complete accepted inventory and coverage only after explicit later captures', async () => {
+    const { review, agent, start, signal, capture } = await setup()
+    await start()
+    await review.submit(agent, { revision: 1, caseRevision: snapshot().caseRevision, summary: 'Saved report.', findings: [], reviewedSourceRefs: [] }, signal)
+    const request = resultRequestSchema.parse({ sessionId: agent.id, resultId: resultIdForSession(agent.id), revision: 1 })
+    expect((await review.result(request, signal)).freshness.status).toBe('unknown')
+    await review.trigger(agent.id, 'compare-unchanged', 'refresh', signal)
+    await expect.poll(() => review.require(agent).status).toBe('stale')
+    expect((await review.result(request, signal)).freshness).toEqual({ status: 'unchanged', lastCheckedAt: snapshot().capturedAt, scope: 'accepted-snapshot' })
+    const original = snapshot().sources[0]!
+    capture.mockResolvedValue(parseSnapshot({ ...snapshot(), sources: [original, { ...original, sourceRef: 'additional-source', sourceId: 'additional-record' }] }))
+    await review.trigger(agent.id, 'compare-added', 'refresh', signal)
+    await expect.poll(() => review.require(agent).revision === 3 && review.require(agent).status === 'stale').toBe(true)
+    expect((await review.result(request, signal)).freshness.status).toBe('changed')
+    capture.mockResolvedValue(parseSnapshot({ ...snapshot(), sources: [], coverage: snapshot().coverage.map(item => item.category === 'documents' ? { ...item, status: 'empty' } : item) }))
+    await review.trigger(agent.id, 'compare-deleted', 'refresh', signal)
+    await expect.poll(() => review.require(agent).revision === 4 && review.require(agent).status === 'stale').toBe(true)
+    expect((await review.result(request, signal)).freshness.status).toBe('changed')
+    capture.mockResolvedValue(parseSnapshot({ ...snapshot(), coverage: snapshot().coverage.map(item => item.category === 'labs' ? { ...item, status: 'unread' } : item) }))
+    await review.trigger(agent.id, 'compare-coverage', 'refresh', signal)
+    await expect.poll(() => review.require(agent).revision === 5 && review.require(agent).status === 'stale').toBe(true)
+    expect((await review.result(request, signal)).freshness.status).toBe('changed')
+    capture.mockResolvedValue(parseSnapshot({ ...snapshot(), providerRevision: 'another-provider' }))
+    await review.trigger(agent.id, 'compare-incomparable', 'refresh', signal)
+    await expect.poll(() => review.require(agent).revision === 6 && review.require(agent).status === 'stale').toBe(true)
+    expect((await review.result(request, signal)).freshness).toEqual({ status: 'unknown', lastCheckedAt: null, scope: 'none' })
+  })
   it('opening only binds metadata; duplicate review events wake once and return before the reader completes', async () => {
     const fixture = await setup()
     const { review, agent, followup, capture, signal } = fixture

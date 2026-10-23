@@ -8,7 +8,9 @@ import type { ReadDatabase, ReadTransaction } from './database.ts'
 import { EncounterPolicy } from './policy.ts'
 import { encounterIdentitySql, sourceQueries } from './sql.ts'
 
-const identitySchema = z.strictObject({ id: z.string(), inpat_code: z.string().nullable() })
+const identitySchema = z.strictObject({
+  id: z.string(), inpat_code: z.string().nullable(), current_dept_code: z.string().nullable(), inpat_state_code: z.string().nullable(),
+})
 const rowSchema = z.strictObject({
   id: z.string(), state: z.string().nullable(), occurred_at: z.string().nullable(),
   available_at: z.string().nullable(), oversized: z.boolean(),
@@ -31,14 +33,38 @@ export class PgEncounterReader extends EncounterReader {
    */
   async resolve(actor: ClinicalActor, claim: LaunchClaim, signal: AbortSignal, isActive?: () => boolean): Promise<EncounterBinding> {
     this.admit(signal, isActive)
-    const entry = await this.policy.authorize(actor, claim)
-    return this.database.read(signal, async (transaction) => {
+    await this.policy.admission(actor, claim)
+    const binding = await this.database.read(signal, async (transaction) => {
       this.admit(signal, isActive)
       const admission = await this.identity(transaction, claim)
+      const entry = await this.currentAccess(actor, claim, admission)
       if ((entry.inpatCode !== undefined && entry.inpatCode !== admission.inpat_code)
         || (claim.inpatCode !== undefined && claim.inpatCode !== admission.inpat_code)) throw new EncounterReadError('source-mismatch', 'Admission identifiers disagree with the clinical source.')
       return this.policy.bind(actor, entry, admission.inpat_code ?? undefined)
     })
+    await this.authorize(actor, binding, signal, isActive)
+    return binding
+  }
+  /** Reauthorize saved-result reads; department grants require current admission data and fail closed on source outage.
+   * @param actor - Verified transport identity.
+   * @param binding - Signed encounter binding.
+   * @param signal - Caller cancellation.
+   * @param isActive - Current login admission.
+   * @returns The unchanged binding after current permission checks.
+   */
+  async authorize(
+    actor: ClinicalActor, binding: EncounterBinding, signal: AbortSignal, isActive?: () => boolean,
+  ): Promise<EncounterBinding> {
+    this.admit(signal, isActive)
+    this.policy.verify(actor, binding)
+    const exact = await this.policy.admission(actor, binding)
+    if (exact === undefined) await this.database.read(signal, async (transaction) => {
+      const current = await this.identity(transaction, binding)
+      await this.currentAccess(actor, binding, current)
+      if (binding.inpatCode !== undefined && binding.inpatCode !== current.inpat_code) throw new EncounterReadError('source-mismatch', 'The admission mapping changed. Reopen the encounter.')
+    })
+    this.admit(signal, isActive)
+    return binding
   }
   /**
    * Capture original evidence after actor, binding and allowlist authorization.
@@ -53,10 +79,11 @@ export class PgEncounterReader extends EncounterReader {
   ): Promise<EncounterSnapshot> {
     this.admit(signal, isActive)
     this.policy.verify(actor, binding)
-    const allowed = await this.policy.authorize(actor, binding)
+    await this.policy.admission(actor, binding)
     const snapshot = await this.database.read(signal, async (transaction) => {
       this.admit(signal, isActive)
       const admission = await this.identity(transaction, binding)
+      const allowed = await this.currentAccess(actor, binding, admission)
       if ((binding.inpatCode !== undefined && binding.inpatCode !== admission.inpat_code)
         || (allowed.inpatCode !== undefined && allowed.inpatCode !== admission.inpat_code)) throw new EncounterReadError('source-mismatch', 'The admission mapping changed. Reopen the encounter.')
       const capturedAt = new Date().toISOString()
@@ -91,13 +118,18 @@ export class PgEncounterReader extends EncounterReader {
       if (Buffer.byteLength(JSON.stringify(value)) > this.config.maxResponseBytes) throw new EncounterReadError('limit-exceeded', 'The complete clinical snapshot exceeds the configured byte limit; no partial snapshot was accepted.')
       return parseSnapshot(value)
     })
-    await this.policy.authorize(actor, binding)
+    await this.authorize(actor, binding, signal, isActive)
     this.admit(signal, isActive)
     return snapshot
   }
   private admit(signal: AbortSignal, isActive?: () => boolean): void {
     if (signal.aborted) throw new EncounterReadError('cancelled', 'Clinical read was cancelled.')
     if (isActive !== undefined && !isActive()) throw new EncounterReadError('forbidden', 'Sign in again before reading clinical data.')
+  }
+  private async currentAccess(actor: ClinicalActor, claim: LaunchClaim | EncounterBinding, current: z.infer<typeof identitySchema>) {
+    const exact = await this.policy.admission(actor, claim)
+    if (exact === undefined && current.inpat_state_code !== '4' && current.inpat_state_code !== '5') throw new EncounterReadError('forbidden', 'Department access is limited to current inpatients. Reopen an authorized encounter.')
+    return this.policy.authorize(actor, claim, current.current_dept_code ?? undefined)
   }
   private async identity(transaction: ReadTransaction, claim: Pick<LaunchClaim, 'inpatId' | 'hospitalCode'>): Promise<z.infer<typeof identitySchema>> {
     const rows = await transaction.query(encounterIdentitySql, [claim.inpatId, claim.hospitalCode])

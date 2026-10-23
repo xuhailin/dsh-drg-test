@@ -25,7 +25,7 @@ export const inject = ['slots', 'locale', 'uiWorkspace']
 export async function apply(ctx: Context): Promise<void> {
   const lifetime = new AbortController()
   ctx.effect(() => () => { lifetime.abort() })
-  const response = await fetch('/api/emr-entry/config', { credentials: 'same-origin', cache: 'no-store', signal: lifetime.signal })
+  const response = await fetch('api/emr-entry/config', { credentials: 'same-origin', cache: 'no-store', signal: lifetime.signal })
   if (!response.ok) throw new Error('client-emr-entry: public settings unavailable')
   const config = entryConfig.parse(await response.json())
   lifetime.signal.throwIfAborted()

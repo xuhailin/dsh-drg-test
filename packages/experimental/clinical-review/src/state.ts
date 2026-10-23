@@ -15,6 +15,9 @@ import { proposalSchema } from './projection.ts'
 import { ClinicalReviewError } from './error.ts'
 import type { ReviewLaunchAccess } from './reader.ts'
 import type { ReviewFinding, ReviewOperation, ReviewReceipt, ReviewReport, ReviewReportId, ReviewState } from './types.ts'
+import { resultIdForSession, type ClinicalEncounterRef, type ClinicalFindingId, type ResultRequest, type ResultsRequest, type RerunRequest,
+  type ResultResponse, type ResultsResponse, type ResultSummary, type RerunResponse } from './result.ts'
+import type { RetainedReviewReport } from './result-projection.ts'
 
 declare module '@deepseek-ai/cordis' { interface Context { clinicalReview: ClinicalReviewService } }
 
@@ -137,26 +140,166 @@ export class ClinicalReviewService {
   async trigger(id: SessionId, eventId: string, trigger: ReviewOperation['trigger'], signal: AbortSignal): Promise<ReviewReceipt> {
     const agent = await this.resolve(id)
     return this.serial(id, async () => {
-      signal.throwIfAborted()
-      const state = this.require(agent)
-      if (state.operations.some(operation => operation.eventId === eventId)) return this.receipt(agent, state, 'duplicate')
-      if (state.operations.length >= this.config.maxOperations) throw new ClinicalReviewError('limit-exceeded', 'This encounter Session reached its configured event limit. An operator must review the retained history and capacity before more events are accepted.')
-      if (state.report !== null && state.history.length >= this.config.maxReports) throw new ClinicalReviewError('limit-exceeded', 'This encounter Session reached its report-history limit.')
-      const revision = state.revision + 1
-      const operation: ReviewOperation = { eventId, trigger, status: 'accepted', revision }
-      const next: ReviewState = { ...state, revision, status: 'collecting', report: null, readRanges: [],
-        history: state.report === null ? state.history : [...state.history, state.report], operations: [...state.operations, operation] }
-      await this.commit(agent, next)
-      this.captures.get(id)?.abort()
-      const controller = new AbortController()
-      this.captures.set(id, controller)
-      const task = this.collect(agent, operation, AbortSignal.any([controller.signal, this.lifetime.signal])).catch((error: unknown) => {
-        this.ctx.logger.warn(`clinical-review: collection failed (${failureCode(error)})`)
-      })
-      this.pending.add(task)
-      void task.finally(() => { this.pending.delete(task); if (this.captures.get(id) === controller) this.captures.delete(id) })
-      return this.receipt(agent, next, 'accepted')
+      await this.authorized(agent, signal)
+      return this.admit(agent, eventId, trigger, signal)
     })
+  }
+
+  private async admit(agent: Agent, eventId: string, trigger: ReviewOperation['trigger'], signal: AbortSignal): Promise<ReviewReceipt> {
+    signal.throwIfAborted()
+    const state = this.require(agent)
+    const previous = state.operations.find(operation => operation.eventId === eventId)
+    if (previous !== undefined) {
+      if (previous.trigger !== trigger) throw new ClinicalReviewError('request-conflict', 'This request ID was already used with different review parameters.')
+      return { sessionId: agent.id, revision: previous.revision, status: 'duplicate', dischargeBlocked: false }
+    }
+    if (state.operations.length >= this.config.maxOperations) throw new ClinicalReviewError('limit-exceeded', 'This encounter Session reached its configured event limit. An operator must review the retained history and capacity before more events are accepted.')
+    if (state.report !== null && state.history.length >= this.config.maxReports) throw new ClinicalReviewError('limit-exceeded', 'This encounter Session reached its report-history limit.')
+    const revision = state.revision + 1
+    const operation: ReviewOperation = { eventId, trigger, status: 'accepted', revision }
+    const next: ReviewState = { ...state, revision, status: 'collecting', report: null, readRanges: [],
+      history: state.report === null ? state.history : [...state.history, state.report], operations: [...state.operations, operation] }
+    await this.commit(agent, next)
+    this.captures.get(agent.id)?.abort()
+    const controller = new AbortController()
+    this.captures.set(agent.id, controller)
+    const task = this.collect(agent, operation, AbortSignal.any([controller.signal, this.lifetime.signal])).catch((error: unknown) => {
+      this.ctx.logger.warn(`clinical-review: collection failed (${failureCode(error)})`)
+    })
+    this.pending.add(task)
+    void task.finally(() => { this.pending.delete(task); if (this.captures.get(agent.id) === controller) this.captures.delete(agent.id) })
+    return this.receipt(agent, next, 'accepted')
+  }
+
+  /** List immutable accepted reports after current binding authorization, without source or model work.
+   * @param request - Owned Session and optional expected encounter reference.
+   * @param signal - Read cancellation.
+   * @returns Newest-first report references and independent current progress.
+   */
+  async results(request: ResultsRequest, signal: AbortSignal): Promise<ResultsResponse> {
+    const agent = await this.resolve(request.sessionId)
+    return this.serial(agent.id, async () => {
+      const state = await this.authorized(agent, signal, request.encounterRef)
+      return { ...this.resultBase(agent, state), results: this.savedSummaries(agent, state).reverse() }
+    })
+  }
+
+  /** Read one exact accepted revision using its retained evidence, even after a later failed review.
+   * @param request - Exact immutable report reference.
+   * @param signal - Read cancellation.
+   * @returns Original report fields and quotations; missing historical source metadata stays explicit.
+   */
+  async result(request: ResultRequest, signal: AbortSignal): Promise<ResultResponse> {
+    const agent = await this.resolve(request.sessionId)
+    return this.serial(agent.id, async () => {
+      const state = await this.authorized(agent, signal, request.encounterRef)
+      const retained = this.selected(agent, request)
+      const history = this.savedSummaries(agent, state)
+      const selected = history[request.revision - 1]
+      if (selected === undefined) throw new ClinicalReviewError('result-not-found', 'This saved report revision is unavailable.')
+      const { report, snapshot } = retained
+      return { ...this.resultBase(agent, state), ...selected, summary: report.summary, assessment: report.assessment,
+        freshness: this.freshness(agent, state, retained),
+        snapshotStatus: snapshot === null ? 'unavailable' : 'retained', coverage: snapshot === null ? [] : [...snapshot.coverage],
+        reviewedSourceRefs: [...report.reviewedSourceRefs],
+        unreviewedSourceRefs: snapshot === null ? [] : snapshot.sources
+          .filter(source => !report.reviewedSourceRefs.includes(source.sourceRef)).map(source => source.sourceRef),
+        findings: report.findings.map((finding, index) => ({
+          findingId: brandString<ClinicalFindingId>(`clinical-finding:${report.reportId}:${String(index + 1)}`), kind: finding.kind,
+          issueCode: finding.kind, legacy: true, fieldKey: null,
+          title: finding.title, explanation: finding.explanation, suggestion: finding.suggestion,
+          evidenceRefs: finding.citations.map((citation) => {
+            const source = snapshot?.sources.find(candidate => candidate.sourceRef === citation.sourceRef
+              && candidate.content.slice(citation.start, citation.end) === citation.quote)
+            return { ...citation, sourceStatus: source === undefined ? 'unavailable' as const : 'retained' as const,
+              source: source === undefined ? null : { sourceId: source.sourceId, sourceRevision: source.sourceRevision,
+                category: source.category, state: source.state,
+                occurredAt: source.occurredAt ?? null, availableAt: source.availableAt ?? null } }
+          }),
+        })),
+        calculation: { drg: { status: 'unavailable', reason: 'engine-unavailable' }, dip: { status: 'unavailable', reason: 'engine-unavailable' } },
+        history: history.reverse(), latestRevision: history.length,
+      }
+    })
+  }
+
+  /** Admit an explicitly requested rerun; retry identities include the original selected result and binding.
+   * @param request - Idempotent request with its exact viewer selection.
+   * @param signal - Admission cancellation.
+   * @returns Original admitted revision on retries; completed reports arrive separately.
+   */
+  async rerun(request: RerunRequest, signal: AbortSignal): Promise<RerunResponse> {
+    const agent = await this.resolve(request.sessionId)
+    return this.serial(agent.id, async () => {
+      await this.authorized(agent, signal, request.encounterRef)
+      this.selected(agent, request)
+      const identity = `result-rerun:${createHash('sha256').update(request.requestId).digest('hex')}:`
+      const eventId = `${identity}${createHash('sha256').update(JSON.stringify([request.encounterRef, request.resultId, request.revision])).digest('hex')}`
+      const prior = this.require(agent).operations.find(operation => operation.eventId.startsWith(identity))
+      if (prior !== undefined && prior.eventId !== eventId) throw new ClinicalReviewError('request-conflict', 'This request ID was already used with different result parameters.')
+      const receipt = await this.admit(agent, eventId, 'manual-review', signal)
+      if (receipt.status === 'bound') throw new ClinicalReviewError('invalid-receipt', 'The review request was not admitted.')
+      return { ...receipt, status: receipt.status, requestId: request.requestId }
+    })
+  }
+
+  private encounterRef(state: ReviewState): ClinicalEncounterRef {
+    const identity = [state.binding.sourceSystem, state.binding.hospitalCode, state.binding.inpatId]
+    return brandString<ClinicalEncounterRef>(`clinical-encounter:${createHash('sha256').update(JSON.stringify(identity)).digest('hex')}`)
+  }
+
+  private async authorized(agent: Agent, signal: AbortSignal, expected?: ClinicalEncounterRef): Promise<ReviewState> {
+    const state = this.require(agent)
+    if (expected !== undefined && expected !== this.encounterRef(state)) throw new ClinicalReviewError('forbidden', 'The result does not belong to this encounter binding.')
+    await this.access.reauthorize(state.binding, AbortSignal.any([signal, this.lifetime.signal]))
+    signal.throwIfAborted()
+    const current = this.require(agent)
+    if (current.binding.bindingId !== state.binding.bindingId) throw new ClinicalReviewError('binding-conflict', 'The encounter binding changed. Reopen its saved results.')
+    return current
+  }
+
+  private retained(agent: Agent): readonly RetainedReviewReport[] {
+    const value = this.ctx.sessionProjections.stateOf(agent.session, 'clinicalResults')
+    if (value === undefined) throw new ClinicalReviewError('projection-unavailable', 'The saved-result projection is unavailable.')
+    return value.reports
+  }
+
+  private selected(agent: Agent, request: ResultRequest): RetainedReviewReport {
+    const selected = this.retained(agent)[request.revision - 1]
+    if (request.resultId !== resultIdForSession(agent.id) || selected === undefined) throw new ClinicalReviewError('result-not-found', 'This saved report revision does not belong to the requested Session.')
+    return selected
+  }
+
+  private savedSummaries(agent: Agent, state: ReviewState): ResultSummary[] {
+    return this.retained(agent).map(({ report, snapshot, generatedAt }, index) => ({ sessionId: agent.id,
+      encounterRef: this.encounterRef(state), resultId: resultIdForSession(agent.id), revision: index + 1, reportId: report.reportId,
+      generatedAt, findingCount: report.findings.length, evidenceRevision: report.caseRevision,
+      capturedAt: snapshot?.capturedAt ?? null, cutoff: snapshot?.cutoff ?? null, legacy: true }))
+  }
+
+  private resultBase(agent: Agent, state: ReviewState): Omit<ResultsResponse, 'results'> {
+    const operation = state.operations.find(item => item.revision === state.revision)
+    return { schemaVersion: 1, resultType: 'pre-discharge-review', sessionId: agent.id, encounterRef: this.encounterRef(state),
+      encounterLabel: state.binding.inpatCode ?? state.binding.inpatId,
+      progress: { revision: state.revision, status: state.status, errorCode: operation?.errorCode ?? null },
+      freshness: this.freshness(agent, state, this.retained(agent).at(-1)), dischargeBlocked: false }
+  }
+
+  private freshness(agent: Agent, state: ReviewState, retained: RetainedReviewReport | undefined): ResultsResponse['freshness'] {
+    const latest = this.ctx.sessionProjections.stateOf(agent.session, 'clinicalResults')?.latestCapture
+    if (retained === undefined || retained.snapshot === null || latest === undefined || latest === null
+      || latest.revision <= retained.report.revision || latest.snapshot.bindingId !== state.binding.bindingId
+      || latest.snapshot.bindingId !== retained.snapshot.bindingId
+      || latest.snapshot.providerRevision !== retained.snapshot.providerRevision) {
+      return { status: 'unknown', lastCheckedAt: null, scope: 'none' }
+    }
+    const identity = (snapshot: EncounterSnapshot): string => JSON.stringify({
+      sources: [...snapshot.sources].sort((a, b) => a.sourceRef.localeCompare(b.sourceRef))
+        .map(({ content: _content, ...source }) => source),
+      coverage: [...snapshot.coverage].sort((a, b) => a.category.localeCompare(b.category)),
+    })
+    return { status: identity(latest.snapshot) === identity(retained.snapshot) ? 'unchanged' : 'changed',
+      lastCheckedAt: latest.snapshot.capturedAt, scope: 'accepted-snapshot' }
   }
 
   /** Read accepted inventory after current broker authorization and freshness checks.

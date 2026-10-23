@@ -38,6 +38,8 @@ Add this package to a Web profile alongside [clinical-review](../clinical-review
 
 `allowedOrigins` defaults to an empty list, which disables window messages while retaining the form. Entries must be exact HTTP(S) origins without credentials, paths, or trailing slashes. The two defaults are required form values; they do not grant encounter access. `requestTimeoutMs` bounds operation waits, `maxPendingRequests` bounds concurrent requests, and `maxMessageBytes` bounds each accepted message. The reader broker reauthorizes the account, hospital, and encounter independently.
 
+Browser configuration and action requests resolve `api/...` relative to the current workspace document, preserving hosted workspace path prefixes.
+
 ### Open and review an encounter
 
 Use **Connect encounter** in the sidebar to enter the source system, hospital code, inpatient record ID, and optional admission number. Opening a Session binds identifiers without reading clinical text or calling a model. In that Session, **Pre-discharge review → Start review** captures evidence and starts analysis. **Refresh evidence** captures a new snapshot without starting analysis; review again to replace the previous findings. Results appear through the existing chat tools. DRG/DIP grouping remains unavailable until a calculation provider is configured.

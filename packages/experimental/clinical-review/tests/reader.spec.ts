@@ -66,6 +66,16 @@ describe('authenticated encounter HTTP reader', () => {
     await expect(unavailable.access.authorize(claim, new AbortController().signal)).rejects.not.toThrow('sensitive database diagnostic')
   })
 
+  it('reauthorizes saved reads without capturing evidence and rejects a substituted binding', async () => {
+    const { access, requests } = await harness(() => ({ value: binding }))
+    const { parseBinding } = await import('@deepseek-ai/dsh-experimental-emr-encounter')
+    await access.reauthorize(parseBinding(binding), new AbortController().signal)
+    expect(requests.map(request => request.operation)).toEqual(['/runtime/emr/authorize'])
+    expect(requests[0]?.body).toEqual({ binding })
+    const changed = await harness(() => ({ value: { ...binding, inpatId: '456' } }))
+    await expect(changed.access.reauthorize(parseBinding(binding), new AbortController().signal)).rejects.toMatchObject({ code: 'source-mismatch' })
+  })
+
   it('rejects oversized complete responses and modified source bytes', async () => {
     const large = await harness(() => ({ value: { content: '文'.repeat(100) } }), 50)
     await expect(large.access.authorize(claim, new AbortController().signal)).rejects.toMatchObject({ code: 'limit-exceeded' })

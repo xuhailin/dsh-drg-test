@@ -1,11 +1,12 @@
 /** Bounded authenticated runtime requests and expiring one-use clinical launch grants. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
-import { EncounterReadError, bindingSchema, grantResultSchema, launchClaimSchema, type EncounterBinding } from '@deepseek-ai/dsh-experimental-emr-encounter'
+import { EncounterReadError, bindingSchema, departmentDirectoryRequestSchema, patientDirectoryRequestSchema, grantResultSchema, launchClaimSchema, type EncounterBinding } from '@deepseek-ai/dsh-experimental-emr-encounter'
 import type { HostedRuntimeRequest } from '@deepseek-ai/dsh-experimental-hosted-workspaces'
 import type { Config } from './config.ts'
 import { newGrant, type EncounterPolicy } from './policy.ts'
 import type { PgEncounterReader } from './reader.ts'
+import type { PgEncounterDirectory } from './directory.ts'
 
 const consumeSchema = z.strictObject({ grant: grantResultSchema.shape.grant })
 const captureSchema = z.strictObject({ binding: bindingSchema })
@@ -44,7 +45,10 @@ export class ClinicalBroker {
   private readonly grants = new Map<string, PendingGrant>()
   private readonly lifetime = new AbortController()
   private readonly pending = new Set<Promise<void>>()
-  constructor(private readonly config: Config, private readonly policy: EncounterPolicy, private readonly reader: PgEncounterReader) {}
+  constructor(
+    private readonly config: Config, private readonly policy: EncounterPolicy,
+    private readonly reader: PgEncounterReader, private readonly directory: PgEncounterDirectory,
+  ) {}
   /**
    * Handle only fixed clinical runtime routes; other plugins may own remaining paths.
    * @param request - Gateway-authenticated actor and current login admission.
@@ -52,7 +56,7 @@ export class ClinicalBroker {
    */
   async handle(request: HostedRuntimeRequest): Promise<boolean> {
     const path = request.request.url?.split('?')[0]
-    if (path === undefined || !['/runtime/emr/launch', '/runtime/emr/consume', '/runtime/emr/capture'].includes(path)) return false
+    if (path === undefined || !['/runtime/emr/launch', '/runtime/emr/consume', '/runtime/emr/authorize', '/runtime/emr/capture', '/runtime/emr/departments', '/runtime/emr/patients'].includes(path)) return false
     if (this.pending.size >= this.config.maxConcurrentReads) {
       write(request.response, 429, { error: { code: 'limit-exceeded', message: 'Clinical reads are busy. Retry after the current read completes.' } })
       return true
@@ -80,7 +84,7 @@ export class ClinicalBroker {
         if (this.grants.size >= this.config.maxPendingGrants) throw new EncounterReadError('limit-exceeded', 'Too many pending encounter launches. Finish or retry after they expire.')
         const binding = await this.reader.resolve(request.actor, claim, signal, request.isActive)
         admit()
-        await this.policy.authorize(request.actor, binding)
+        await this.reader.authorize(request.actor, binding, signal, request.isActive)
         if (this.grants.size >= this.config.maxPendingGrants) throw new EncounterReadError('limit-exceeded', 'Too many pending encounter launches. Finish or retry after they expire.')
         const grant = newGrant()
         const expiresAt = Date.now() + this.config.grantTtlMs
@@ -93,8 +97,16 @@ export class ClinicalBroker {
         if (pending.actorId !== request.actor.id) throw new EncounterReadError('forbidden', 'This launch grant belongs to another account.')
         this.grants.delete(grant)
         this.policy.verify(request.actor, pending.binding)
-        await this.policy.authorize(request.actor, pending.binding)
+        await this.reader.authorize(request.actor, pending.binding, signal, request.isActive)
         value = pending.binding
+      } else if (path === '/runtime/emr/authorize') {
+        const { binding } = captureSchema.parse(body)
+        value = await this.reader.authorize(request.actor, binding, signal, request.isActive)
+      } else if (path === '/runtime/emr/departments') {
+        departmentDirectoryRequestSchema.parse(body)
+        value = await this.directory.departments(request.actor, signal, request.isActive)
+      } else if (path === '/runtime/emr/patients') {
+        value = await this.directory.patients(request.actor, patientDirectoryRequestSchema.parse(body), signal, request.isActive)
       } else {
         const { binding } = captureSchema.parse(body)
         value = await this.reader.capture(request.actor, binding, signal, request.isActive)

@@ -22,7 +22,7 @@ async function bench() {
   const open = vi.fn()
   const parent = { postMessage: vi.fn() }
   vi.stubGlobal('opener', parent)
-  const send = vi.fn<typeof fetch>().mockImplementation(async url => url === '/api/emr-entry/config'
+  const send = vi.fn<typeof fetch>().mockImplementation(async url => url === 'api/emr-entry/config'
     ? Response.json(config)
     : Response.json({ sessionId: 'private-session', revision: 0, status: 'bound', dischargeBlocked: false, clinicalBody: 'omitted' }))
   vi.stubGlobal('fetch', send)
@@ -53,6 +53,10 @@ describe('EMR browser entry plugin', () => {
     expect(b.send).toHaveBeenCalledOnce()
     b.dispatch('https://emr.example', b.parent)
     await vi.waitFor(() => { expect(b.open).toHaveBeenCalledWith('private-session') })
+    const workspace = new URL('https://workspace.example/workspaces/doctor/')
+    expect(b.send.mock.calls.map(([url]) => new URL(url instanceof Request ? url.url : url, workspace).pathname)).toEqual([
+      '/workspaces/doctor/api/emr-entry/config', '/workspaces/doctor/api/clinical-review/launch',
+    ])
     expect(b.send.mock.calls[1]![1]?.credentials).toBe('same-origin')
     expect(b.parent.postMessage).toHaveBeenLastCalledWith({
       type: 'dsh.emr.launch.result', eventId: 'event', sessionId: 'private-session', status: 'bound', dischargeBlocked: false,

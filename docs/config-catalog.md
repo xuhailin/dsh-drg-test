@@ -976,6 +976,36 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-claude-code-mods -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-client-clinical-results -->
+<a id="deepseek-aidsh-experimental-client-clinical-results"></a>
+
+## `@deepseek-ai/dsh-experimental-client-clinical-results`
+
+- `inject`: `connection`
+- `source`: [`packages/experimental/client-clinical-results/src/index.ts:8`](../packages/experimental/client-clinical-results/src/index.ts)
+
+```ts config-catalog
+/** Deployment-owned embedding origins and browser request bounds. */
+export type Config = ViewerConfig
+
+/** Public, nonclinical deployment settings for the saved-result viewer. */
+export interface ViewerConfig {
+  /** Exact parent/opener origins permitted to complete the embedding handshake. */
+  readonly allowedOrigins: string[]
+  /** Maximum duration of one authenticated browser request. */
+  readonly requestTimeoutMs: number
+  /** Maximum UTF-8 JSON bytes accepted from the embedding host. */
+  readonly maxMessageBytes: number
+  /** Maximum outstanding embedding action requests retained by one view. */
+  readonly maxPendingRequests: number
+  /** Maximum completed embedding receipts retained by one view. */
+  readonly maxActionReceipts: number
+  /** Maximum patient rows requested in one directory page. */
+  readonly directoryPageSize: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-client-clinical-results -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-client-emr-entry -->
 <a id="deepseek-aidsh-experimental-client-emr-entry"></a>
 
@@ -1152,6 +1182,8 @@ export interface Config {
   maxSourceBytes: number
   /** Maximum records accepted per supported evidence category. */
   maxRowsPerCategory: number
+  /** Maximum patients returned in one directory page. */
+  maxDirectoryPageSize: number
   /** Maximum bytes read from the encounter allowlist file. */
   maxPolicyBytes: number
   /** Deadline in milliseconds for one broker operation and its database queries. */

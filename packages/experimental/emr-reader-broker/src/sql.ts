@@ -2,7 +2,7 @@
 import type { EvidenceCategory } from '@deepseek-ai/dsh-experimental-emr-encounter'
 
 /** The first query verifies admission identity inside the hospital scope. */
-export const encounterIdentitySql = 'SELECT inpat_id::text AS id, inpat_code FROM cpoe_inpat_record WHERE inpat_id = $1::bigint AND cur_hospital_code = $2 AND is_valid = true LIMIT 2'
+export const encounterIdentitySql = 'SELECT inpat_id::text AS id, inpat_code, current_dept_code, inpat_state_code FROM cpoe_inpat_record WHERE inpat_id = $1::bigint AND cur_hospital_code = $2 AND is_valid = true LIMIT 2'
 
 function bounded(body: string): string {
   return `WITH evidence AS (${body}), bounded AS (SELECT * FROM evidence ORDER BY id LIMIT $3) SELECT id, state, occurred_at, available_at, octet_length(body::text) > $4 OR sum(octet_length(body::text)) OVER () > $5 AS oversized, CASE WHEN octet_length(body::text) <= $4 AND sum(octet_length(body::text)) OVER () <= $5 THEN body ELSE NULL END AS body FROM bounded ORDER BY id`

@@ -117,7 +117,7 @@ export class EntryActions {
 
   private async readStatus(sessionId: SessionId, signal: AbortSignal): Promise<ReturnType<typeof reviewStatus.parse> | 'unbound' | 'denied' | 'unavailable'> {
     const send = this.send
-    const response = await send('/api/clinical-review/status', {
+    const response = await send('api/clinical-review/status', {
       method: 'POST', credentials: 'same-origin', cache: 'no-store', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sessionId }), signal,
     })
@@ -165,7 +165,7 @@ export class EntryActions {
 
   private async perform(operation: string, body: string): Promise<ReturnType<typeof receipt.parse>> {
     const send = this.send
-    const response = await send(`/api/clinical-review/${operation}`, {
+    const response = await send(`api/clinical-review/${operation}`, {
       method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body,
       signal: AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(this.config.requestTimeoutMs)]),
     })

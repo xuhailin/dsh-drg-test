@@ -3,6 +3,9 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { runLoaderSmoke, LOADER_SMOKE_TEST_TIMEOUT_MS } from '@deepseek-ai/dsh-loader-smoke'
+import { z } from 'zod'
+import { snapshotSchema } from '@deepseek-ai/dsh-experimental-emr-encounter'
+import { reportSchema } from '../src/projection.ts'
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url))
 const fixture = fileURLToPath(new URL('./snapshot-fixture.ts', import.meta.url))
@@ -19,7 +22,7 @@ describe('clinical review through the shipped headless profile', () => {
           '- id: llm-deepseek', '  disabled: true', '- id: session-title-llm', '  disabled: true',
           '- id: agent-default-model', '  config:', '    provider: clinical-fixture', '    model: fixture',
           '- id: session-persistence-jsonl', '  config:', "    root: !!js dshHomePath('sessions')", '    compression: none',
-          '- insert:', '    - id: clinical-review-fixture', `      name: ${JSON.stringify(fixture)}`, '      config:', '        scriptModel: true', '',
+          '- insert:', '    - id: clinical-review-fixture', `      name: ${JSON.stringify(fixture)}`, '      config:', '        scriptModel: true', '        saveResult: true', '',
         ].join('\n'))
       },
       inspect: async (cwd) => {
@@ -35,6 +38,13 @@ describe('clinical review through the shipped headless profile', () => {
         expect(text).toContain('Source synthetic-document-1 at reviewedSourceRefs[0] has not been fully read.')
         expect(text).toContain('"drg":"unavailable"')
         expect(text).toContain('"dip":"unavailable"')
+        const saved = z.object({ reports: z.array(z.object({ report: reportSchema, snapshot: snapshotSchema.nullable(),
+          generatedAt: z.string().nullable() })) }).parse(JSON.parse(await readFile(join(cwd, '.dsh/clinical-saved-result.json'), 'utf8')))
+        expect(saved.reports).toHaveLength(1)
+        expect(saved.reports[0]?.report).toMatchObject({ assessment: 'pending-human-review', findings: [{ kind: 'inconsistency',
+          citations: [{ quote: 'pneumonia' }, { quote: 'no pneumonia' }] }], reviewedSourceRefs: ['synthetic-document-1'] })
+        expect(saved.reports[0]?.snapshot?.sources[0]?.content).toContain('Clinical diagnosis: pneumonia.')
+        expect(typeof saved.reports[0]?.generatedAt).toBe('string')
       },
     })
     expect(output.stdout).toContain('不影响出院')

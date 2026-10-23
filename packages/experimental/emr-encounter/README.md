@@ -25,6 +25,8 @@ Read one authorized encounter as immutable original evidence, with source identi
 
 Mount one concrete reader provider, such as [the controlled PostgreSQL broker](../emr-reader-broker/README.md), and consume `ctx.encounterReader`. The abstract service has no standalone mount configuration. Runtime consumers validate wire responses with the exported parsers before retaining evidence. Browser consumers import the same parsers from `@deepseek-ai/dsh-experimental-emr-encounter/wire`, which does not load the Cordis service.
 
+The browser-safe entry also exports [directory schemas](src/directory.ts) for authorized department labels and bounded inpatient pages. Requests carry no account identity; patient rows include only encounter identifiers, name and bed. Parsing these records grants no access.
+
 Bindings retain the verified account, issuer, subject, hospital and admission identifiers. Sources retain original content and source state; coverage distinguishes complete, empty, unread and unsupported categories. Empty means the supported query returned no records, not absence of disease or treatment.
 
 Providers reauthorize each capture, honor cancellation and reject incomplete or oversized snapshots explicitly. Consumers own Session binding, durable evidence, citations and stale-result handling; provider responses do not themselves change a Session or wake an agent.

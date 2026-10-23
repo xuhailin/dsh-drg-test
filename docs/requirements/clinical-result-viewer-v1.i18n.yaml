@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for clinical-result-viewer-v1.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/clinical-result-viewer-v1.md
+/structured-clinical-result-viewer-v1:
+  en: 5436c093865f64c9
+  zh: f4460034afd4d1b3
+/structured-clinical-result-viewer-v1/summary:
+  en: c69ee120e8a43515
+  zh: b6503a5639b0f06b
+/structured-clinical-result-viewer-v1/table-of-contents:
+  en: 48cfef0d2a25d233
+  zh: 97a3b37a27a9ce07
+/structured-clinical-result-viewer-v1/users-and-scope:
+  en: de4fc2e6ab1e5676
+  zh: ce8d22a5b823eafd
+/structured-clinical-result-viewer-v1/users-and-scope/approved-development-directory-scope:
+  en: e23c4a1bfe8e667d
+  zh: a4a11100dfde8ac2
+/structured-clinical-result-viewer-v1/user-flow-and-presentation:
+  en: 2633c05d58cc2e81
+  zh: 30a4471ac3693cbc
+/structured-clinical-result-viewer-v1/identity-and-structured-information:
+  en: 8fc501032f122b06
+  zh: dd362a8e413a4a7f
+/structured-clinical-result-viewer-v1/actions-and-status:
+  en: ef42b16c7b542f21
+  zh: e57f29e526ce9665
+/structured-clinical-result-viewer-v1/plugin-responsibilities-and-embedding:
+  en: d542a036749d08e9
+  zh: 77bbb4d2d3540b74
+/structured-clinical-result-viewer-v1/behavioral-requirements:
+  en: 33f4b2ff322ee62c
+  zh: d5720a50b6a9445c
+/structured-clinical-result-viewer-v1/acceptance-scenarios:
+  en: 3b6303bc57f8d6e9
+  zh: ac9477edb76d4475
+/structured-clinical-result-viewer-v1/compatibility-and-delivery-boundaries:
+  en: 28c754e23264fe75
+  zh: ab98cd6d486ec1e8
+/structured-clinical-result-viewer-v1/dependencies-and-review-points:
+  en: 4642e6c7060fd090
+  zh: 7643575b45e78890
+/structured-clinical-result-viewer-v1/dev-note:
+  en: 1a0ea172fbacbf03
+  zh: 5cd200f3d57f6bbe

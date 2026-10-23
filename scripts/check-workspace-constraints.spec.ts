@@ -473,3 +473,15 @@ it('requires the standalone shortcut protocol and rejects unrelated runtime file
       .toEqual([expect.stringContaining('package.json files must be')])
   }
 })
+
+it.each([
+  ['clinical-review', 'lib/result.js'],
+  ['emr-encounter', 'lib/wire.js'],
+])('requires the neutral clinical entry for %s in its publication files', (name, entry) => {
+  const dir = `packages/experimental/${name}`
+  const manifest = JSON.parse(readFileSync(new URL(`../${dir}/package.json`, import.meta.url), 'utf8')) as WorkspaceManifest['manifest']
+  expect(checkWorkspaceManifest({ dir, manifest })).toEqual([])
+  expect(manifest.files).toEqual(expectedDshPackageFiles(manifest))
+  expect(checkWorkspaceManifest({ dir, manifest: { ...manifest, files: manifest.files!.filter(file => file !== entry) } }))
+    .toEqual([expect.stringContaining('package.json files must be')])
+})

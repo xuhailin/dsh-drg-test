@@ -98,7 +98,7 @@ describe('ui-layout client apply', () => {
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
     const entry = slots.entries('root')[0]!
-    expect(entry.inject).toBeUndefined()
+    expect(entry.inject).toBeDefined()
     const handle = entry.store as ReturnType<typeof createLayoutStore>
     const instance = handle.create()
     expect(handle.create()).toBe(instance)
@@ -164,6 +164,8 @@ describe('ui-layout client apply', () => {
     expect(slots.spec('shell.bottom')).toBeUndefined()
     expect(slots.spec('shell.overlay')).toBeUndefined()
     expect(slots.spec('shell.leading')).toBeUndefined()
+    expect(slots.spec('shell.page')).toBeUndefined()
+    expect(ctx.get('clientPages')).toBeUndefined()
     expect(host.root.getSnapshot().hooks.panelInfo).toBeUndefined()
     // The built-in root declaration survives entry teardown (renderer-owned).
     expect(slots.spec('root')).toEqual({ kind: 'single', scope: 'root' })
