@@ -27,6 +27,7 @@ import { ConversationSession, ConversationSessionHeader } from '../src/client/sk
 import { conversationPhase } from '../src/client/contract/snapshot.ts'
 import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
 import type { HeroShellProps } from '../src/client/skeleton/EmptyHero.tsx'
+import type { ConversationPresentation } from '../src/client/contract/presentation.ts'
 import './control-row-dom.ts'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
 import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
@@ -130,6 +131,7 @@ function mount(
     overlayTakeover?: boolean
     /** The session list summary's `blank` flag — independent of the snapshot's. */
     summaryBlank?: boolean
+    summaryCwd?: string
     /** Drop the session's summary row entirely (a session the list has not caught up with). */
     omitSummaryRow?: boolean
     /** Classify the selected child as a subagent instead of an ordinary fork. */
@@ -138,6 +140,7 @@ function mount(
     nestedSubagent?: boolean
     /** A composer block another plugin raised for this session. */
     composerBlock?: { reason: string }
+    presentations?: readonly ConversationPresentation[]
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
   } = {},
@@ -152,7 +155,7 @@ function mount(
   }
   const childRow = {
     id: SID, displayTitle: 'Child', parentId: options.nestedSubagent === true ? parent : root,
-    cwd: '/projects/one', running: false, retainedBy: { mainView: 1 }, blank: options.summaryBlank ?? false, updatedAt: 3,
+    cwd: options.summaryCwd ?? '/projects/one', running: false, retainedBy: { mainView: 1 }, blank: options.summaryBlank ?? false, updatedAt: 3,
     ...(options.summaryOrigin === undefined ? {} : { origin: options.summaryOrigin }),
   }
   const listed = options.omitSummaryRow !== true
@@ -343,6 +346,7 @@ function mount(
       ...allowAllAccess,
       useProjection: (() => undefined),
       useComposerBlock: select => select(options.composerBlock),
+      usePresentations: select => select(options.presentations ?? []),
       useInput,
       inputActions,
       renderSlot,
@@ -404,6 +408,80 @@ describe('Hero chrome', () => {
 })
 
 describe('ConversationRoot resident composer', () => {
+  it('uses matching feature copy without replacing the composer or its blocking reason', () => {
+    const presentation: ConversationPresentation = {
+      id: 'review', matches: summary => summary?.id === SID,
+      headline: () => 'Review assistant', badge: () => 'Record review',
+      placeholder: () => 'Ask about this review',
+    }
+    const options = { summaryBlank: true, presentations: [presentation] }
+    const b = mount(sessionSnapshotOf({ blank: true }), undefined, undefined, options)
+    expect(b.view.getByText('Review assistant')).toBeTruthy()
+    const editor = b.view.getByRole('textbox')
+    expect(editor.getAttribute('data-placeholder')).toBe('Ask about this review')
+    act(() => { b.session.set({ ...b.session.getSnapshot(), blank: false }) })
+    expect(b.view.getByRole('textbox')).toBe(editor)
+    expect(editor.getAttribute('data-placeholder')).toBe('Ask about this review')
+    b.view.unmount()
+    const blocked = mount(sessionSnapshotOf(), undefined, undefined, {
+      presentations: [presentation], composerBlock: { reason: 'Choose a model' },
+    })
+    expect(blocked.view.getByRole('textbox').getAttribute('data-placeholder')).toBe('Choose a model')
+  })
+
+  it('keeps default welcome copy when the feature does not match this Session', () => {
+    const b = mount(sessionSnapshotOf({ blank: true }), undefined, undefined, {
+      summaryBlank: true,
+      presentations: [{ id: 'other', matches: () => false, headline: () => 'Other assistant',
+        badge: () => 'Other', placeholder: () => 'Other input' }],
+    })
+    expect(b.view.queryByText('Other assistant')).toBeNull()
+    expect(b.view.getByRole('textbox').getAttribute('data-placeholder')).toBe(zh['placeholder.hero'])
+  })
+
+  it('uses a feature-managed Session directory without workspace setup while preserving model blocks', () => {
+    const presentation: ConversationPresentation = {
+      id: 'managed', matches: () => true, workspaceSelection: 'managed',
+      headline: () => 'Review', badge: () => 'Records', placeholder: () => 'Ask about this review',
+    }
+    const options = { summaryBlank: true, presentations: [presentation] }
+    const b = mount(sessionSnapshotOf({ blank: true }), [], undefined, options)
+    expect(b.view.getByRole('textbox').getAttribute('contenteditable')).toBe('true')
+    expect(b.view.getByRole('textbox').getAttribute('data-placeholder')).toBe('Ask about this review')
+    expect(b.view.queryByRole('button', { name: zh['hero.chooseWorkspace'] })).toBeNull()
+    expect(b.slotCalls).not.toContain('conversation.hero.agentPreset')
+    expect(b.slotCalls).toContain('conversation.hero.options')
+    b.view.unmount()
+    const blocked = mount(sessionSnapshotOf({ blank: true }), [], undefined, {
+      ...options, composerBlock: { reason: 'Choose a model' },
+    })
+    expect(blocked.view.getByRole('textbox').getAttribute('aria-disabled')).toBe('true')
+    expect(blocked.view.getByRole('textbox').getAttribute('data-placeholder')).toBe('Choose a model')
+  })
+
+  it.each([{ sessionId: undefined }, { omitSummaryRow: true }, { summaryCwd: '' }])(
+    'requires workspace setup when managed presentation has no usable Session directory: %j', (options) => {
+      const b = mount(sessionSnapshotOf({ blank: true }), [], undefined, {
+        summaryBlank: true, ...options,
+        presentations: [{ id: 'managed', matches: () => true, workspaceSelection: 'managed',
+          headline: () => 'Review', badge: () => 'Records', placeholder: () => 'Ask about this review' }],
+      })
+      expect(b.view.getByRole('textbox').getAttribute('contenteditable')).not.toBe('true')
+      expect(b.view.getByRole('textbox').getAttribute('data-placeholder')).toBe(zh['placeholder.workspace'])
+      expect(b.view.getByRole('button', { name: zh['hero.chooseWorkspace'] })).toBeTruthy()
+    },
+  )
+
+  it.each([true, false])('keeps a managed Session without cwd inert despite workspace membership (blank=%j)', (blank) => {
+    const b = mount(sessionSnapshotOf({ blank }), undefined, undefined, {
+      summaryBlank: blank, summaryCwd: '',
+      presentations: [{ id: 'managed', matches: () => true, workspaceSelection: 'managed',
+        headline: () => 'Review', badge: () => 'Records', placeholder: () => 'Ask about this review' }],
+    })
+    expect(b.view.getByRole('textbox').getAttribute('contenteditable')).not.toBe('true')
+    expect(b.view.getByRole('textbox').getAttribute('data-placeholder')).toBe(zh['placeholder.workspace'])
+  })
+
   it('keeps global header navigation without selecting a Session', () => {
     const b = mount(sessionSnapshotOf(), [], undefined, { sessionId: undefined })
     expect(b.view.container.querySelector('header')).not.toBeNull()

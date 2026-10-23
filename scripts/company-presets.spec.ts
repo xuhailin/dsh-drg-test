@@ -42,7 +42,8 @@ function walk(rows: readonly unknown[]): Record<string, unknown>[] {
 function fixture(): string {
   const directory = mkdtempSync(join(tmpdir(), 'dsh-company-presets-'))
   directories.push(directory)
-  for (const path of [policyPath, ...['minimal', 'standard', 'ptc', 'cordis'].map(presetPath)]) {
+  for (const path of [policyPath, 'deploy/hosted-workspaces/clinical.preset.yml', 'deploy/hosted-workspaces/clinical-prompt.mjs',
+    ...['minimal', 'standard', 'ptc', 'cordis'].map(presetPath)]) {
     mkdirSync(dirname(join(directory, path)), { recursive: true })
     writeFileSync(join(directory, path), readFileSync(join(root, path)))
   }
@@ -75,18 +76,19 @@ it('resolves legal pressure budgets for both deployed model capacities', () => {
   }
 })
 
-it('derives the clinical role while preserving all standard tools, policies, and deferred expressions', () => {
+it('keeps general tools and policies in an independent clinical composition without coding workflow plugins', () => {
   const original: unknown = load(readFileSync(join(root, presetPath('standard')), 'utf8'), { schema: entryListSchema })
   const standard = record(record(list(record(list(original)[0]).insert)[0]).config)
   const declaration = generateClinicalPreset(root)
-  expect(declaration).toMatchObject({ id: 'preset-clinical-review', name: '@deepseek-ai/dsh-agent-preset', config: { id: 'clinical-review' } })
+  expect(declaration).toMatchObject({ id: 'preset-clinical-review', name: '@deepseek-ai/dsh-agent-preset', config: { id: 'clinical-review', name: '医保助手' } })
   const plugins = structuredClone(declaration.config.plugins)
   const persona = walk(plugins).find(row => row.id === 'persona')!
-  expect(record(persona.config).prefix).toContain('You are a clinical record review assistant powered by the {{model}} model.')
-  const standardPersona = walk(list(standard.plugins)).find(row => row.id === 'persona')!
-  record(persona.config).prefix = record(standardPersona.config).prefix
-  expect(plugins).toEqual(standard.plugins)
-  expect(walk(plugins).map(row => row.id)).toEqual(walk(list(standard.plugins)).map(row => row.id))
+  expect(record(persona.config).prefix).toContain('你是“医保助手”，面向临床医生')
+  expect(record(persona.config).complete).not.toBe(true)
+  expect(walk(plugins).some(row => ['agent-instructions', 'plan-mode', 'planning'].includes(String(row.id)))).toBe(false)
+  const general = plugins.filter(row => !['persona', 'clinical-prompt'].includes(String(row.id)))
+  expect(general).toEqual(list(standard.plugins).filter(value => !['persona', 'agent-instructions', 'planning'].includes(String(record(value).id))))
+  expect(plugins.find(row => row.id === 'clinical-prompt')?.name).toBe(join(root, 'deploy/hosted-workspaces/clinical-prompt.mjs'))
 })
 
 it('keeps clinical profile edits before replacing only the company compaction policy', () => {
@@ -113,11 +115,14 @@ it('keeps saved standard-preset edits separate from the clinical composition', (
   expect(generateClinicalPreset(directory, profile)).toEqual(clinical)
 })
 
-it('fails rather than deriving a clinical preset without its standard persona', () => {
+it('loads its own clinical configuration independently of the standard persona and fails on a missing clinical prompt row', () => {
   const directory = fixture()
   const path = join(directory, presetPath('standard'))
   writeFileSync(path, readFileSync(path, 'utf8').replace('id: persona', 'id: missing-persona'))
-  expect(() => generateClinicalPreset(directory)).toThrow('Expected one persona entry')
+  expect(generateClinicalPreset(directory).config.name).toBe('医保助手')
+  const clinical = join(directory, 'deploy/hosted-workspaces/clinical.preset.yml')
+  writeFileSync(clinical, readFileSync(clinical, 'utf8').replace('id: clinical-prompt', 'id: missing-prompt'))
+  expect(() => generateClinicalPreset(directory)).toThrow('Expected one clinical-prompt entry')
 })
 
 it('detects clinical preset use from plugin rows and groups without evaluating deferred expressions', () => {

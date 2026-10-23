@@ -371,6 +371,10 @@ describe('encounter review admission and durable state', () => {
     await expect.poll(() => review.require(agent).status).toBe('reviewing')
     expect(followup).toHaveBeenCalledTimes(1)
     expect(JSON.stringify(vi.mocked(followup).mock.calls)).toContain('zh-CN')
+    const task = JSON.stringify(followup.mock.calls[0]?.[0].content)
+    expect(task).toContain('请核查当前已授权住院的出院前病历')
+    expect(task).toContain('需确认事项、原文依据和建议')
+    expect(task).not.toMatch(/review_load_case|review_read_evidence|review_submit_findings|case-[a-f0-9]+|revision/)
   })
 
   it('same encounter reauthorization replaces an old binding and invalidates its evidence', async () => {

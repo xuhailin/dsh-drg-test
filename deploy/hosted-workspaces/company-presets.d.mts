@@ -13,11 +13,11 @@ export interface ClinicalPresetDeclaration extends CompanyPresetPatch {
 }
 
 /**
- * Derive clinical role instructions while retaining the installed standard tool policy.
+ * Load the independent physician-facing clinical composition.
  * @param root - Repository or installed image root.
  * @param profilePatch - Optional saved profile patch.
  * @returns Complete clinical preset declaration after saved clinical overrides.
- * @throws If the standard preset or its persona row is missing.
+ * @throws If the clinical declaration or prompt-policy row is missing.
  */
 export function generateClinicalPreset(root: string, profilePatch?: string): ClinicalPresetDeclaration
 

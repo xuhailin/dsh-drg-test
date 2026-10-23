@@ -42,7 +42,9 @@ class ClinicalModel extends LlmAdapter {
   }
   override async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     options.signal?.throwIfAborted()
-    expect(JSON.stringify(options.messages)).toContain('You are a clinical record review assistant')
+    const prompt = JSON.stringify(options.messages)
+    expect(prompt).toContain('你是“医保助手”，面向临床医生')
+    for (const developerText of ['pnpm run dev:web', 'implementation checkout', 'plan:policy']) expect(prompt).not.toContain(developerText)
     expect(options.tools?.map(tool => tool.name)).toEqual(expect.arrayContaining([
       process.platform === 'win32' ? 'pwsh' : 'bash', 'read', 'grep', 'web_search', 'review_load_case',
     ]))
@@ -144,7 +146,7 @@ it.each([{ name: 'root', prefix: undefined }, { name: 'prefix', prefix: 'clinica
     return { status: response.status, data }
   }, { operation, body })
   await page.goto(scaffold.authenticatedUrl)
-  await page.getByRole('button', { name: 'Department patients', exact: true }).click()
+  await page.getByRole('button', { name: 'Insurance assistant', exact: true }).click()
   await page.getByRole('combobox', { name: /^Department/ }).selectOption({ label: 'Synthetic department' })
   const launching = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/api/clinical-review/launch'))
   await page.getByRole('button', { name: 'Synthetic patient A-01 · SYNTHETIC-123', exact: true }).click()
@@ -157,22 +159,36 @@ it.each([{ name: 'root', prefix: undefined }, { name: 'prefix', prefix: 'clinica
   await page.getByText('No saved report for this encounter', { exact: true }).waitFor()
   expect(model.calls).toBe(0)
   expect(captures).toBe(0)
+  await page.getByRole('button', { name: 'Open review chat', exact: true }).click()
+  const reviewBadge = page.getByText('Pre-discharge review', { exact: true })
+  await reviewBadge.waitFor()
+  expect(await reviewBadge.locator('..').textContent()).toContain('Insurance assistant')
+  const composer = page.getByRole('textbox', { name: 'Describe the medical records to check, or ask about this review result' })
+  await composer.waitFor()
+  await expect.poll(() => composer.getAttribute('contenteditable')).toBe('true')
+  expect(await page.getByRole('button', { name: 'Choose workspace', exact: true }).count()).toBe(0)
+  expect(model.calls).toBe(0)
+  expect(captures).toBe(0)
+  await page.getByRole('button', { name: 'Insurance assistant', exact: true }).click()
   await page.getByRole('button', { name: 'Start review', exact: true }).click()
   await page.getByRole('button', { name: 'Open review chat', exact: true }).click()
-  const card = page.getByRole('button', { name: 'View result · Revision 1', exact: true })
+  await page.getByRole('textbox', { name: 'Describe the medical records to check, or ask about this review result' }).waitFor()
+  const card = page.locator('[data-clinical-result-card][data-result-revision="1"]')
   await card.waitFor({ timeout: 15_000 })
   await card.click()
   const report = page.locator('article[data-clinical-result]')
   await expect.poll(() => report.count()).toBe(1)
-  await report.locator('summary').click()
   await expect.poll(() => report.locator('blockquote').textContent()).toBe('no pneumonia')
+  expect(await report.locator('[data-clinical-source-details]').getAttribute('open')).toBeNull()
+  expect(await report.locator('[data-clinical-report-details]').getAttribute('open')).toBeNull()
+  expect(await report.getByText('source-1', { exact: true }).isVisible()).toBe(false)
   const source = await clinicalRequest('results', { sessionId })
   const saved = resultsResponseSchema.parse(source.data).results[0]!
   sourceRevision = 2
   const rerun = await clinicalRequest('rerun', { sessionId: saved.sessionId, encounterRef: saved.encounterRef,
     resultId: saved.resultId, revision: saved.revision, requestId: 'browser-second-review' })
   expect(rerun.status).toBe(202)
-  await page.getByRole('button', { name: 'View result · Revision 2', exact: true }).waitFor({ timeout: 30_000 })
+  await page.locator('[data-clinical-result-card][data-result-revision="2"]').waitFor({ timeout: 30_000 })
   await expect.poll(() => model.calls, { timeout: 10_000 }).toBe(8)
   expect(await report.locator('blockquote').textContent()).toBe('no pneumonia')
   const callsAtRead = model.calls, capturesAtRead = captures
@@ -180,16 +196,20 @@ it.each([{ name: 'root', prefix: undefined }, { name: 'prefix', prefix: 'clinica
   await page.goto(new URL(exactPath, scaffold.baseUrl.replace(/\/$/u, '') + '/').href)
   await page.locator('article[data-clinical-result]').waitFor()
   expect(await page.locator('[data-composer-input]').count()).toBe(0)
-  for (const width of [360, 1024]) {
+  for (const { width, colorScheme } of [
+    { width: 390, colorScheme: 'light' }, { width: 1024, colorScheme: 'light' },
+    { width: 390, colorScheme: 'dark' }, { width: 1024, colorScheme: 'dark' },
+  ] as const) {
     await page.setViewportSize({ width, height: 900 })
-    const evidence = page.locator('article[data-clinical-result] summary')
+    await page.emulateMedia({ colorScheme })
+    const evidence = page.locator('[data-clinical-source-details] > summary')
     await evidence.focus()
     if (!(await evidence.evaluate(element => element.parentElement?.hasAttribute('open')))) await page.keyboard.press('Enter')
     expect(await page.locator('article[data-clinical-result] blockquote').textContent()).toBe('no pneumonia')
     expect(await page.getByText('source-1', { exact: true }).count()).toBe(1)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     expect(await page.getByRole('main').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
-    if (width === 360) {
+    if (width === 390 && colorScheme === 'light') {
       const golden = fileURLToPath(new URL('./expected/clinical-results/result.expected.md', import.meta.url))
       await mkdir(dirname(golden), { recursive: true })
       await compareOrRefreshGolden(golden, await captureStableAria(page, 'article[data-clinical-result]', scaffold.workspaceCwd,
@@ -197,9 +217,9 @@ it.each([{ name: 'root', prefix: undefined }, { name: 'prefix', prefix: 'clinica
     }
     await mkdir(join(fileURLToPath(new URL('../../..', import.meta.url)), 'output/playwright'), { recursive: true })
     const screenshotRoot = join(fileURLToPath(new URL('../../..', import.meta.url)), 'output/playwright')
-    await page.screenshot({ path: join(screenshotRoot, `clinical-results-${name}-${width}-evidence.png`) })
+    await page.screenshot({ path: join(screenshotRoot, `clinical-results-${name}-${width}-${colorScheme}-evidence.png`) })
     await page.getByRole('main').evaluate((element) => { element.scrollTop = 0 })
-    await page.screenshot({ path: join(screenshotRoot, `clinical-results-${name}-${width}.png`) })
+    await page.screenshot({ path: join(screenshotRoot, `clinical-results-${name}-${width}-${colorScheme}.png`) })
   }
   const read = await clinicalRequest('result', { sessionId: saved.sessionId, resultId: saved.resultId, revision: 1 })
   const old = resultResponseSchema.parse(read.data)
@@ -208,7 +228,7 @@ it.each([{ name: 'root', prefix: undefined }, { name: 'prefix', prefix: 'clinica
   expect(model.calls).toBe(callsAtRead)
   expect(captures).toBe(capturesAtRead)
   denied = true
-  await page.getByRole('button', { name: 'Update result and progress', exact: true }).click()
+  await page.getByRole('button', { name: 'Refresh result', exact: true }).click()
   await page.getByText('Access denied. Check your account and encounter authorization.', { exact: true }).waitFor()
   expect(await page.locator('article[data-clinical-result]').count()).toBe(0)
   expect(await page.locator('body').textContent()).not.toContain('no pneumonia')

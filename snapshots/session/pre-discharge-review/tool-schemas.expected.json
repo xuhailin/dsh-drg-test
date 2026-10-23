@@ -108,22 +108,6 @@
       }
     },
     {
-      "name": "exit_plan_mode",
-      "description": "Use only in plan mode. Present your plan for the user's review and, on approval, leave plan mode. The user may approve (carry out the plan from your next step) or keep planning — their feedback comes back in the tool result; revise and present again.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "plan": {
-            "type": "string",
-            "description": "The complete plan, as markdown, starting with a # heading that names it."
-          }
-        },
-        "required": [
-          "plan"
-        ]
-      }
-    },
-    {
       "name": "get_goal",
       "description": "Read the current session goal, including the id and revision that update_goal requires.",
       "parameters": {
@@ -302,7 +286,7 @@
     },
     {
       "name": "review_get_report",
-      "description": "Read the current advisory review report and explicit unreviewed coverage. DRG and DIP calculation are unavailable; findings require clinician review and never block discharge.",
+      "description": "Read the current pre-discharge clinical record review and explicit unreviewed coverage. Explain the key findings to the physician in clinical language; do not dump internal identifiers or execution details. DRG and DIP calculation are unavailable; findings require clinician review and never block discharge.",
       "parameters": {
         "type": "object",
         "properties": {}
@@ -358,7 +342,7 @@
     },
     {
       "name": "review_submit_findings",
-      "description": "Save an advisory pre-discharge review proposal with exact quotations from evidence already read. Distinguish inconsistency, missing information, and items needing verification. Empty/unread coverage is not a clinical absence. Mark a source fully reviewed only after reading all of it. All findings remain pending human review; no discharge block, clinical write, DRG/DIP group, score, or payment decision is made.",
+      "description": "Save a pre-discharge clinical record review for a physician, with exact quotations from evidence already read. State the reviewed scope, explain each discrepancy or missing item in clinical language, and suggest what the physician should verify. Keep technical identifiers and offsets in citation fields, not in the summary or finding prose. Distinguish inconsistency, missing information, and items needing verification. Empty/unread coverage is not a clinical absence. Mark a source fully reviewed only after reading all of it. All findings remain pending human review; no discharge block, clinical write, DRG/DIP group, score, or payment decision is made.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -369,7 +353,8 @@
             "type": "string"
           },
           "summary": {
-            "type": "string"
+            "type": "string",
+            "description": "Concise physician-facing conclusion and reviewed scope, with any material coverage limits."
           },
           "reviewedSourceRefs": {
             "type": "array",
@@ -392,13 +377,16 @@
                   ]
                 },
                 "title": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Short clinical issue the physician can recognize."
                 },
                 "explanation": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Explain the discrepancy, missing information, or uncertainty using the cited evidence."
                 },
                 "suggestion": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "What the physician should verify or clarify; never autonomously add a diagnosis."
                 },
                 "citations": {
                   "type": "array",

@@ -21,6 +21,13 @@ Session Controller 拥有连续的已加载逻辑 event window。每个 `Session
 
 Chat 与 Trajectory 可以识别同一个持久 event family，但各自保留自己的 Definition State 与最终 node payload。共享的 target-neutral 机制只包括 identity routing、有序 replay、Location data、predecessor dependency 与 publication cadence。
 
+<a id="session-specific-presentation"></a>
+## 特定 Session 的呈现
+
+共享 shell 通过 `ctx.uiConversation.presentations.register()` 接受[特定 Session 的呈现](../../packages/client/ui-conversation/src/client/contract/presentation.ts)。`ConversationPresentation` 将唯一 `id` 和纯 `matches(SessionSummary | undefined)` 判断与本地化 `headline`、`badge`、`placeholder` 回调配对。首个匹配注册生效；移除时重新发布注册表，恢复下一匹配项或默认文案。框架 source 提供注册变化及当前摘要，locale seat 刷新翻译文案。这些呈现不选择 preset、不改变工具或替换编辑器。
+
+省略 `workspaceSelection` 时保留普通工作区选择要求。匹配的 `workspaceSelection: 'managed'` 呈现可以使用既有 Session 的非空服务器配置 `cwd`，无需归属 Workspace，并隐藏工作区和 preset 选择器。它不创建或更改 Workspace 实体、Session 目录、已选 preset 或权限。缺少既有 Session 或非空目录时，输入仍禁用。欢迎区选项保持可见；包括模型选择在内的输入阻断原因仍优先于呈现文案。
+
 ## Target 激活
 
 每个 Session 都保留单调增长的 active target 集合。创建或读取 target source 不会激活它。shell 会显式激活持久化选择或新选择的 View，其他消费者则通过 target source 的首个订阅激活 target。首次激活会创建该 target 的 builder，并从当前按 target 索引的 Context 调用一次 `replace()`。后续 flush 对每个 active target 调用 `apply()`，取消订阅不会移除 target。

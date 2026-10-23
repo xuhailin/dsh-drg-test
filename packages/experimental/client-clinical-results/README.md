@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This optional Web plugin presents accepted pre-discharge review reports, exact saved evidence, coverage gaps, and separate DRG/DIP availability. Chat cards open the report revision accepted during their Turn. The existing right Sidebar and `?page=clinical-results` page share one renderer; opening either makes no model request and does not capture evidence. Review guidance never blocks discharge.
+This optional Web plugin presents the Insurance assistant's review summary, items for clinician confirmation, original record quotations, and record coverage. Chat cards open the report revision accepted during their Turn. The existing right Sidebar and `?page=clinical-results` page share one renderer; opening either makes no model request and does not capture evidence. Review guidance never blocks discharge.
 
 ## Table of Contents
 
@@ -26,7 +26,9 @@ Load this package and [clinical-review](../clinical-review/README.md) in a suppo
 
 Open a saved report from its chat card, or open `?page=clinical-results&sessionId=<reference>&resultId=<reference>&revision=<number>`. Resolve the query against the workspace root document, preserving any reverse-proxy path prefix. A Session-only link lists authorized saved reports and requires an explicit selection. References do not grant access: every read checks the authenticated owner and encounter permission. A report always retains its source quotations and evidence revision; current sources are never substituted into historical citations.
 
-The viewer labels legacy reports, missing historical metadata, unread or unsupported coverage, pending human review, and unavailable calculation engines. Source freshness reports only a comparison supported by an explicit accepted capture and displays its time and scope. Unknown freshness is readable. A zero-finding report does not establish complete coverage or clinical clearance.
+The summary and items for clinician confirmation appear first. Each item shows the reason, the original wording, and what to check. Source identifiers, revisions, quotation offsets, retrieval diagnostics, original classifications, and report history stay in expandable details. Record coverage distinguishes obtained, not obtained, not connected, and no records returned: obtaining data does not establish that it was fully reviewed, and missing data does not establish that the patient has no related condition. The viewer states that DRG/DIP grouping is not connected and provides no grouping or reimbursement conclusion.
+
+Medical record update status reports only a comparison supported by an explicit accepted capture; the comparison time and scope remain in report details. Unknown freshness is readable. A zero-item report does not establish complete coverage or clinical clearance. Clinical-review conversations receive localized welcome and composer text through the Conversation presentation registry. An existing clinical Session with a configured working directory uses managed workspace selection, so clinicians can ask about the record without choosing a directory or preset. Model availability and input restrictions still apply; standard conversations retain their own presentation.
 
 **Request another review** admits an explicit idempotent request. Admission, analysis progress, and report selection remain separate. Update progress and choose a new saved revision when it becomes available. Failed reads retain a previously displayed report with a notice; authentication or permission loss clears clinical content. An uncertain admission requires inspecting progress and the chat before another request.
 

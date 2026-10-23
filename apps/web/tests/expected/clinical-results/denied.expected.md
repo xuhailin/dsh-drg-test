@@ -1,3 +1,3 @@
-- main "Pre-discharge review result":
+- main "Insurance assistant":
   - status:
     - paragraph: Access denied. Check your account and encounter authorization.

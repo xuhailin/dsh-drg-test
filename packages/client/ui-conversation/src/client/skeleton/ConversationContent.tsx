@@ -22,7 +22,7 @@ function NoConversationWidthControls() {
 export function ConversationContent(props: ConversationContentProps) {
   const {
     sessionId, phase, hero, useSession, useSessions, useSessionStatus,
-    useWorkspaces, useInput, useComposerBlock, renderSlot, renderSlotChain,
+    useWorkspaces, useInput, useComposerBlock, usePresentations, renderSlot, renderSlotChain,
     selectWorkspace, t, useFactorySlot,
   } = props
   const session = useSession(snapshot => snapshot)
@@ -33,6 +33,12 @@ export function ConversationContent(props: ConversationContentProps) {
     sessionId === undefined ? undefined : snapshot.get(sessionId)?.pendingInteraction)
   const inputState = useInput(s => s)
   const cwd = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.cwd)
+  const summary = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId])
+  const presentations = usePresentations(value => value)
+  const presentation = presentations.find(entry => entry.matches(summary))
+  const managedSelection = presentation?.workspaceSelection === 'managed'
+  const managedWorkspace = managedSelection
+    && sessionId !== undefined && cwd !== undefined && cwd !== ''
   const workspaces = useWorkspaces(s => s)
   // A plugin this package cannot import (ui-model-selection) says this session cannot
   // send; its reason is already localized by whoever raised it.
@@ -107,39 +113,43 @@ export function ConversationContent(props: ConversationContentProps) {
     ? undefined
     : workspaceDisplayTitle(storedChipTitle, t('workspace.defaultName'))
 
-  const heroWorkspaceRow = (
-    <div className={css.heroWorkspaceRow}>
-      <WorkspaceChip
-        buttonRef={pickerAnchor}
-        label={chipTitle}
-        menuOpen={pickerOpen}
-        onClick={() => { setPickerOpen(open => !open) }}
-        t={t}
-      />
-      {renderSlot('conversation.hero.workspace', {
-        open: pickerOpen,
-        anchorRef: pickerAnchor,
-        selectedId: pendingWorkspaceId ?? sessionWorkspace?.workspaceId,
-        onPick: (workspaceId) => {
-          setPickerOpen(false)
-          setPendingWorkspaceId(workspaceId)
-          void selectWorkspace(workspaceId).catch(() => {
-            setPendingWorkspaceId(current => current === workspaceId ? undefined : current)
-          })
-        },
-        onClose: () => { setPickerOpen(false) },
-      })}
-      {renderSlot('conversation.hero.agentPreset', {})}
-      {sessionId === undefined ? null : <div className={css.heroOptions}>{renderSlot('conversation.hero.options', {})}</div>}
-    </div>
-  )
+  const heroWorkspaceRow = managedWorkspace
+    ? <div className={css.heroOptions}>{renderSlot('conversation.hero.options', {})}</div>
+    : (
+      <div className={css.heroWorkspaceRow}>
+        <WorkspaceChip
+          buttonRef={pickerAnchor}
+          label={chipTitle}
+          menuOpen={pickerOpen}
+          onClick={() => { setPickerOpen(open => !open) }}
+          t={t}
+        />
+        {renderSlot('conversation.hero.workspace', {
+          open: pickerOpen,
+          anchorRef: pickerAnchor,
+          selectedId: pendingWorkspaceId ?? sessionWorkspace?.workspaceId,
+          onPick: (workspaceId) => {
+            setPickerOpen(false)
+            setPendingWorkspaceId(workspaceId)
+            void selectWorkspace(workspaceId).catch(() => {
+              setPendingWorkspaceId(current => current === workspaceId ? undefined : current)
+            })
+          },
+          onClose: () => { setPickerOpen(false) },
+        })}
+        {renderSlot('conversation.hero.agentPreset', {})}
+        {sessionId === undefined ? null : <div className={css.heroOptions}>{renderSlot('conversation.hero.options', {})}</div>}
+      </div>
+    )
 
   // The placeholder chip ("Choose workspace") and the Workspace-trigger input travel
   // together: no workspace picked yet (cold start, no session at all), or a
-  // blank session whose workspace vanished (deleted from the sidebar). The
+  // blank session whose workspace vanished (deleted from the sidebar).
+  // Feature-managed Sessions use their already-configured directory. The
   // bar is ONE session-maybe slot rendered unconditionally — inert is a prop,
   // not a different tree, so the textarea DOM survives the transition.
-  const inert = sessionId === undefined || (hero && chipTitle === undefined)
+  const inert = sessionId === undefined
+    || (managedSelection ? !managedWorkspace : hero && chipTitle === undefined)
   // A raised block is the same inert posture with the blocker's own reason:
   // one disabled textarea, never a second tree. The no-workspace state wins
   // when both hold — picking a workspace is the earlier prerequisite.
@@ -158,12 +168,14 @@ export function ConversationContent(props: ConversationContentProps) {
         // block keeps the model seat live because choosing a model is how the
         // user clears it.
         ? { blocked: composerBlock, placeholder: composerBlock.reason }
-        : hero ? { placeholder: t('placeholder.hero') } : {}),
+        : presentation !== undefined ? { placeholder: presentation.placeholder() }
+          : hero ? { placeholder: t('placeholder.hero') } : {}),
   })
 
   const composerBar = (
     <div className={clsx(css.composerStack, hero && css.composerHero)}>
-      {hero && <HeroShell t={t} renderSlot={renderSlot} />}
+      {hero && <HeroShell t={t} renderSlot={renderSlot}
+        headline={presentation?.headline()} badge={presentation?.badge()} />}
       {hero && heroWorkspaceRow}
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
       {inputBar}

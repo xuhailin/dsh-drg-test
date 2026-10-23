@@ -62,6 +62,10 @@ Queue 预览启用空白折叠和文档边缘 trim，保留 emoji，并使用 CS
 <a id="shell-and-standard-props"></a>
 ## Shell 与标准 props
 
+功能插件可以通过 `ctx.uiConversation.presentations.register()` 注册特定 Session 的欢迎和输入文案。[呈现声明](src/client/contract/presentation.ts)提供仅匹配当前 Session 摘要的纯函数，以及绑定语言字典的文案回调。首个匹配项决定标题、场景标记和普通输入提示。贡献随插件卸载而移除，保留常驻编辑器和草稿，不匹配的 Session 继续使用默认文案。
+
+工作区选择沿用既有行为，除非匹配的呈现声明 `workspaceSelection: 'managed'`。对于已存在且服务器配置了非空 `cwd` 的 Session，托管选择使用该目录并隐藏工作区和 preset 选择器；它不创建或更改 Workspace、权限或已选 preset。缺少 Session 或目录时仍禁止输入。欢迎区选项及包括模型选择在内的输入阻断原因保留，并优先于功能输入提示。详见[特定 Session 的呈现](../../../docs/subsystems/conversation.zh.md#session-specific-presentation)。
+
 共享图片插槽属性将展示选择与持久化引用分开：`thumbnail` 请求完整缩放的附件列表缩略图，`compact` 请求裁剪的图片方块。每张图片可通过可选的 `label` 提供无障碍展示名称；加载和缓存标识仍使用原始附件引用。`MessageImagesContentInput` 为 root 作用域的 `conversation.images.content` Factory 增加可选的完整 `MessageImageLabels`。消息、工具及 Factory 输入显式携带视图提供的授权 `loadImage` 回调；读取和 URL 缓存仍由资源所有者负责。[ui-attachment](../ui-attachment/README.zh.md) 提供该 Factory，负责渲染与灯箱。
 
 控件组的尺寸、内容、可见性或字体加载状态变化后，composer 测量展开状态下的控件组。若无法排在同一行，控制栏为模型位设置 `--dsh-composer-model-text-display: none` 和 `--dsh-composer-model-icon-display: block`；两者默认值分别为 `block` 和 `none`。若连图标也放不下，仍允许换行。

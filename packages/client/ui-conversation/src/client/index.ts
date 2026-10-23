@@ -27,6 +27,7 @@ export { apply, Config, inject } from './apply.ts'
 export type { Config as ConversationConfig } from './apply.ts'
 export { UiConversation } from './conversation/assembly.ts'
 export type { ConversationBinding } from './conversation/assembly.ts'
+export type { ConversationPresentation } from './contract/presentation.ts'
 export type { ConversationGroupRegistry } from './conversation/group-registry.ts'
 export type {
   ConversationGroupContext, ConversationGroupData, ConversationGroupDataMap,

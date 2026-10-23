@@ -116,6 +116,8 @@ Skills cannot grant access, pin versions, approve coding, or compute an authorit
 
 The first Web presentation uses readable tool results and existing question UI, showing patient/encounter, cutoff, scheme, findings with source links, unreviewed coverage, and independent DRG/DIP status. A later custom card needs a registered Client renderer; Host presenters alone do not create Web cards. Runtime and empty/error states use locale-owned text.
 
+The [structured result viewer draft](clinical-result-viewer-v1.md) defines the next presentation scope: one renderer for the DSH panel and independent EMR embedding, a saved-result read API, and registered navigation actions. Its requirements do not imply that human disposition or calculation is implemented.
+
 <a id="grouping"></a>
 ## DRG and DIP calculation
 

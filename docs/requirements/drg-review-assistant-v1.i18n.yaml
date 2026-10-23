@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/requirements/drg-review-assistant-v1.md
 /pre-discharge-review-and-drg-dip-pre-grouping-v1:
-  en: 79a9306bfa2a052d
-  zh: bebf3f1911cf69df
+  en: 7d8fcb613a5d8b39
+  zh: aadd7770884cd4d4
 /pre-discharge-review-and-drg-dip-pre-grouping-v1/summary:
   en: 14f92ec5ab7ec5c0
   zh: 5e135b92a3d663ee

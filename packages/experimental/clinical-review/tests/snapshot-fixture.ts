@@ -15,6 +15,7 @@ import { registerReviewTools } from '../src/tools.ts'
 import { Config as ReviewConfig } from '../src/config.ts'
 import * as Persona from '@deepseek-ai/dsh-persona'
 import { generateClinicalPreset } from '../../../../deploy/hosted-workspaces/company-presets.mjs'
+import * as ClinicalPrompt from '../../../../deploy/hosted-workspaces/clinical-prompt.mjs'
 
 export const name = 'clinical-review-snapshot-fixture'
 export const inject = ['agents', 'sessions', 'sessionProjections', 'tools', 'llm']
@@ -51,7 +52,8 @@ class ScriptedModel extends LlmAdapter {
     for (const name of [process.platform === 'win32' ? 'pwsh' : 'bash', 'read', 'grep', 'web_search', 'review_load_case']) {
       if (!tools.has(name)) throw new Error(`Clinical preset lost ${name}`)
     }
-    if (!JSON.stringify(options.messages).includes('You are a clinical record review assistant')) throw new Error('Clinical preset persona missing from model request')
+    if (tools.has('exit_plan_mode')) throw new Error('Clinical composition includes the coding plan workflow')
+    if (!JSON.stringify(options.messages).includes('你是“医保助手”，面向临床医生')) throw new Error('Clinical preset persona missing from model request')
     const calls = [
       { name: 'review_load_case', args: {} },
       { name: 'review_submit_findings', args: { revision: 1, caseRevision: digest, summary: '尚需读取原文后确认。',
@@ -110,6 +112,7 @@ export function apply(ctx: Context, config: { scriptModel: boolean; saveResult: 
   ctx.on('agent/created', async ({ agent }) => {
     if (!ctx.agents.roots().includes(agent)) return
     await agent.ctx.plugin(Persona, personaConfig)
+    await agent.ctx.plugin(ClinicalPrompt)
     appendPluginRecord(agent.session, 'plugin:clinical-review/state', {
       schemaVersion: 1, ownerSessionId: agent.id, caseRef: 'synthetic-case', binding, revision: 1, status: 'reviewing', snapshot,
       report: null, history: [], readRanges: [], operations: [{ eventId: 'synthetic-review', trigger: 'manual-review', status: 'dispatched', revision: 1 }],

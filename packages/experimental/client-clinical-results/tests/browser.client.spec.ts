@@ -5,10 +5,13 @@ import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '../src/client/index.ts'
 import { config, result } from './fixtures.client.ts'
+import type { ConversationPresentation } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import { zh } from '../src/client/locales.ts'
 
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, '', '/') })
 
-async function bench(sidebar: boolean, send: typeof fetch = async () => Response.json(config)) {
+async function bench(sidebar: boolean, send: typeof fetch = async () => Response.json(config), presentation = false) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   const slots = ctx.get('slots')!
@@ -18,6 +21,8 @@ async function bench(sidebar: boolean, send: typeof fetch = async () => Response
   const removePage = vi.fn(), registerPage = vi.fn(() => removePage)
   ctx.provide('clientPages', { register: registerPage })
   const removeTab = vi.fn(), registerTab = vi.fn(() => removeTab)
+  const removePresentation = vi.fn(), registerPresentation = vi.fn((_definition: ConversationPresentation) => removePresentation)
+  if (presentation) ctx.provide('uiConversation', { presentations: { register: registerPresentation } } as never)
   if (sidebar) {
     ctx.provide('sidebarRightTabs', { register: registerTab } as never)
     ctx.provide('sidebarRight', { openResource: vi.fn() } as never)
@@ -25,10 +30,30 @@ async function bench(sidebar: boolean, send: typeof fetch = async () => Response
   vi.stubGlobal('fetch', send)
   const fiber = ctx.plugin({ inject, apply })
   await fiber.await()
-  return { ctx, slots, fiber, registerPage, removePage, registerTab, removeTab }
+  return { ctx, slots, fiber, registerPage, removePage, registerTab, removeTab, registerPresentation, removePresentation }
 }
 
 describe('clinical result browser registrations', () => {
+  it('localizes only clinical-review conversations and restores defaults on disposal', async () => {
+    const b = await bench(false, undefined, true)
+    try {
+      const definition = b.registerPresentation.mock.calls[0]?.[0]
+      if (definition === undefined) throw new Error('Clinical presentation was not registered')
+      const summary = { id: SessionId('synthetic'), displayTitle: 'Synthetic', running: false, blank: true,
+        retainedBy: {}, updatedAt: 0, projectionValues: { agentPreset: 'clinical-review' } }
+      expect(definition.matches(summary)).toBe(true)
+      expect(definition.matches({ ...summary, projectionValues: { agentPreset: 'standard' } })).toBe(false)
+      expect(definition.matches({ ...summary, projectionValues: {} })).toBe(false)
+      expect(definition.matches(undefined)).toBe(false)
+      expect(definition.workspaceSelection).toBe('managed')
+      b.ctx.locale.setLocale('zh')
+      expect(definition.headline()).toBe(zh.assistantName)
+      expect(definition.badge()).toBe(zh.reviewContext)
+      expect(definition.placeholder()).toBe(zh.reviewQuestion)
+      await b.fiber.dispose()
+      expect(b.removePresentation).toHaveBeenCalledOnce()
+    } finally { await b.ctx.fiber.dispose() }
+  })
   it('reauthorizes the explicit direct-page revision after a connection generation replaces its cached read', async () => {
     window.history.replaceState(null, '', `/?page=clinical-results&sessionId=${result.sessionId}&resultId=${result.resultId}&revision=1`)
     vi.stubGlobal('opener', null)

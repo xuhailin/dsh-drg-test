@@ -16,15 +16,27 @@ function draw(state: Partial<ViewerState> = {}) {
 }
 
 describe('shared saved clinical report presentation', () => {
-  it('shows retained exact quotations, source identity/revision/state, coverage and independent DRG/DIP availability', () => {
-    draw()
+  it('leads with the summary and clinician questions while keeping identifiers in closed details', () => {
+    const view = draw()
     expect(screen.getByRole('heading', { name: zh.title })).toBeTruthy()
     expect(screen.getByText(zh.historical)).toBeTruthy()
-    const evidence = screen.getByText(`${zh.evidence} (1)`).closest('details')!
-    fireEvent.click(evidence.querySelector('summary')!)
     expect(screen.getByText('Exact quotation')).toBeTruthy()
+    expect([...view.container.querySelectorAll('h2')].slice(0, 2).map(node => node.textContent)).toEqual([zh.summary, zh.findings])
+    const sourceDetails = screen.getByText(zh.sourceDetails).closest('details')!
+    const reportDetails = screen.getByText(zh.reportDetails).closest('details')!
+    expect(sourceDetails.open).toBe(false)
+    expect(reportDetails.open).toBe(false)
+    const firstScreen = view.container.querySelector('article')!.cloneNode(true) as HTMLElement
+    firstScreen.querySelectorAll('details').forEach((detail) => { detail.remove() })
+    for (const identifier of ['document-1', 'revision-old', 'source-old', result.reportId, zh.revision, zh.legacy, 'Synthetic retrieval gap']) {
+      expect(firstScreen.textContent).not.toContain(identifier)
+    }
+    expect(firstScreen.textContent).toContain(zh.encounterLabel.replace('{label}', result.encounterLabel))
+    expect(firstScreen.textContent).toContain(zh.coverageNote)
+    expect(firstScreen.textContent).toContain(zh.calculationNote)
+    fireEvent.click(sourceDetails.querySelector('summary')!)
+    fireEvent.click(reportDetails.querySelector('summary')!)
     for (const text of ['document-1', 'revision-old', 'signed', 'Synthetic retrieval gap', 'unreviewed-source', zh.unread, zh.unsupported, zh.freshnessUnknown]) expect(screen.getByText(text)).toBeTruthy()
-    expect(screen.getAllByText(zh.engineUnavailable)).toHaveLength(2)
     expect(screen.getByText(zh.progressFailed)).toBeTruthy()
     expect(screen.getByText(zh.navigationUnavailable)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /EMR/ })).toBeNull()
@@ -36,6 +48,7 @@ describe('shared saved clinical report presentation', () => {
     const b = draw({ phase: 'failed', rerun: 'failed' })
     expect(screen.getByText(result.summary)).toBeTruthy()
     expect(screen.getByText(zh.rerunFailed)).toBeTruthy()
+    fireEvent.click(screen.getByText(zh.reportDetails))
     fireEvent.change(screen.getByLabelText(zh.history), { target: { value: '2' } })
     expect(b.select).toHaveBeenCalledWith(result.history[0])
     fireEvent.click(screen.getByRole('button', { name: zh.retry }))
@@ -64,5 +77,16 @@ describe('shared saved clinical report presentation', () => {
     expect(screen.getByText(zh.zeroFindings)).toBeTruthy()
     expect(screen.getAllByText(zh.snapshotUnavailable)).toHaveLength(2)
     expect(screen.queryByText(zh.unreviewedEmpty)).toBeNull()
+  })
+
+  it('keeps source quotations readable when the original record cannot be retrieved', () => {
+    const finding = result.findings[0]!
+    draw({ result: { ...result, findings: [{ ...finding,
+      evidenceRefs: finding.evidenceRefs.map(evidence => ({ ...evidence, source: null, sourceStatus: 'unavailable' })),
+    }] } })
+    expect(screen.getByText('Exact quotation')).toBeTruthy()
+    expect(screen.getByText(zh.missingSource)).toBeTruthy()
+    expect(screen.getByText(zh.suggestion)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /定位|病历/ })).toBeNull()
   })
 })

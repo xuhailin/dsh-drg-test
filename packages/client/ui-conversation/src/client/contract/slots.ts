@@ -17,6 +17,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type { ComposerBlock } from './composer-blocks.ts'
+import type { ConversationPresentation } from './presentation.ts'
 import type { DraftAttachmentId, InputActions, InputNotice, InputState } from './input.ts'
 import type { ComposerKeyboard, DraftSnapshot, EditSelection } from './draft-editor.ts'
 import type { createConversationStore } from '../stores.ts'
@@ -406,7 +407,10 @@ export interface ConversationInjected {
   /** Connect and open a blank Session in the selected Workspace. */
   selectWorkspace: (workspaceId: WorkspaceId) => Promise<void>
   /** Session-addressed composer block source, or the stable absent source. */
-  hooks: { composerBlock: ObservableSnapshot<ComposerBlock | undefined> }
+  hooks: {
+    composerBlock: ObservableSnapshot<ComposerBlock | undefined>
+    presentations: ObservableSnapshot<readonly ConversationPresentation[]>
+  }
 }
 
 /** Business callbacks injected into the strict Session body. */

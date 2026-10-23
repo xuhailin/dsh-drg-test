@@ -6,6 +6,8 @@
 
 评审日期：2026-10-22。基线：DSH Web 0.2.1-rc.2 及当前 [SSO／个人工作区实现](sso-private-workspaces-v1.zh.md)。执行顺序和资源发布见[实施方案](drg-review-assistant-v1-implementation.zh.md)。
 
+下一阶段的[结构化结果展示](clinical-result-viewer-v1.zh.md)草案约定聊天结果卡、可独立嵌入 EMR 的界面、稳定语义键及有限导航动作，不代表当前实现已扩展临床能力。
+
 ## 概要
 
 帮助准备出院的医生核对拟填报诊断、操作和文书与住院证据是否一致。展示带原文依据的差异和缺项；人工确认对应编码快照后，依据明确的适用方案分别计算并解释 DRG 或 DIP 预分组。

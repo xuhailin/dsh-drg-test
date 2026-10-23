@@ -471,7 +471,7 @@ export class ClinicalReviewService {
         await this.commit(agent, next)
         if (operation.trigger === 'refresh') return
         const message = createUserMessage({ source: { kind: 'clinical-review-trigger', eventId: operation.eventId, revision: next.revision },
-          content: [{ type: 'text', text: `Review the authorized encounter ${next.caseRef} before discharge at revision ${String(next.revision)}. First call review_load_case, read relevant original evidence with review_read_evidence, then submit cited findings with review_submit_findings. Distinguish missing/unread sources and order intent from execution. This is advisory and never blocks discharge. Findings require human review. DRG and DIP calculation are unavailable; do not invent groups, scores, or payment conclusions. Write the report summary, finding titles, explanations, suggestions, and final reply in ${this.config.reviewLanguage}.` }] })
+          content: [{ type: 'text', text: `请核查当前已授权住院的出院前病历。先查看可用资料并阅读相关原文，再保存带原文依据的核查结果。重点说明诊断、操作及文书之间的差异、资料缺项和需要医生确认的事项；区分医嘱计划与实际执行，未读或未提供资料不能作为阴性依据。报告和回复使用 ${this.config.reviewLanguage}：先说明核查范围与结论，再列需确认事项、原文依据和建议，并说明未覆盖资料。不要展示工具名、内部标识、版本参数或执行日志。结果仅供医生复核，不阻断出院，不修改病历。DRG、DIP 预分组当前不可用，不编造病组、分值或支付结论。` }] })
         agent.followup(message)
         await this.flush(agent)
       })

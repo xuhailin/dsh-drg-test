@@ -53,7 +53,7 @@ kind: "package-reference"
 
 [配置 schema](src/config.ts) 校验部署限制。要用 MCP 替换 HTTP 证据读取，可挂载 [EncounterReader](../emr-encounter/README.zh.md) 的实现，然后选择 `readerMode: provided`。浏览器启动授权仍使用代理。
 
-[托管临床 overlay](../../../deploy/hosted-workspaces/clinical.runtime.patch.yml) 为新建就诊 Session 选择 `clinical-review`。其 [preset 生成器](../../../deploy/hosted-workspaces/clinical-presets.mjs) 保留已安装 `standard` preset 的工具和策略，将编码角色替换为临床核查指令。profile 中对 `standard` 保存的修改不会带入此独立 preset；请直接配置 `clinical-review`。公司模型部署为此 preset 应用相同压缩策略。已有就诊 Session 保留其保存的 preset。授权、证据校验和持久化核查状态仍由 Host 负责。
+[托管临床 overlay](../../../deploy/hosted-workspaces/clinical.runtime.patch.yml) 为新建就诊 Session 选择 `clinical-review`，显示为“医保助手”。其[独立组合](../../../deploy/hosted-workspaces/clinical.preset.yml) 保留通用工具及其策略，不加载仓库指令或编码计划流程。[作用域提示插件](../../../deploy/hosted-workspaces/clinical-prompt.mjs) 移除 Harness 开发指引和实现路径，保留工具指令及其他运行上下文。profile 中对 `standard` 保存的修改不会带入此独立 preset；请直接配置 `clinical-review`。公司模型部署应用相同压缩策略。已有 Session 保留其 preset 标识及历史；后续 Agent 激活使用该标识的当前定义。授权、证据校验和持久化核查状态仍由 Host 负责。
 
 ### 接入、核查与刷新
 
@@ -113,7 +113,7 @@ Session 刷盘结果不确定时停止后续核查操作，并报告 `durability
 
 #### 模型看到的内容
 
-已绑定 Agent 获得资料清单、原文阅读、问题提交和报告读取工具。新建托管临床 Session 使用临床核查角色及既有通用工具。显式核查会追加持久化用户消息，要求以 `reviewLanguage` 进行有证据依据的分析。来源元数据包含覆盖范围、截止时间、版本和来源引用；原文仅通过已记录的工具结果进入会话。报告将所有问题标为 `pending-human-review`，两种计算均标为 `unavailable`。
+已绑定 Agent 获得资料清单、原文阅读、问题提交和报告读取工具。托管临床角色要求面向医生说明结论、原文依据、核实建议和覆盖限制；内部标识与执行细节留在工具字段中。显式核查追加使用临床用语的持久化请求，通过 `reviewLanguage` 指定报告语言。来源元数据包含覆盖范围、截止时间、版本和来源引用；原文仅通过已记录的工具结果进入会话。报告将所有问题标为 `pending-human-review`，两种计算均标为 `unavailable`。
 
 #### Token 影响
 

@@ -36,7 +36,7 @@ type ViewerInput = {
 
 const categories: Record<string, ResultsKey> = { encounter: 'encounterCategory', diagnoses: 'diagnosesCategory', orders: 'ordersCategory',
   documents: 'documentsCategory', labs: 'labsCategory', checks: 'checksCategory', operations: 'operationsCategory', administration: 'administrationCategory' }
-function category(value: string, t: Copy): string { const key = categories[value]; return key === undefined ? value : t(key) }
+function category(value: string, t: Copy): string { const key = categories[value]; return key === undefined ? t('otherCategory') : t(key) }
 
 function Metadata({ entries }: { entries: readonly (readonly [string, string])[] }) {
   return <dl className={css.metadata}>{entries.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
@@ -69,58 +69,59 @@ export function ResultDocument({ result, select, refresh, rerun, rerunState, t }
   t: Copy
 }) {
   const unknown = t('unknown')
+  const coverageDetails = result.coverage.flatMap(item => item.detail === undefined ? [] : [[item.category, item.detail] as const])
   return <article className={css.document} data-clinical-result={result.reportId}>
     <header className={css.header}>
-      <div className={css.heading}><span className={css.eyebrow}>{t('pendingReview')}</span><h1>{t('title')}</h1><p>{result.encounterLabel}</p></div>
-      <div className={css.badges}><span>{t('revision')} {result.revision}</span><span>{t(result.revision === result.latestRevision ? 'current' : 'historical')}</span></div>
+      <div className={css.heading}><span className={css.eyebrow}>{t('pendingReview')}</span><h1>{t('title')}</h1><p>{t('encounterLabel', { label: result.encounterLabel })}</p></div>
+      <div className={css.badges}><span>{t(result.revision === result.latestRevision ? 'current' : 'historical')}</span></div>
     </header>
-    <p className={css.notice}>{t('disclaimer')}</p>
-    <Metadata entries={[
-      [t('generatedAt'), result.generatedAt ?? unknown], [t('capturedAt'), result.capturedAt ?? unknown], [t('cutoff'), result.cutoff ?? unknown],
-      [t('evidenceRevision'), result.evidenceRevision], [t('reportId'), result.reportId],
-      [t('freshness'), t(result.freshness.status === 'changed' ? 'freshnessChanged' : result.freshness.status === 'unchanged' ? 'freshnessUnchanged' : 'freshnessUnknown')],
-      [t('lastChecked'), result.freshness.lastCheckedAt ?? unknown], [t('comparisonScope'), t(result.freshness.scope === 'none' ? 'comparisonNone' : 'comparisonSnapshot')],
-    ]} />
-    <History reports={result.history} selected={result.revision} select={select} t={t} />
-    <section className={css.section} aria-label={t('summary')}><h2>{t('summary')}</h2><p>{result.summary}</p></section>
+    <section className={`${css.section} ${css.reviewSummary}`} aria-label={t('summary')}>
+      <h2>{t('summary')}</h2><p>{result.summary}</p>
+      <p className={css.attention}>{t('findingCount', { count: result.findings.length })}</p>
+      <p className={css.secondary}>{t('generatedAt')} · {result.generatedAt ?? unknown}</p>
+      <div className={css.updateStatus}><h3>{t('freshness')}</h3>
+        <p>{t(result.freshness.status === 'changed' ? 'freshnessChanged' : result.freshness.status === 'unchanged' ? 'freshnessUnchanged' : 'freshnessUnknown')}</p>
+      </div>
+    </section>
+    <p className={css.secondary}>{t('disclaimer')}</p>
     <section className={css.section} aria-label={t('findings')}>
-      <h2>{t('findingCount', { count: result.findings.length })}</h2>
+      <h2>{t('findings')}</h2>
       {result.findings.length === 0 && <p className={css.notice}>{t('zeroFindings')}</p>}
       {result.findings.map(finding => <section className={css.finding} key={finding.findingId} data-finding-id={finding.findingId}>
         <span className={css.eyebrow}>{t(finding.kind)}</span><h3>{finding.title}</h3>
-        <p className={css.secondary}>{t('legacy')}</p>
         <h4>{t('explanation')}</h4><p>{finding.explanation}</p>
-        <h4>{t('suggestion')}</h4><p>{finding.suggestion}</p>
-        <details className={css.evidence}><summary>{t('evidence')} ({finding.evidenceRefs.length})</summary>
+        <div className={css.evidence}><h4>{t('evidence')} ({finding.evidenceRefs.length})</h4>
+          {finding.evidenceRefs.length === 0 && <p className={css.secondary}>{t('noEvidence')}</p>}
           {finding.evidenceRefs.map(evidence => <div className={css.quotation} key={`${evidence.sourceRef}:${evidence.start}:${evidence.end}`}>
-            <h4>{t('quotation')}</h4><blockquote>{evidence.quote}</blockquote>
-            <Metadata entries={[
-              [t('sourceRef'), evidence.sourceRef], [t('sourceId'), evidence.source?.sourceId ?? unknown],
-              [t('sourceRevision'), evidence.source?.sourceRevision ?? unknown], [t('sourceState'), evidence.source?.state ?? unknown],
-              [t('sourceCategory'), evidence.source === null ? unknown : category(evidence.source.category, t)],
-              [t('occurredAt'), evidence.source?.occurredAt ?? unknown], [t('availableAt'), evidence.source?.availableAt ?? unknown],
-              [t('offsets'), `${evidence.start}–${evidence.end}`],
-            ]} />
+            <p className={css.secondary}>{evidence.source === null ? t('otherCategory') : category(evidence.source.category, t)} · {evidence.source?.occurredAt ?? unknown}</p>
+            <blockquote>{evidence.quote}</blockquote>
             {evidence.sourceStatus === 'unavailable' && <p className={css.notice}>{t('missingSource')}</p>}
+            <details className={css.technical} data-clinical-source-details><summary>{t('sourceDetails')}</summary>
+              <Metadata entries={[
+                [t('sourceRef'), evidence.sourceRef], [t('sourceId'), evidence.source?.sourceId ?? unknown],
+                [t('sourceRevision'), evidence.source?.sourceRevision ?? unknown], [t('sourceState'), evidence.source?.state ?? unknown],
+                [t('sourceCategory'), evidence.source?.category ?? unknown],
+                [t('occurredAt'), evidence.source?.occurredAt ?? unknown], [t('availableAt'), evidence.source?.availableAt ?? unknown],
+                [t('offsets'), `${evidence.start}–${evidence.end}`],
+              ]} />
+            </details>
           </div>)}
-        </details>
-        <p className={css.secondary}>{t('navigationUnavailable')}</p>
+        </div>
+        <h4>{t('suggestion')}</h4><p>{finding.suggestion}</p>
       </section>)}
     </section>
     <section className={css.section} aria-label={t('coverage')}><h2>{t('coverage')}</h2>
+      <p className={css.secondary}>{t('coverageNote')}</p>
       {result.snapshotStatus === 'unavailable' && <p className={css.notice}>{t('snapshotUnavailable')}</p>}
       <ul className={css.coverage}>{result.coverage.map(item => <li key={item.category}>
-        <span>{category(item.category, t)}</span><span>{t(item.status)}</span>{item.detail !== undefined && <p>{item.detail}</p>}
+        <span>{category(item.category, t)}</span><span>{t(item.status)}</span>
       </li>)}</ul>
-      <h3>{t('reviewedSources')}</h3>
-      {result.reviewedSourceRefs.length === 0 ? <p className={css.secondary}>{t('noneReviewed')}</p>
-        : <ul>{result.reviewedSourceRefs.map(ref => <li key={ref}>{ref}</li>)}</ul>}
-      <h3>{t('unreviewed')}</h3>
-      {result.unreviewedSourceRefs.length === 0 ? <p className={css.secondary}>{t(result.snapshotStatus === 'unavailable' ? 'snapshotUnavailable' : 'unreviewedEmpty')}</p>
-        : <ul>{result.unreviewedSourceRefs.map(ref => <li key={ref}>{ref}</li>)}</ul>}
+      <p>{result.reviewedSourceRefs.length === 0 ? t('noneReviewed') : t('reviewedCount', { count: result.reviewedSourceRefs.length })}</p>
+      {(result.unreviewedSourceRefs.length > 0 || result.snapshotStatus === 'retained') && <p>{result.unreviewedSourceRefs.length === 0
+        ? t('unreviewedEmpty') : t('unreviewedCount', { count: result.unreviewedSourceRefs.length })}</p>}
     </section>
     <section className={css.section} aria-label={t('calculation')}><h2>{t('calculation')}</h2>
-      <Metadata entries={[[t('drg'), t('engineUnavailable')], [t('dip'), t('engineUnavailable')]]} />
+      <p>{t('calculationNote')}</p>
     </section>
     <section className={css.section} aria-label={t('progress')}><h2>{t('progress')}</h2>
       <p role="status">{t(result.progress.status === 'failed' ? 'progressFailed' : result.progress.status)}</p>
@@ -128,6 +129,23 @@ export function ResultDocument({ result, select, refresh, rerun, rerunState, t }
       <div className={css.actions}><Button variant="outline" onClick={refresh}>{t('refresh')}</Button>
         <Button variant="primary" onClick={rerun} disabled={rerunState === 'pending' || rerunState === 'unknown' || ['collecting', 'reviewing'].includes(result.progress.status)}>{t('rerun')}</Button></div>
     </section>
+    <details className={css.technical} data-clinical-report-details><summary>{t('reportDetails')}</summary>
+      <p className={css.secondary}>{t('legacy')}</p>
+      <Metadata entries={[
+        [t('revision'), String(result.revision)], [t('capturedAt'), result.capturedAt ?? unknown], [t('cutoff'), result.cutoff ?? unknown],
+        [t('evidenceRevision'), result.evidenceRevision], [t('reportId'), result.reportId],
+        [t('lastChecked'), result.freshness.lastCheckedAt ?? unknown], [t('comparisonScope'), t(result.freshness.scope === 'none' ? 'comparisonNone' : 'comparisonSnapshot')],
+      ]} />
+      <History reports={result.history} selected={result.revision} select={select} t={t} />
+      {coverageDetails.length > 0 && <><h3>{t('coverageDetails')}</h3><Metadata entries={coverageDetails} /></>}
+      <h3>{t('reviewedSources')}</h3>
+      {result.reviewedSourceRefs.length === 0 ? <p className={css.secondary}>{t('noneReviewed')}</p>
+        : <ul>{result.reviewedSourceRefs.map(ref => <li key={ref}>{ref}</li>)}</ul>}
+      <h3>{t('unreviewed')}</h3>
+      {result.unreviewedSourceRefs.length === 0 ? <p className={css.secondary}>{t(result.snapshotStatus === 'unavailable' ? 'snapshotUnavailable' : 'unreviewedEmpty')}</p>
+        : <ul>{result.unreviewedSourceRefs.map(ref => <li key={ref}>{ref}</li>)}</ul>}
+      <p className={css.secondary}>{t('navigationUnavailable')}</p>
+    </details>
   </article>
 }
 

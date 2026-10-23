@@ -7,7 +7,6 @@ import { applyEntryPatches, entryListSchema } from '@deepseek-ai/cordis-plugin-i
 
 const presets = ['minimal', 'standard', 'ptc', 'cordis']
 const clinicalPresetId = 'clinical-review'
-const clinicalPersona = 'You are a clinical record review assistant powered by the {{model}} model. Review the authorized encounter using original evidence and exact citations. Identify inconsistencies, missing information, and items requiring clinician verification. Findings are advisory and require human review; never block discharge or modify EMR records. DRG and DIP calculation are unavailable; do not invent groups, scores, or payment conclusions.'
 
 function readList(file, optional = false) {
   let text
@@ -48,30 +47,18 @@ function profileOverrides(rows, profilePatch) {
 }
 
 /**
- * Derive the hosted clinical preset from the installed standard tool composition.
- * Replaces only the persona prefix, then applies this preset's saved profile edits.
+ * Load the independent physician-facing composition and apply its saved profile edits.
  * @param {string} root - Repository or installed image root.
  * @param {string} [profilePatch] - Optional saved profile patch.
  * @returns {import('./company-presets.mjs').ClinicalPresetDeclaration} Complete clinical preset declaration.
- * @throws When the standard preset or its persona row is missing.
+ * @throws When the clinical declaration or prompt-policy row is missing.
  */
 export function generateClinicalPreset(root, profilePatch) {
-  const standard = canonicalPreset(root, 'standard')
-  const persona = exactlyOne(standard.config.plugins, 'persona', 'standard preset plugins')
-  if (persona.name !== '@deepseek-ai/dsh-persona' || persona.config === null || typeof persona.config !== 'object' || Array.isArray(persona.config)) {
-    throw new Error('Expected a configured dsh-persona row in the standard preset')
-  }
-  const declaration = {
-    id: `preset-${clinicalPresetId}`,
-    name: '@deepseek-ai/dsh-agent-preset',
-    config: {
-      ...standard.config,
-      id: clinicalPresetId,
-      name: 'Clinical review',
-      description: 'Evidence-based clinical record review with advisory findings for clinicians.',
-      plugins: applyEntryPatches(standard.config.plugins, [{ id: 'persona', config: { ...persona.config, prefix: clinicalPersona } }], failPatch),
-    },
-  }
+  const file = resolve(root, 'deploy/hosted-workspaces/clinical.preset.yml')
+  const declaration = exactlyOne(applyEntryPatches([], readList(file), failPatch), `preset-${clinicalPresetId}`, file)
+  const prompt = exactlyOne(declaration.config.plugins, 'clinical-prompt', file)
+  if (prompt.name !== './clinical-prompt.mjs') throw new Error(`Expected the clinical prompt plugin in ${file}`)
+  prompt.name = resolve(root, 'deploy/hosted-workspaces/clinical-prompt.mjs')
   return exactlyOne(profileOverrides([declaration], profilePatch), declaration.id, 'clinical preset overrides')
 }
 

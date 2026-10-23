@@ -53,7 +53,7 @@ The hosted-workspace deployment supplies the broker URL, opaque owner identity, 
 
 The [configuration schema](src/config.ts) validates deployment bounds. To replace HTTP evidence reads with MCP, mount an implementation of [EncounterReader](../emr-encounter/README.md), then select `readerMode: provided`. Browser launch authorization still uses the broker.
 
-The [hosted clinical overlay](../../../deploy/hosted-workspaces/clinical.runtime.patch.yml) selects `clinical-review` for new encounter Sessions. Its [preset generator](../../../deploy/hosted-workspaces/clinical-presets.mjs) preserves the installed `standard` preset's tools and policies while replacing its coding persona with clinical review instructions. Saved profile edits to `standard` do not carry into this separate preset; customize `clinical-review` directly. Company model deployments apply the same compaction policy to this preset. Existing encounter Sessions retain their saved preset. Authorization, evidence validation, and durable review state remain Host responsibilities.
+The [hosted clinical overlay](../../../deploy/hosted-workspaces/clinical.runtime.patch.yml) selects `clinical-review`, displayed as “医保助手”, for new encounter Sessions. Its [independent composition](../../../deploy/hosted-workspaces/clinical.preset.yml) retains the general tools and their policies without repository instruction loading or the coding plan workflow. A [scoped prompt plugin](../../../deploy/hosted-workspaces/clinical-prompt.mjs) removes Harness-development guidance and implementation paths while retaining tool instructions and other runtime context. Saved profile edits to `standard` do not carry into this separate preset; customize `clinical-review` directly. Company model deployments apply the same compaction policy. Existing Sessions retain their preset identity and history; later Agent activations use the current definition for that identity. Authorization, evidence validation, and durable review state remain Host responsibilities.
 
 ### Entry, review, and refresh
 
@@ -113,7 +113,7 @@ Disposing the plugin aborts source work, waits for admitted tasks, and removes r
 
 #### What the model sees
 
-A bound Agent receives inventory, passage-reading, finding-submission, and report-reading tools. New hosted clinical Sessions use a clinical review persona with the existing general tools. An explicit review appends a durable user message requesting evidence-based analysis in `reviewLanguage`. Source metadata includes coverage, cutoff, revisions, and source references; original content appears only in logged tool results. Reports mark every finding `pending-human-review` and both calculations `unavailable`.
+A bound Agent receives inventory, passage-reading, finding-submission, and report-reading tools. The hosted clinical persona asks for physician-facing conclusions, original evidence, verification suggestions, and explicit coverage limits; internal identifiers and execution details remain in tool fields. An explicit review appends a durable request in clinical language and selects report language through `reviewLanguage`. Source metadata includes coverage, cutoff, revisions, and source references; original content appears only in logged tool results. Reports mark every finding `pending-human-review` and both calculations `unavailable`.
 
 #### Token effect
 

@@ -1,6 +1,10 @@
 # Authored external evidence/model inputs around the shipped headless profile.
 - id: llm-deepseek
   disabled: true
+- id: agent-instructions
+  disabled: true
+- id: plan-mode
+  disabled: true
 - insert:
     - id: clinical-review-fixture
       name: ../../../packages/experimental/clinical-review/tests/snapshot-fixture.ts

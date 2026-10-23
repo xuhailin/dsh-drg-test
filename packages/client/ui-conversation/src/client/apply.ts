@@ -159,6 +159,10 @@ export function apply(ctx: Context, config: Config = Config({})): void {
   const maxConcurrentFileUploads = config.maxConcurrentFileUploads as number
   const workspaceNavigation = ctx.get('uiWorkspace') as unknown as WorkspaceNavigation
   const uiConversation = new UiConversation(ctx, sessions)
+  const presentations = {
+    getSnapshot: () => uiConversation.presentations.entries(),
+    subscribe: (listener: () => void) => uiConversation.presentations.subscribe(listener),
+  }
   uiConversation.userText.register(sessionReferenceRule)
   uiConversation.userText.register(collapseWhitespaceRule)
   uiConversation.userText.register(trimWhitespaceRule)
@@ -354,6 +358,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     inject: (sessionId: SessionId | undefined): ConversationInjected => ({
       hooks: {
         composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId),
+        presentations,
       },
       selectWorkspace: workspaceId => workspaceNavigation.openWorkspace(workspaceId, (nextId) => {
         if (sessionId !== undefined && nextId !== sessionId) {

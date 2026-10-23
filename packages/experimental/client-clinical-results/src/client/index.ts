@@ -43,6 +43,15 @@ export async function apply(ctx: Context): Promise<void> {
   const config = viewerConfigSchema.parse(await response.json())
   lifetime.signal.throwIfAborted()
   ctx.effect(() => ctx.locale.register('clinical-results', { en, zh }))
+  ctx.inject(['uiConversation'], (conversationCtx) => {
+    const t = conversationCtx.locale.bind('clinical-results')
+    conversationCtx.effect(() => conversationCtx.uiConversation.presentations.register({
+      id: 'clinical-review',
+      workspaceSelection: 'managed',
+      matches: summary => summary?.projectionValues?.agentPreset === 'clinical-review',
+      headline: () => t('assistantName'), badge: () => t('reviewContext'), placeholder: () => t('reviewQuestion'),
+    }))
+  })
   const standalone = new ResultController(config, fetch)
   const workspaceResult = new ResultController(config, fetch)
   const directory = new DirectoryController(config, fetch,
@@ -176,7 +185,7 @@ export async function apply(ctx: Context): Promise<void> {
     }
     patientCtx.slots.inject('main', () => patientCtx.slots.register({ name: 'main', key: 'clinical-patients', locale: 'clinical-results', inject: () => patientFace }, PatientWorkspace))
     patientCtx.slots.inject('sidebar.panellist', () => patientCtx.slots.register({ name: 'sidebar.panellist', id: 'clinical-patients', locale: 'clinical-results',
-      label: () => patientCtx.locale.bind('clinical-results')('patients'), order: 20,
+      label: () => patientCtx.locale.bind('clinical-results')('assistantName'), order: 20,
     }, PatientIcon))
   })
 

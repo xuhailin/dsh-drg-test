@@ -6,6 +6,8 @@ Status: confirmed product direction; first-stage implementation is locally verif
 
 Review date: 2026-10-22. Baseline: DSH Web 0.2.1-rc.2 with the current [SSO/private-workspace implementation](sso-private-workspaces-v1.md). Execution sequencing and resource publication belong to the [implementation proposal](drg-review-assistant-v1-implementation.md).
 
+The next [structured result viewer](clinical-result-viewer-v1.md) draft specifies chat result cards, an independent EMR-embeddable view, stable semantic keys, and bounded navigation actions. It does not extend the current implementation's clinical capabilities.
+
 ## Summary
 
 Help doctors preparing discharge compare draft diagnoses, procedures, and documents with the available inpatient evidence. Present cited discrepancies and missing information; after human confirmation of the relevant coded snapshot, compute and explain a DRG or DIP pre-group under an explicitly selected scheme.

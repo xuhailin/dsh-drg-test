@@ -36,10 +36,11 @@ export function ResultCards({ turn, useResults, ownerSessionId, open, confirm, u
   return <div className={css.cards}>{pending.filter(item => confirmed.unavailable[item.reportId]).map(item => <div key={item.reportId} className={css.notice} role="status">
     <p>{t('cardUnavailable')}</p><Button size="sm" variant="outline" onClick={() => { confirm(item.ref, item.reportId, true) }}>{t('retry')}</Button>
   </div>)}{results.map(result => <button type="button" key={result.reportId} className={css.card}
-    onClick={() => { open(result.ref) }} aria-label={`${t('open')} · ${t('revision')} ${result.ref.revision}`}>
+    data-clinical-result-card={result.reportId} data-result-revision={result.ref.revision}
+    onClick={() => { open(result.ref) }} aria-label={t('openSavedResult', { generatedAt: result.generatedAt ?? t('unknown') })}>
     <IconChecklistOutlineRegular size={20} className={css.cardIcon} />
-    <span className={css.cardText}><strong>{t('title')}</strong><span>{result.encounterLabel}</span>
-      <span>{t('generatedAt')} {result.generatedAt ?? t('unknown')} · {t('revision')} {result.ref.revision} · {t('findingCount', { count: result.findingCount })}</span>
+    <span className={css.cardText}><strong>{t('title')}</strong><span>{t('encounterLabel', { label: result.encounterLabel })}</span>
+      <span>{t('generatedAt')} {result.generatedAt ?? t('unknown')} · {t('findingCount', { count: result.findingCount })}</span>
       <span>{result.coverageGaps === null ? t('savedCoverage') : t('coverageGapCount', { count: result.coverageGaps })}</span><span>{t('open')}</span>
     </span>
   </button>)}</div>

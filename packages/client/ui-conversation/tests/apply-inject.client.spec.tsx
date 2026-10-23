@@ -145,6 +145,26 @@ async function bench() {
 }
 
 describe('Conversation inject API', () => {
+  it('publishes presentation contributions and withdraws them when their plugin unloads', async () => {
+    const b = await bench()
+    onTestFinished(() => b.runtime.dispose())
+    const source = b.residentApi(ROOT).hooks.presentations
+    const notify = vi.fn()
+    const unsubscribe = source.subscribe(notify)
+    onTestFinished(unsubscribe)
+    const presentation = { id: 'review', matches: () => true, headline: () => 'Review',
+      badge: () => 'Records', placeholder: () => 'Ask about the records' }
+    const feature = await b.runtime.mount({ inject: ['uiConversation'], apply: (ctx) => {
+      ctx.uiConversation.presentations.register(presentation)
+    } })
+    expect(source.getSnapshot()).toEqual([presentation])
+    expect(b.residentApi(undefined).hooks.presentations).toBe(source)
+    expect(() => b.runtime.ctx.uiConversation.presentations.register(presentation)).toThrow('already registered')
+    await feature.dispose()
+    expect(source.getSnapshot()).toEqual([])
+    expect(notify).toHaveBeenCalledTimes(2)
+  })
+
   it('owns the File action, reads its mounted composer availability, and unregisters on disposal', async () => {
     const b = await bench()
     onTestFinished(() => b.runtime.dispose())

@@ -20,6 +20,7 @@ describe('clinical review through the shipped headless profile', () => {
       prepare: async (cwd) => {
         await writeFile(join(cwd, patchName), [
           '- id: llm-deepseek', '  disabled: true', '- id: session-title-llm', '  disabled: true',
+          '- id: agent-instructions', '  disabled: true', '- id: plan-mode', '  disabled: true',
           '- id: agent-default-model', '  config:', '    provider: clinical-fixture', '    model: fixture',
           '- id: session-persistence-jsonl', '  config:', "    root: !!js dshHomePath('sessions')", '    compression: none',
           '- insert:', '    - id: clinical-review-fixture', `      name: ${JSON.stringify(fixture)}`, '      config:', '        scriptModel: true', '        saveResult: true', '',
@@ -30,7 +31,7 @@ describe('clinical review through the shipped headless profile', () => {
         const paths = await readdir(sessions, { recursive: true })
         const logs = await Promise.all(paths.filter(path => /session\.v[0-9]+\.jsonl$/.test(path)).map(path => readFile(join(sessions, path), 'utf8')))
         const text = logs.join('\n')
-        expect(text).toContain('You are a clinical record review assistant')
+        expect(text).toContain('你是“医保助手”，面向临床医生')
         expect(text).toContain('"name":"web_search"')
         expect(text).toContain('"name":"read"')
         expect(text).toContain('review_read_evidence')
