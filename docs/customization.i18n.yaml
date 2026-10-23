@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for customization.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/customization.md
+/customization-conventions-and-extension-points:
+  en: 6f5182671e8b9f02
+  zh: 7241ee419a2ec18a
+/customization-conventions-and-extension-points/requirements-defaults-and-exceptions:
+  en: e24ca75020d9bc93
+  zh: 93f92a4c3a74a0d5
+/customization-conventions-and-extension-points/extension-point-map:
+  en: 05eb83543a4b0eb7
+  zh: 3e1cccac55487c73
+/customization-conventions-and-extension-points/basis-and-exception-handling:
+  en: d6f630e9d6e6a2e4
+  zh: 0435afe28d3fd79c
+/customization-conventions-and-extension-points/verification-by-change-scope:
+  en: b931c1c65ffae2b9
+  zh: b5654fae721cf173
