@@ -1,0 +1,13 @@
+# Bilingual-pair consistency record for clinical-review.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/subsystems/clinical-review.md
+/clinical-encounter-review:
+  en: 02db41b48e30ac9a
+  zh: 3fc1f417f00a9cdc
+/clinical-encounter-review/actor-and-encounter-binding:
+  en: 0cf9f7061ea9ed26
+  zh: 14fe122743895fc5
+/clinical-encounter-review/evidence-snapshots:
+  en: cf1ebc68308a82a5
+  zh: 13467e466d50b588

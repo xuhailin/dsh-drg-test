@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/emr-reader-broker/README.md
+/:
+  en: ae8d9c4df66098dd
+  zh: 781051ec51a591c9
+/deepseek-ai-dsh-experimental-emr-reader-broker:
+  en: 635848ae7b3c3164
+  zh: 8d60539b6691c590
+/deepseek-ai-dsh-experimental-emr-reader-broker/summary:
+  en: ca4c84cef28ef67d
+  zh: 5ec69065f78ec8f0
+/deepseek-ai-dsh-experimental-emr-reader-broker/table-of-contents:
+  en: 23386452a66b2fbd
+  zh: 4a8d91b2f313fead
+/deepseek-ai-dsh-experimental-emr-reader-broker/use-this-package:
+  en: c348325e70f73752
+  zh: bb13b1384bc7e3b8
+/deepseek-ai-dsh-experimental-emr-reader-broker/understand-the-implementation:
+  en: 104964bd56cec405
+  zh: 86a767fe96393575
+/deepseek-ai-dsh-experimental-emr-reader-broker/further-exploration:
+  en: 32ae39eb8b010a3b
+  zh: 0ed44b0e78a8f623
+/deepseek-ai-dsh-experimental-emr-reader-broker/model-experience:
+  en: d1c7566dfa7bbd6b
+  zh: 702ea431fa923d21
+/deepseek-ai-dsh-experimental-emr-reader-broker/model-experience/kv-cache-effect:
+  en: 0a78d185556de613
+  zh: 94799810ad4432c2
+/deepseek-ai-dsh-experimental-emr-reader-broker/known-limitations-and-deferred-work:
+  en: 2679f90cd1f0d4aa
+  zh: 5bf37b42b5cd4dc1
+/deepseek-ai-dsh-experimental-emr-reader-broker/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 8ec3e73528ddb1a6

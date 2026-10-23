@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for drg-review-assistant-v1-plugins.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/drg-review-assistant-v1-plugins.md
+/pre-discharge-review-drg-dip-plugin-design-v1:
+  en: 02ba7529c210615b
+  zh: 827b403a61d11d57
+/pre-discharge-review-drg-dip-plugin-design-v1/summary:
+  en: 62242cd7674e2c9d
+  zh: e76a221b93e75d06
+/pre-discharge-review-drg-dip-plugin-design-v1/table-of-contents:
+  en: 69ea6b6f0fe70b20
+  zh: 235d2c6495ae7431
+/pre-discharge-review-drg-dip-plugin-design-v1/plugin-responsibilities:
+  en: 530d712615d79f08
+  zh: e17ae0dab7f5d46c
+/pre-discharge-review-drg-dip-plugin-design-v1/triggers-and-call-order:
+  en: 681be13bff56f838
+  zh: 8293c25e99d14337
+/pre-discharge-review-drg-dip-plugin-design-v1/context-and-data-flow:
+  en: 75338b18f3adff32
+  zh: ddfca96b5ff4becd
+/pre-discharge-review-drg-dip-plugin-design-v1/business-tools-and-skills:
+  en: 358a74d21191ad96
+  zh: 26d2b4e73a599344
+/pre-discharge-review-drg-dip-plugin-design-v1/drg-and-dip-calculation:
+  en: 4426f6cddee826cb
+  zh: f377bf420b4429c5
+/pre-discharge-review-drg-dip-plugin-design-v1/persistence-confirmation-and-recovery:
+  en: 672601060d599e8f
+  zh: 136e9b5cb833118f
+/pre-discharge-review-drg-dip-plugin-design-v1/emr-data-provider-replacement:
+  en: ea370b97f87ac977
+  zh: 6dc1750be7c7ab3b
+/pre-discharge-review-drg-dip-plugin-design-v1/validation-and-unresolved-dependencies:
+  en: dcb66b9ef6228e05
+  zh: ee634c5dd7f1b073
+/pre-discharge-review-drg-dip-plugin-design-v1/dev-note:
+  en: ff15769977574367
+  zh: f7d36008a3d5f5c9

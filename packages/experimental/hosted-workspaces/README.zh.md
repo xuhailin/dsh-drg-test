@@ -45,8 +45,11 @@ kind: "package-bundle"
 | `discoveryUrl` | 从 issuer 发现 | 可选的内部发现 URL；返回的 issuer 仍须匹配 |
 | `oidcFlow` | `authorization-code` | 授权码登录；仅返回 ID token 的提供方可使用 `implicit` |
 | `clientSecretFile` | 未设置 | 仅网关读取的授权码机密客户端密钥；implicit 模式忽略此项 |
-| `deepseekKeyFile` | 必填 | 仅挂载到网关的上游 Key 文件 |
-| `deepseekBaseUrl` | `https://api.deepseek.com/anthropic` | 兼容 Messages 的上游接口 |
+| `modelProtocol` | `anthropic-messages` | Messages 或 `openai-responses` 流式协议 |
+| `modelKeyFile`, `modelBaseUrl` | 未设置 | 显式指定仅供网关使用的密钥文件及协议 API 根地址；Responses 两项均必填 |
+| `runtimeModel`, `runtimeContextWindow`, `runtimeMaxTokens` | 未设置、`32768`、`8192` | Responses 实例模型及部署预算；模型须在允许列表内，输出须符合代理和上下文限制 |
+| `runtimePatchFile` | 未设置 | `/opt/dsh/` 下可选的规范化镜像内覆盖配置 |
+| `deepseekKeyFile`, `deepseekBaseUrl` | Key 必填；`https://api.deepseek.com/anthropic` | 对应通用字段未设置时使用的既有 Messages 配置 |
 | `allowedModels` | `deepseek-flash`, `deepseek-v4-pro` | 共享 Key 代理允许使用的模型 |
 | `allowHttp` | `false` | 显式允许仅供开发的 HTTP；本地 Compose 试用会启用 |
 | `sessionTtlMs`, `flowTtlMs` | 12 小时、5 分钟 | 浏览器会话和登录尝试的绝对有效期 |
@@ -54,15 +57,22 @@ kind: "package-bundle"
 | `maxUsers`, `maxBrowserSessions` | `20`, `200` | 持久化账号数和有效浏览器会话数限制 |
 | `containerMemoryBytes`, `containerNanoCpus`, `containerPidsLimit` | 2 GiB、2 CPU、`256` | 应用于每个个人容器的限制 |
 | `containerTmpBytes` | 256 MiB | 个人容器 `/tmp` tmpfs 大小 |
+| `sharedResourcesPath` | 未设置 | Docker daemon 主机上的可选规范化绝对目录，只读挂载到 `/opt/dsh/resources` |
 | `maxRequestsPerWindow`, `rateWindowMs`, `maxConcurrentModelRequests` | `30`、60 秒、`2` | 每个账号使用共享 Key 的模型请求限制 |
 | `maxModelRequestBytes`, `maxOutputTokens` | 32 MiB、`256000` | 模型请求字节数和请求输出 token 上限 |
 | `maxIndexResponseBytes`, `maxProxyConnectionsPerUser` | 2 MiB、`64` | 解码并修改后的 index 字节数，以及同时存在的个人代理连接数 |
 
+Responses 的 `modelBaseUrl` 包含 API 前缀，例如 `https://models.example.test/v1`；代理追加 `/responses`。Messages 在 API 根地址后追加 `/v1/messages`。部署须选择一种协议并显式配置模型允许列表。个人实例通过既有 [pi-ai 适配器](../../llm/llm-pi-ai/README.zh.md)调用 Responses，`HOSTED_MODEL_API_KEY` 仅保存账号专属令牌；公司密钥保留在网关。
+
 ### 身份和保留的工作
 
-网关从经过验证的 OIDC issuer 和 subject 推导账号。它根据自己的账号记录选择个人运行实例，校验浏览器 origin，并用仅供后端使用的 DSH cookie 替换浏览器凭据。运行实例凭据仅授权模型代理允许的操作；上游 Key 不进入个人容器。
+打开入口 `/` 会自动发起公司登录，已有有效会话时则交接到对应个人工作区。匿名访问个人 `/` 或 `/index.html` 会返回统一入口，不将旧 origin 携带为登录目标；目的地由经过验证的身份决定。显式访问 `/?signedout=1` 会停留在退出页面，直到用户再次登录。
+
+网关从经过验证的 OIDC issuer 和 subject 推导账号。它根据自己的账号记录选择个人运行实例，校验浏览器 origin，并用仅供后端使用的 DSH cookie 替换浏览器凭据。运行实例凭据授权模型代理和可选 `/runtime/` 处理器；上游 Key 不进入个人容器。处理器接收已验证账号、取消信号及当前登录检查，负责资源权限校验。临床读取要求该账号至少保留一个未过期浏览器登录；退出一个浏览器不会撤销另一个仍有效的登录。
 
 退出登录会撤销对应浏览器会话，并关闭该会话获准建立的连接。个人数据和后台工作会保留，公司身份提供方的会话不会退出。网关重启会保留账号记录及既有容器；必须将网关存储与个人数据卷一起备份。
+
+设置 `sharedResourcesPath` 后，每个个人实例获得 `DSH_SHARED_RESOURCES_ROOT=/opt/dsh/resources`，并以非递归、只读方式绑定已发布集合。实例管理器在复用前核验来源、目标、只读状态及私有传播方式。通过[资料工具](../drg-resources/README.zh.md)准备集合；网关不校验包内容，也不授予分组就绪资格。既有容器挂载不符时返回 `resource_conflict`，由运维保留 home 卷后替换容器。不设置该选项时保留无资料的运行方式。
 
 -----
 
@@ -75,6 +85,8 @@ kind: "package-bundle"
 网关默认使用 PKCE、nonce 和绑定浏览器的 state 完成授权码登录。implicit 兼容模式仅请求 `id_token`；回调页面移除 URL fragment，再通过同源 POST 提交，由服务端验证签名、issuer、audience、有效期、nonce 和 state。两种模式均不使用密码授权，也不请求 EMR 业务 access token。DSH 不将 ID token 或 access token 保存到 localStorage。[注册指南](../../../docs/user/guide/hosted-workspaces.zh.md#sso-registration)拥有提供方设置。
 
 网关通过短时、一次性的交接，将验证后的浏览器会话转移到该账号独立的 origin。implicit fragment 中转页将表单限制为 CSP `form-action 'self'`。其 POST 返回使用 `form-action 'none'` 的入口 HTTP 200 页面，由 meta refresh 导航到该交接地址。交接返回一个文档，由该文档发起新的同源导航，结束身份提供方的重定向链。账号／退出栏在 DSH 应用上方预留空间。HTTP 和 WebSocket 请求只会到达该有效会话所选择的运行实例。
+
+DRG Agent 状态页区分登录恢复和工作区恢复，并在验证及交接期间显示加载状态。已有有效会话的空 implicit 回调会经统一入口恢复；携带 state 的 fragment 仍须验证。网关失败日志只包含操作及安全的分类代码，不输出原始错误消息、OAuth／JWT 值或密钥。
 
 Docker 控制请求使用配置的 `dockerSocket`，即使环境定义了 `DOCKER_HOST` 或 Docker TLS 设置。Docker 为每个账号分配一个命名 home 数据卷和桥接网络。启动流程在复用资源前检查既有资源的归属和隔离配置。模型代理监听网关在个人网络中的具体地址，并在用户容器之外执行请求限制。启动失败会删除本次操作创建的资源；清理失败需要运维人员检查。
 
@@ -106,11 +118,11 @@ Docker 控制请求使用配置的 `dockerSocket`，即使环境定义了 `DOCKE
 
 #### 模型看到的内容
 
-个人 Web profile 拥有提示词、工具和已记录的对话内容。此组合层转发获准的 Messages 请求，不添加提示文本或工具 schema。它仅接受流式 `POST /model/v1/messages`；Files 操作和上游文件引用会被拒绝。
+个人 Web profile 拥有提示词、工具和已记录的对话内容。此组合层转发获准的请求，不添加提示文本或工具 schema。选定协议接受流式 `POST /model/v1/messages` 或 `POST /model/v1/responses`。Files 操作和上游文件引用会被拒绝。Responses 使用无状态请求（`store: false`）；拒绝引用已存储的响应、对话、提示词和条目，也不提供后台任务及提供方托管工具。函数工具及完整的本地工具结果仍可使用。 启用共享资料后，仓库 entrypoint 向支持技能的 preset 提供内置 `drg-national-reference` 技能。既有技能工具负责持久化目录及加载正文，不覆盖用户指令文件。
 
 #### Token 影响
 
-网关不添加模型输入 token。个人运行实例的既有上下文和工具决定 token 用量；代理限制请求中的 `max_tokens` 值，并仅允许配置的模型 ID。
+网关不增加模型输入 token。可选资料技能通过既有日志化工具增加目录摘要，以及按需加载的指令与选定原文片段。代理限制选定协议的 `max_tokens` 或 `max_output_tokens`，并只接受配置的模型 ID。
 
 #### KV Cache 影响
 
@@ -120,7 +132,7 @@ Docker 控制请求使用配置的 `dockerSocket`，即使环境定义了 `DOCKE
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **实验性试用**——真实公司 SSO、真实 DeepSeek 流式请求，以及部署环境的隔离需要另行验收；此组合层不宣称可用于生产或患者数据。
+- **实验性试用**——真实公司 SSO、真实模型流式请求，以及部署环境的隔离需要另行验收；此组合层不宣称可用于生产或患者数据。
 - **磁盘配额需要宿主机配置**——此处不为 Docker 命名卷强制执行每账号硬配额。在允许访问共享服务器存储前，须配置并验证 Linux 文件系统／项目配额。
 - **单网关实例**——待完成的登录流程、连接跟踪和运行实例启动归属保留在进程内；不支持副本和分布式准入。
 - **保留后台工作**——退出登录不会停止工具或容器，也不提供空闲停止策略。运维人员负责保留、备份及最终资源清理。
@@ -133,6 +145,6 @@ Docker 控制请求使用配置的 `dockerSocket`，即使环境定义了 `DOCKE
 <details>
 <summary>维护者工作上下文——点击展开</summary>
 
-[需求验证记录](../../../docs/requirements/sso-private-workspaces-v1.zh.md#dev-note) 统一记录已执行的本地检查及其限制。公司 SSO 注册、服务器部署及独立用户验收均未执行。
+[需求验证记录](../../../docs/requirements/sso-private-workspaces-v1.zh.md#dev-note) 统一记录已执行的检查及其限制。公司回调已注册，并已观察到真实账号进入个人首页。[资料集成记录](../../../docs/requirements/drg-review-assistant-v1-implementation.zh.md#dev-note)记录了新 standard 聊天通过公司 SSO／DeepSeek 自动加载技能、核验摘要及引用 PDF 页码的结果；公司服务器部署及独立用户验收仍待完成。
 
 </details>

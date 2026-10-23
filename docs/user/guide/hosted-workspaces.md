@@ -16,6 +16,7 @@ Try company-style login and private DSH chats on a local Docker engine before ch
 - [Build images with GitLab CI](#gitlab-ci)
 - [Register the company SSO application](#sso-registration)
 - [Connect company services](#company-services)
+- [Shared national references](#shared-references)
 - [Isolation and operating limits](#isolation-and-limits)
 - [Verify and recover](#verification-and-recovery)
 - [Further Exploration](#further-exploration)
@@ -40,13 +41,17 @@ docker compose -f deploy/hosted-workspaces/compose.yml -f deploy/hosted-workspac
 
 The test overlay selects mock OIDC and model services and mounts synthetic fixture keys. It does not contact company SSO or DeepSeek. Keep this overlay for local synthetic data only.
 
+Build upgrades under a new image tag or digest. Replacing a tag used by running personal containers makes the gateway reject those instances until they are recreated. Finish active turns, stop the gateway before personal containers so incoming requests cannot restart them, preserve the home volumes, and recreate the affected containers during a planned upgrade.
+
 ### Try two accounts
 
-Open [the local portal](http://chat.localhost:8080), select company sign-in, and choose **Sign in as Alice** on the mock SSO page. The browser should return to an origin such as `http://u-<40-hex-characters>.chat.localhost:8080` and display the existing DSH chat UI with an account/logout control. The first visit also starts Alice's personal container.
+Open [the local portal](http://chat.localhost:8080). It automatically opens company sign-in; choose **Sign in as Alice** on the mock SSO page. The browser should return to an origin such as `http://u-<40-hex-characters>.chat.localhost:8080` and display the existing DSH chat UI with an account/logout control. The first visit also starts Alice's personal container.
 
 Send a short chat message. The mock response begins with `Mock DeepSeek:`. For the tool flow, send `WRITE_MARKER alice.txt` and respond to any normal DSH approval. The mock model requests the real Bash tool to write and read a marker in the personal workspace.
 
 Use a separate browser profile or private window to sign in as **Bob**. Bob should receive a different origin and an empty independent workspace. Repeat with `WRITE_MARKER bob.txt`, then check the isolation and logout scenarios below; the expected results are acceptance targets until the verification record confirms the run.
+
+Use the portal as the bookmark. If an old personal home page needs login, the gateway returns through company sign-in and selects the current account's workspace. Signing out leaves a confirmation page with a company sign-in action, so the active company SSO session does not immediately log the user back in.
 
 ### Stop the local portal
 
@@ -103,6 +108,8 @@ The administrator supplies the issuer, client ID, supported flow, and reachable 
 
 In implicit mode, the callback page removes the fragment from the address bar and sends its fields to the gateway by same-origin POST. The gateway verifies the token through the provider's JWKS before creating a browser session; an unverified browser-decoded token cannot authenticate. DSH requests only an ID token for identity, not EMR business access or refresh tokens. It uses no password grant and stores no SSO token in localStorage. Browsers do not call the token endpoint, so token-endpoint CORS is unnecessary.
 
+If the callback is reopened without response fields while a live DSH session exists, it resumes through the portal. A real response carrying state is still validated. Verification and workspace opening show a DRG Agent loading page; the retry action appears when sign-in cannot continue.
+
 **Logout is application-local.** It revokes the browser session and closes its connections. It retains personal files and background jobs and leaves the company's global SSO session active. A later company sign-in can therefore complete without another password prompt.
 
 -----
@@ -128,9 +135,30 @@ For an implicit application, set `HOSTED_OIDC_FLOW=implicit`. This mode does not
 
 These are replacement examples, not an existing company deployment. `HOSTED_OIDC_DISCOVERY_URL` is optional when the configured issuer is directly reachable; if an internal URL is used, its metadata must still report that issuer. Keep secret values out of `.env`, command arguments, browser settings, and committed files.
 
-The default upstream is `https://api.deepseek.com/anthropic`; the configured model IDs are `deepseek-flash` and `deepseek-v4-pro`. The shared-key proxy permits only streaming `POST /model/v1/messages`, with per-account admission and output limits. It denies Files API operations and upstream file references. Image attachments need separate end-to-end confirmation of the DSH inline fallback.
+The default upstream is `https://api.deepseek.com/anthropic`; the configured model IDs are `deepseek-flash` and `deepseek-v4-pro`. The shared-key proxy applies per-account admission and output limits. Company Responses-compatible models use `modelProtocol: openai-responses` and explicit `modelKeyFile` / `modelBaseUrl` settings; the [package reference](../../../packages/experimental/hosted-workspaces/README.md#configuration) defines endpoint prefixes and the stateless request restrictions. Images need separate end-to-end confirmation.
+
+At startup, the company-model composition applies its compaction policy to all four bundled Web presets without changing their tools. It gives its route 4,096 tokens each for compaction headroom, summary output, and retained recent history, fitting the default 32K context and 8K output. Recheck the [compaction policy](../../../packages/compaction/compaction-basic/README.md#use-this-package) when changing capacities so history does not consume the model's output space.
 
 A company entry needs DNS for both the portal and `*.portal-hostname`, plus TLS certificates covering those names. The reverse proxy must preserve Host and forward HTTP and WebSocket traffic to the gateway. Personal runtime ports remain unpublished; browsers never connect directly to a runtime container. See [public deployment forwarding](public-deployments.md) for the underlying Web transport requirements.
+
+-----
+
+<a id="shared-references"></a>
+## Optional encounter review
+
+The clinical pilot adds the [gateway reader](../../../packages/experimental/emr-reader-broker/README.md), [private review workflow](../../../packages/experimental/clinical-review/README.md), and [browser entry](../../../packages/experimental/client-emr-entry/README.md). Add `compose.clinical.yml` to the existing Compose files and configure its source-system, database-configuration, binding-key, and encounter-allowlist paths from `.env.example`. These files mount only in the gateway. Configure exact browser origins and source/hospital defaults in the image-owned `clinical.runtime.patch.yml` before building.
+
+Sign in at the existing portal, choose the encounter entry, and submit an allowed encounter identifier. Opening the Session does not start a model request; choose pre-discharge review to collect evidence and start an advisory review. The browser entry package contains an EMR embedding example. Production EMR discharge handlers must remain independent of review acknowledgements; no clinical write or discharge interception is installed by this overlay. DRG/DIP calculation remains unavailable in this stage.
+
+## Shared national references
+
+Prepare a source-only collection with [the operator resource utility](../../../packages/experimental/drg-resources/README.md), then set `HOSTED_SHARED_RESOURCES_PATH` to its `published` directory on the Docker daemon host. The directory must already exist; the gateway does not create it. Add [compose.resources.yml](../../../deploy/hosted-workspaces/compose.resources.yml) to the same Compose invocation as the base and your selected service overlay.
+
+Each personal runtime reads the collection at `/opt/dsh/resources`; `DSH_SHARED_RESOURCES_ROOT` records that location in the runtime process environment. DSH command subprocesses filter `DSH_*` values, so Bash reads use the fixed path. Only the published directory is shared. Staging, private homes, credentials, and the Docker socket remain outside it. The bind excludes nested mounts, uses private propagation, and rejects writes even when tool execution is approved. National source archives record `profile: source-only` and `groupingReady: false`; a reference default permits reading, not grouping.
+
+The repository image includes `pdftotext` and an opt-in `drg-national-reference` bundled skill. With the shared mount enabled, a fresh chat using the standard, PTC, or Cordis preset can discover the skill and read the references from a natural-language request, such as “Which national DRG references are installed? Read their contents and cite the edition and PDF pages.” Keep the company SSO/model composition to use real services; the mock overlay is only for automated tests. Approve normal tool requests when needed. The minimal preset has no skill tool and does not provide this discovery. Source-only answers explain the publication; they do not calculate a verified group.
+
+Enabling this option changes required personal-container mounts. Existing containers report `resource_conflict` until an operator replaces them using the home-preserving procedure below; a restart cannot add a mount. Back up identity mappings and homes and finish active work first. Disabling the option likewise needs controlled replacement of containers that still carry the shared mount. Publication, default rollback, withdrawal, and backup verification belong to the resource utility; the SSO gateway grants no publication role.
 
 -----
 
@@ -156,6 +184,8 @@ Use synthetic data for the local trial. Run the following scenarios through the 
 
 | Scenario | Required observation |
 |---|---|
+| Open the portal with no DSH session, then revisit with a live session | Company sign-in starts automatically; the live session opens its own workspace |
+| Open an expired personal home bookmark, then sign in as another account | The verified current account opens its own workspace; the old host does not choose the destination |
 | Alice and Bob chat and write different marker files | Each account sees only its own chats, files, settings, and tool output |
 | Alice presents her session on Bob's private host or supplies Bob's identifiers | The gateway rejects the request; Bob's runtime receives no operation |
 | Each account has pending approval, terminal, or subagent activity | Responses and streams remain in the owning runtime |
@@ -167,7 +197,7 @@ Use synthetic data for the local trial. Run the following scenarios through the 
 | An implicit callback has a forged, expired, wrong-audience, or replayed ID token | The gateway rejects authentication and creates no browser session |
 | SSO, runtime startup, model upstream, or quota fails | The operation visibly fails without selecting another account or claiming success |
 
-If the portal is unavailable, inspect Compose service status and logs. If login fails, verify the exact callback, issuer, configured flow, and JWKS access. For authorization-code clients, also verify token-endpoint authentication and any client-secret mount. For startup conflicts or cleanup failures, inspect the reported Docker resources and preserve volumes; do not rename another user's container or bypass isolation checks to make startup succeed.
+If the portal is unavailable, inspect Compose service status and logs. A sign-in failure offers a new login attempt; a workspace failure offers a retry. Gateway failure logs identify the operation and a safe category code rather than raw errors or token values. For login failures, verify the exact callback, issuer, configured flow, and JWKS access. For authorization-code clients, also verify token-endpoint authentication and any client-secret mount. For startup conflicts or cleanup failures, inspect the reported Docker resources and preserve volumes; do not rename another user's container or bypass isolation checks to make startup succeed.
 
 Mock completion verifies the local code path only. Company acceptance still requires the registered real SSO application, a real DeepSeek streaming request, two test identities, the intended Linux networking/storage controls, and independent user acceptance. It does not authorize real patient data.
 
@@ -188,6 +218,6 @@ Persistent volumes and account mappings survive container restarts. Image replac
 <details>
 <summary>Working verification context — click to expand</summary>
 
-The [requirements verification record](../../requirements/sso-private-workspaces-v1.md#dev-note) owns executed Docker, browser, tool, and model checks. Company SSO registration, company deployment, and independent user acceptance remain unperformed.
+The [requirements verification record](../../requirements/sso-private-workspaces-v1.md#dev-note) owns executed Docker, browser, tool, and model checks. Company callback registration and a real-account home-page visit have been observed. The [reference integration record](../../requirements/drg-review-assistant-v1-implementation.md#dev-note) covers the fresh standard chat through company SSO/DeepSeek, automatic skill loading, digest verification, and PDF page citations; company deployment and independent user acceptance remain pending.
 
 </details>

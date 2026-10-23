@@ -21,14 +21,14 @@
   en: 4d2696f012e85c3c
   zh: c33380e85a3f1afc
 /deepseek-ai-dsh-experimental-hosted-workspaces/use-this-package/configuration:
-  en: ce8c92cb8f7eda31
-  zh: ae251794ef34d37d
+  en: 4c8a504365d5aefb
+  zh: 24be1ee18db5555d
 /deepseek-ai-dsh-experimental-hosted-workspaces/use-this-package/identity-and-retained-work:
-  en: c794eb19cb25d9ed
-  zh: 90ef6df7db6e8bd7
+  en: d120bdd30e32e80c
+  zh: 17ab5b840882a214
 /deepseek-ai-dsh-experimental-hosted-workspaces/understand-the-implementation:
-  en: 90b4711409b168b4
-  zh: 3df85b0a8e1617a9
+  en: 3d92e8dacd600f95
+  zh: 8ffe2da08249af9f
 /deepseek-ai-dsh-experimental-hosted-workspaces/further-exploration:
   en: 24893ce6a84d7b1b
   zh: 5688c853cc9c53e7
@@ -39,17 +39,17 @@
   en: d2f1d261890b413c
   zh: 9bed5f02caa98030
 /deepseek-ai-dsh-experimental-hosted-workspaces/model-experience/forwarded-model-requests/what-the-model-sees:
-  en: fa7a3ee6307b0da6
-  zh: fd6b295380d40b48
+  en: d297476c2104b35f
+  zh: 5353814d6f1b5f2b
 /deepseek-ai-dsh-experimental-hosted-workspaces/model-experience/forwarded-model-requests/token-effect:
-  en: c3de77aeab6329bb
-  zh: d1bff2228179fb79
+  en: d09ca764c037b9e9
+  zh: 63ec0f5590287b80
 /deepseek-ai-dsh-experimental-hosted-workspaces/model-experience/forwarded-model-requests/kv-cache-effect:
   en: fa6b43102a089536
   zh: 7bf6325f5f7420b9
 /deepseek-ai-dsh-experimental-hosted-workspaces/known-limitations-and-deferred-work:
-  en: 4ce2c829fe32d40e
-  zh: f2d3eefffa9130b3
+  en: 5ddf59bc805d865c
+  zh: f533fc877fe2e139
 /deepseek-ai-dsh-experimental-hosted-workspaces/known-limitations-and-deferred-work/dev-note:
-  en: 24d48cb155374d5f
-  zh: 5433a689fb55461a
+  en: acf84c6be9764a3d
+  zh: a3c9b82bafef0fe9

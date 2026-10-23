@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/drg-resources/README.md
+/:
+  en: 8ca40291c01713a4
+  zh: 1353fe8afab49adb
+/deepseek-ai-dsh-experimental-drg-resources:
+  en: 673fa7a7ced3beb8
+  zh: ca980ae8d056d141
+/deepseek-ai-dsh-experimental-drg-resources/summary:
+  en: 4ea744c8b793978b
+  zh: 2a72e7757c18c827
+/deepseek-ai-dsh-experimental-drg-resources/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 5acc0d3807846b6e
+/deepseek-ai-dsh-experimental-drg-resources/use-this-package:
+  en: bbff250eba0f1b89
+  zh: 0a618f05cc88ee2b
+/deepseek-ai-dsh-experimental-drg-resources/use-this-package/operator-publication:
+  en: 75b8c51c1b67f444
+  zh: e0171ec3e323001b
+/deepseek-ai-dsh-experimental-drg-resources/use-this-package/shared-reads-and-permissions:
+  en: e4b6e359c6fe3b14
+  zh: f925e739dc06c2bb
+/deepseek-ai-dsh-experimental-drg-resources/use-this-package/failures-and-recovery:
+  en: f17e4f65ebff25b9
+  zh: 7e775f4aff831f8c
+/deepseek-ai-dsh-experimental-drg-resources/understand-the-implementation:
+  en: 8722e5aa289e647f
+  zh: 1519e4dc8a5bc71b
+/deepseek-ai-dsh-experimental-drg-resources/further-exploration:
+  en: 1c332057486255a6
+  zh: 7303908cbed0669c
+/deepseek-ai-dsh-experimental-drg-resources/model-experience:
+  en: 5fdadb10b65651a1
+  zh: 598a12648449fb39
+/deepseek-ai-dsh-experimental-drg-resources/model-experience/kv-cache-effect:
+  en: 4951015a8226c30b
+  zh: 59825d74f7a0823b
+/deepseek-ai-dsh-experimental-drg-resources/known-limitations-and-deferred-work:
+  en: cd7c9489db250e0a
+  zh: ef41e8fb855ef450
+/deepseek-ai-dsh-experimental-drg-resources/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: e88aeb617ffb74ea

@@ -1,0 +1,43 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/client-emr-entry/README.md
+/:
+  en: 7ef3d0b0bb505b61
+  zh: 4246cf14818b737f
+/deepseek-ai-dsh-experimental-client-emr-entry:
+  en: d1240351a655c8a5
+  zh: 4fac6cdb08b40dda
+/deepseek-ai-dsh-experimental-client-emr-entry/summary:
+  en: a6c2355736fb8727
+  zh: 0681c88539fb429e
+/deepseek-ai-dsh-experimental-client-emr-entry/table-of-contents:
+  en: 23386452a66b2fbd
+  zh: 55b2121ae6059425
+/deepseek-ai-dsh-experimental-client-emr-entry/use-this-package:
+  en: d6dfad4bd9884665
+  zh: af2a42e5cc50f87c
+/deepseek-ai-dsh-experimental-client-emr-entry/use-this-package/open-and-review-an-encounter:
+  en: 58c9eb5647e1bcef
+  zh: 6a4e4072190c3961
+/deepseek-ai-dsh-experimental-client-emr-entry/use-this-package/embed-an-emr-entry:
+  en: 259f643c1e325a37
+  zh: 89423de5c7b7b2f7
+/deepseek-ai-dsh-experimental-client-emr-entry/understand-the-implementation:
+  en: 94609d50883e0eaf
+  zh: 32ccc698a5ed3d28
+/deepseek-ai-dsh-experimental-client-emr-entry/further-exploration:
+  en: c45c4d1f071d579f
+  zh: c22f1c0a194f2c02
+/deepseek-ai-dsh-experimental-client-emr-entry/model-experience:
+  en: ca6767a2962cf522
+  zh: 1996ff9a9d386acc
+/deepseek-ai-dsh-experimental-client-emr-entry/model-experience/kv-cache-effect:
+  en: afb7bc2cef7aea53
+  zh: 2676a10ec2327509
+/deepseek-ai-dsh-experimental-client-emr-entry/known-limitations-and-deferred-work:
+  en: ed87d26203f43a6b
+  zh: f04db0ba49e3fbd6
+/deepseek-ai-dsh-experimental-client-emr-entry/known-limitations-and-deferred-work/dev-note:
+  en: db95243393b01774
+  zh: a2c50c15f5edda40

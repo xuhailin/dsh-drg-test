@@ -978,6 +978,36 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-claude-code-mods -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-client-emr-entry -->
+<a id="deepseek-aidsh-experimental-client-emr-entry"></a>
+
+## `@deepseek-ai/dsh-experimental-client-emr-entry`
+
+- `inject`: `connection`
+- `source`: [`packages/experimental/client-emr-entry/src/index.ts:8`](../packages/experimental/client-emr-entry/src/index.ts)
+
+```ts config-catalog
+/** Deployment-owned browser origins, defaults, and request limits. */
+export type Config = EntryConfig
+
+/** Public entry settings contain no credentials or patient content. */
+export interface EntryConfig {
+  /** Exact HTTP(S) origins allowed to send launch messages from an opener or parent window. */
+  readonly allowedOrigins: string[]
+  /** Initial source-system value in the manual entry form; it grants no access. */
+  readonly defaultSourceSystem: string
+  /** Initial hospital value in the manual entry form; the broker still authorizes it. */
+  readonly defaultHospitalCode: string
+  /** Maximum browser wait for one launch, review, or refresh request, in milliseconds. */
+  readonly requestTimeoutMs: number
+  /** Maximum concurrent browser operation requests. */
+  readonly maxPendingRequests: number
+  /** Maximum UTF-8 JSON bytes accepted in one window launch message. */
+  readonly maxMessageBytes: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-client-emr-entry -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-client-ui-cot-translation -->
 <a id="deepseek-aidsh-experimental-client-ui-cot-translation"></a>
 
@@ -1005,6 +1035,55 @@ export interface CotTranslationPreferences {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-client-ui-cot-translation -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-clinical-review -->
+<a id="deepseek-aidsh-experimental-clinical-review"></a>
+
+## `@deepseek-ai/dsh-experimental-clinical-review`
+
+- `inject`: `agents` · `sessions` · `sessionProjections` · `sessionPersistence` · `sessionController` · `tools` · `connection`
+- `source`: [`packages/experimental/clinical-review/src/config.ts:5`](../packages/experimental/clinical-review/src/config.ts)
+
+```ts config-catalog
+/** Hosted review settings; upstream model configuration stays in the normal DSH profile. */
+export interface Config {
+  /** HTTP(S) broker base URL for authorized launch and evidence requests. */
+  readonly brokerBaseUrl: string
+  /** Credential or process-environment name containing the private runtime token. */
+  readonly runtimeTokenEnv: string
+  /** Fixed authenticated owner identity supplied by the hosted gateway. */
+  readonly ownerId: string
+  /** Private working directory assigned to newly created encounter Sessions. */
+  readonly cwd: string
+  /** Existing Agent preset for new encounter Sessions; omission uses the standard default. */
+  readonly agentPreset?: string
+  /** Complete broker request deadline in milliseconds, including the response body. */
+  readonly timeoutMs: number
+  /** Maximum bytes in one complete broker response. */
+  readonly maxResponseBytes: number
+  /** Maximum UTF-8 bytes in the complete model-visible text-block array. */
+  readonly maxToolBytes: number
+  /** Maximum UTF-16 code units returned in one original evidence passage. */
+  readonly maxSourceChars: number
+  /** Maximum findings accepted in one model-proposed report. */
+  readonly maxFindings: number
+  /** Maximum retained deduplication event identities per encounter Session. */
+  readonly maxOperations: number
+  /** Maximum retained historical reports per encounter Session. */
+  readonly maxReports: number
+  /** Maximum bytes in one complete browser API request. */
+  readonly maxRequestBytes: number
+  /** Maximum UTF-8 bytes in the complete retained review state. */
+  readonly maxStateBytes: number
+  /** Maximum source metadata entries returned per inventory page. */
+  readonly maxInventoryItems: number
+  /** HTTP evidence reader or an independently mounted EncounterReader provider. */
+  readonly readerMode: 'http' | 'provided'
+  /** Requested language for report fields and the final model reply. */
+  readonly reviewLanguage: string
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-clinical-review -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp -->
 <a id="deepseek-aidsh-experimental-computer-use-cua-driver-mcp"></a>
@@ -1045,6 +1124,46 @@ export type Config = CuaConfig
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-cua-macos -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-emr-reader-broker -->
+<a id="deepseek-aidsh-experimental-emr-reader-broker"></a>
+
+## `@deepseek-ai/dsh-experimental-emr-reader-broker`
+
+- `source`: [`packages/experimental/emr-reader-broker/src/config.ts:4`](../packages/experimental/emr-reader-broker/src/config.ts)
+
+```ts config-catalog
+/** Credentials and policy are mounted only in the controlled gateway. */
+export interface Config {
+  /** Source-system identity accepted by the encounter allowlist. */
+  sourceSystem: string
+  /** Gateway-only JSON file containing PostgreSQL connection credentials. */
+  databaseConfigFile: string
+  /** Gateway-only JSON file mapping authenticated accounts to permitted encounters. */
+  allowlistFile: string
+  /** Gateway-only file containing the persistent encounter-binding signing key. */
+  bindingKeyFile: string
+  /** Lifetime in milliseconds of an unconsumed launch grant. */
+  grantTtlMs: number
+  /** Maximum number of unconsumed launch grants retained in memory. */
+  maxPendingGrants: number
+  /** Maximum UTF-8 bytes accepted in a complete broker request body. */
+  maxRequestBytes: number
+  /** Maximum UTF-8 bytes returned in a complete evidence snapshot. */
+  maxResponseBytes: number
+  /** Maximum UTF-8 bytes accepted for one original source body. */
+  maxSourceBytes: number
+  /** Maximum records accepted per supported evidence category. */
+  maxRowsPerCategory: number
+  /** Maximum bytes read from the encounter allowlist file. */
+  maxPolicyBytes: number
+  /** Deadline in milliseconds for one broker operation and its database queries. */
+  requestTimeoutMs: number
+  /** Maximum broker operations admitted concurrently across all accounts. */
+  maxConcurrentReads: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-emr-reader-broker -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-hosted-workspaces -->
 <a id="deepseek-aidsh-experimental-hosted-workspaces"></a>
 
@@ -1060,6 +1179,8 @@ export interface Config {
   publicOrigin: string
   /** Locally available Docker image reference used for personal runtimes. */
   image: string
+  /** Absolute normalized Linux daemon-host directory mounted read-only at /opt/dsh/resources; omission adds no shared mount. */
+  sharedResourcesPath?: string
   /** Deployment-specific prefix for owned Docker containers, networks, and volumes. */
   prefix: string
   /** Exact OIDC issuer expected in discovery metadata and validated ID tokens. */
@@ -1072,9 +1193,23 @@ export interface Config {
   oidcFlow: OidcFlow
   /** Gateway-only client_secret_basic secret file for authorization-code; implicit does not read it. */
   clientSecretFile?: string
-  /** Gateway-only file containing the upstream model API key. */
-  deepseekKeyFile: string
-  /** Upstream base URL to which the model proxy appends /v1/messages. */
+  /** Wire protocol admitted by the private model proxy. */
+  modelProtocol: 'anthropic-messages' | 'openai-responses'
+  /** Gateway-only upstream key file; required for OpenAI Responses and preferred for new deployments. */
+  modelKeyFile?: string
+  /** Protocol API base; Responses appends /responses, Messages appends /v1/messages. */
+  modelBaseUrl?: string
+  /** Default personal-runtime model; Responses requires an identifier in allowedModels. */
+  runtimeModel?: string
+  /** Deployment context budget advertised by the personal Responses route. */
+  runtimeContextWindow: number
+  /** Per-request output-token budget configured on the personal Responses route. */
+  runtimeMaxTokens: number
+  /** Optional image-owned runtime overlay beneath /opt/dsh; user-writable paths are not accepted. */
+  runtimePatchFile?: string
+  /** Legacy Messages key file, used only when modelKeyFile is absent. */
+  deepseekKeyFile?: string
+  /** Legacy Messages API base, used only when modelBaseUrl is absent. */
   deepseekBaseUrl: string
   /** Exact model identifiers admitted by the shared-key model proxy. */
   allowedModels: string[]
@@ -1118,7 +1253,7 @@ export interface Config {
   runtimePort: number
   /** Maximum complete model-request body bytes before JSON parsing or upstream access. */
   maxModelRequestBytes: number
-  /** Maximum max_tokens value accepted in a model request. */
+  /** Maximum protocol output-token limit accepted in a model request. */
   maxOutputTokens: number
   /** Maximum admitted model requests per account in one rate window. */
   maxRequestsPerWindow: number
@@ -4800,6 +4935,7 @@ export interface Config {
 | `@deepseek-ai/dsh-compaction` | `CompactionEngine` | — | [`packages/compaction/compaction/src/index.ts`](../packages/compaction/compaction/src/index.ts) |
 | `@deepseek-ai/dsh-credentials` | `CredentialProvider` | — | [`packages/credentials/credentials/src/index.ts`](../packages/credentials/credentials/src/index.ts) |
 | `@deepseek-ai/dsh-deepseek-account` | `DeepSeekAccount` | — | [`packages/credentials/deepseek-account/src/index.ts`](../packages/credentials/deepseek-account/src/index.ts) |
+| `@deepseek-ai/dsh-experimental-emr-encounter` | `EncounterReader` | — | [`packages/experimental/emr-encounter/src/index.ts`](../packages/experimental/emr-encounter/src/index.ts) |
 | `@deepseek-ai/dsh-file-reference` | `FileReferenceService` | — | [`packages/context/file-reference/src/index.ts`](../packages/context/file-reference/src/index.ts) |
 | `@deepseek-ai/dsh-fs` | `FileSystem` | — | [`packages/fs/fs/src/index.ts`](../packages/fs/fs/src/index.ts) |
 | `@deepseek-ai/dsh-host-directory-picker` | `DirectoryPicker` | — | [`packages/host/directory-picker/src/index.ts`](../packages/host/directory-picker/src/index.ts) |
@@ -4841,6 +4977,7 @@ export interface Config {
 | `@deepseek-ai/dsh-experimental-badge-skill-bundle` | — | [`packages/experimental/badge-skill-bundle/src/index.ts`](../packages/experimental/badge-skill-bundle/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-browser-use-runtime` | — | [`packages/experimental/browser-use-runtime/src/index.ts`](../packages/experimental/browser-use-runtime/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-cot-translation-bundle` | — | [`packages/experimental/cot-translation-bundle/src/index.ts`](../packages/experimental/cot-translation-bundle/src/index.ts) |
+| `@deepseek-ai/dsh-experimental-drg-resources` | — | [`packages/experimental/drg-resources/src/index.ts`](../packages/experimental/drg-resources/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-inspector-profile` | — | [`packages/experimental/inspector-profile/src/index.ts`](../packages/experimental/inspector-profile/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-plugin-market-bundle` | — | [`packages/experimental/plugin-market-bundle/src/index.ts`](../packages/experimental/plugin-market-bundle/src/index.ts) |
 | `@deepseek-ai/dsh-experimental-ralph-bundle` | — | [`packages/experimental/ralph-bundle/src/index.ts`](../packages/experimental/ralph-bundle/src/index.ts) |

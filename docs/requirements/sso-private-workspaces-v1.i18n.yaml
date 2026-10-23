@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/requirements/sso-private-workspaces-v1.md
 /sso-and-private-dsh-workspaces-v1:
-  en: 67ce51defda6e8a8
-  zh: 8a832c7c4efb5e79
+  en: 40d387b90586d91e
+  zh: 09e9efa175869657
 /sso-and-private-dsh-workspaces-v1/summary:
   en: 3d355ea2e7dd50a9
   zh: 48b62f2f218bc6e1
@@ -12,26 +12,26 @@
   en: 5713ffe17320c3c4
   zh: def32193536b278a
 /sso-and-private-dsh-workspaces-v1/confirmed-scope:
-  en: fc5853469013fa73
-  zh: 9b048b4c8e8dc138
+  en: 084b5b316138d8fa
+  zh: 8c2f2a4c942a98e2
 /sso-and-private-dsh-workspaces-v1/current-implementation:
-  en: 9a885559698e9ab0
-  zh: afa58bf988441e6d
+  en: 7674369fc8404bb5
+  zh: 9edda89f03c465dd
 /sso-and-private-dsh-workspaces-v1/architecture:
   en: 9e32c0ba4d2c2ff9
   zh: 0feb912e14218149
 /sso-and-private-dsh-workspaces-v1/identity-and-private-data:
-  en: 00003fd3adf892f8
-  zh: 0dc4b405dd6c5a75
+  en: 3a92993ca869cffc
+  zh: b5e7ec9adcba0016
 /sso-and-private-dsh-workspaces-v1/execution-and-credentials:
   en: 43810bcc668b8dc2
   zh: 6ec5517127aa42e4
 /sso-and-private-dsh-workspaces-v1/acceptance:
-  en: e0d141e14a8967bb
-  zh: 24257d3faf639622
+  en: 94a338cea936a3f3
+  zh: bd619b419bc4e878
 /sso-and-private-dsh-workspaces-v1/dependencies-and-verification:
-  en: f1f9bdac59d70c73
-  zh: 6726cb2596351655
+  en: 98fa59d593f40f5d
+  zh: b2039fa3dad5842b
 /sso-and-private-dsh-workspaces-v1/dev-note:
-  en: a23879621bd2d1f0
-  zh: 230fb436c048c12a
+  en: 5d76ac6bf32d8389
+  zh: 9f284803554a0c28

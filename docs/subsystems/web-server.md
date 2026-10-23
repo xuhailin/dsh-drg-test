@@ -277,6 +277,30 @@ Admit or wrap an authenticated shared API request, including body transfer. Exis
 
 Source: [`packages/client/connection/src/index.ts`](../../packages/client/connection/src/index.ts)
 
+<a id="hosted-workspaces-events"></a>
+
+### `hosted-workspaces/*` events
+
+<a id="hosted-workspacesruntime-request--waterfall"></a>
+
+#### `hosted-workspaces/runtime-request` — waterfall
+
+Serve an optional operation under /runtime/ after runtime credential and live-login checks. A handler owns its response only when returning true; other paths delegate to next(). Each provider must authorize its own resources and recheck isActive before publishing data.
+
+```ts cordis-catalog
+/**
+ * Serve an optional operation under /runtime/ after runtime credential and live-login checks.
+ * A handler owns its response only when returning true; other paths delegate to next().
+ * Each provider must authorize its own resources and recheck isActive before publishing data.
+ * @param request - verified identity, response, cancellation, and current login check.
+ * @param next - delegate an unhandled path; the terminal continuation returns false.
+ * @mode waterfall
+ */
+'hosted-workspaces/runtime-request'(request: HostedRuntimeRequest, next: () => Promise<boolean>): Promise<boolean>
+```
+
+Source: [`packages/experimental/hosted-workspaces/src/runtime-access.ts`](../../packages/experimental/hosted-workspaces/src/runtime-access.ts)
+
 <a id="webserver-events"></a>
 
 ### `webserver/*` events

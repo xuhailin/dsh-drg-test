@@ -13,5 +13,6 @@ Shared Session event declarations and resolved schemas appear in the [Session pe
 
 | Record | Owner | Purpose | Payload and source |
 |---|---|---|---|
+| `plugin:clinical-review/state` | `@deepseek-ai/dsh-experimental-clinical-review` | Complete encounter review state, including binding, accepted evidence, read ranges, proposals, and durable event outcomes. | <code>ReviewState</code> · [`packages/experimental/clinical-review/src/types.ts`](../packages/experimental/clinical-review/src/types.ts) |
 | `plugin:translator/request` | `@deepseek-ai/dsh-experimental-translator` | Provider-independent translation input, retained before dispatch. | <code>TranslationRequestRecord</code> · [`packages/experimental/translator/src/types.ts`](../packages/experimental/translator/src/types.ts) |
 | `plugin:translator/result` | `@deepseek-ai/dsh-experimental-translator` | Successful translation, retained before it is returned to the consumer. | <code>TranslationResultRecord</code> · [`packages/experimental/translator/src/types.ts`](../packages/experimental/translator/src/types.ts) |

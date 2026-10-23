@@ -1,0 +1,55 @@
+# Bilingual-pair consistency record for drg-review-assistant-v1.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/drg-review-assistant-v1.md
+/pre-discharge-review-and-drg-dip-pre-grouping-v1:
+  en: 79a9306bfa2a052d
+  zh: bebf3f1911cf69df
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/summary:
+  en: 14f92ec5ab7ec5c0
+  zh: 5e135b92a3d663ee
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/table-of-contents:
+  en: 287983be19a13280
+  zh: d8df83c81b6360e0
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/users-and-scope:
+  en: 2f95c7ad4e4980e2
+  zh: 52245f0e41a35716
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/multiple-users-and-shared-references:
+  en: 77f62f3b5780fd08
+  zh: 7219829444b164c0
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/workflow-and-example:
+  en: f98ef8e445dd2f6f
+  zh: 15fea8d978916d5c
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/required-records-and-execution-data:
+  en: f77c1c07234d73b4
+  zh: 0376c33220199df9
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/required-records-and-execution-data/minimum-packet-and-conditional-records:
+  en: 210d9ebffeb6e6f4
+  zh: 1c002f4ef1c3eff5
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/required-records-and-execution-data/execution-event-fields-and-interpretation:
+  en: 514f4be1948c86e2
+  zh: 242eb039c9c29d30
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/review-scope-and-ownership:
+  en: 3ced7571222da6fc
+  zh: a456939816dc3e21
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/confirmation-and-result-lifecycle:
+  en: 4125f67d290289a8
+  zh: 74e6410f3a6c4b1a
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/behavioral-requirements:
+  en: d37c399038885fb4
+  zh: d1083b29ad24cd0a
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/plugin-design:
+  en: eef7cfb60675e4b9
+  zh: 5f77f4225936eb3c
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/emr-integration-and-replaceable-data-access:
+  en: d26abca49573b66b
+  zh: 737baa1f0d5d7ea4
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/acceptance:
+  en: 5c5d2e81992c69e4
+  zh: 3344b22395baf4b6
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/sources-and-unresolved-dependencies:
+  en: 59451f25afdb5d54
+  zh: d9a77310ffcbb06a
+/pre-discharge-review-and-drg-dip-pre-grouping-v1/dev-note:
+  en: a3f168372741e575
+  zh: 4111fef1241323b4

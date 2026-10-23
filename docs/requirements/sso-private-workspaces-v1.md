@@ -2,7 +2,7 @@
 
 English | [中文](sso-private-workspaces-v1.zh.md)
 
-Status: Docker implementation and local verification are in progress. Company server deployment and independent user acceptance remain pending.
+Status: Automatic entry and status pages are implemented and locally verified. Company server deployment and independent user acceptance remain pending.
 
 ## Summary
 
@@ -26,6 +26,8 @@ The user selected company stable SSO, multiple users with private conversations,
 
 The user confirmed that company SSO does not support authorization-code flow and selected implicit compatibility with the existing EMR login approach. The implementation keeps authorization-code as its default and permits an ID-token-only implicit response for this company application; enabling code flow at the company provider is not a prerequisite.
 
+The user requested direct entry to the home page without a second portal sign-in click, plus clearer status and failure pages. Opening the portal automatically continues sign-in or restores the current account's workspace. Explicit logout must remain visible without immediately signing back in through the active company SSO session.
+
 Each user needs a private workspace, execution permissions, and tool interactions. This scope includes the existing chat interface and its supported shell, file, terminal, approval, and subagent flows. Availability of platform-specific or external tools depends on the deployed image and integrations; retaining tools does not establish that every desktop capability works on Linux.
 
 The user selected server-side persistent private volumes for the first delivery. Moving conversations into the EMR PostgreSQL database or adding OceanBase is outside this delivery. Acceptance must verify retained history after restart, the same history after a fresh login from another browser, and denied cross-account access. The user approved the private GitLab project [xu.hailin/dsh-drg-test](http://git.sy/xu.hailin/dsh-drg-test) for CI and publication. CI builds images without uploading them, as selected by the user after an unauthenticated upload-start probe succeeded against the company registry and was cancelled. Server and company-domain selection remain deferred.
@@ -36,6 +38,8 @@ The trial does not connect real patient records, implement DRG rules, change emr
 ## Current implementation
 
 The optional [hosted-workspaces bundle](../../packages/experimental/hosted-workspaces/README.md) implements OIDC login, durable accounts and browser sessions, personal Docker runtime provisioning, authenticated HTTP/WebSocket routing, and restricted shared-key model access. The [Docker trial guide](../user/guide/hosted-workspaces.md) owns local commands and the exact SSO registration checklist.
+
+An unauthenticated portal `GET /` starts SSO with HTTP 303; a live portal session goes to its own workspace. Anonymous personal `/` and `/index.html` requests return to `/auth/login` without binding the old origin as a login target. The verified current identity chooses the personal origin. Explicit target validation and cross-account API denial remain enforced.
 
 Each personal container uses the existing Web profile and its [owner Peer](../../packages/client/connection/src/rpc-host.ts). That owner controls only one account's runtime. Separate home volumes and Docker execution environments provide user separation; conversation permissions or different working directories alone do not provide that isolation.
 
@@ -62,6 +66,8 @@ Use the verified issuer and subject to resolve an internal user identity. A disp
 
 Both configured login flows authenticate a signed ID token before creating a session. Implicit mode receives the fragment through a same-origin POST and validates signature, issuer, audience, expiry, nonce, and browser-bound state at the gateway. DSH needs no EMR business access token, uses no password grant, and stores no SSO token in localStorage.
 
+An implicit callback with no response fields resumes through the portal when a live session exists. A fragment carrying state remains a real authentication response and cannot bypass validation through that recovery path. DRG Agent status pages show verification and handoff loading, separate sign-in and workspace failures, and provide the relevant retry action. Failure diagnostics contain only the operation and a safe category code, excluding raw error messages and credential values.
+
 The gateway owns the identity-to-runtime mapping and browser-session records. Each runtime owns its DSH_HOME, DSH_AGENTS_HOME, conversations, attachments, settings, installed user plugins, workspace, and terminal state. The runtime manager owns volume allocation and container lifecycle; private volumes are not mounted into other users' containers.
 
 The same authorization applies to index responses, API calls, uploads, downloads, exported logs, previews, and WebSocket upgrades. Personal runtime ports are not published to the host. The gateway uses a bare portal origin and per-account subdomains; a company reverse proxy must preserve Host and support upgrades, as described in the [deployment guide](../user/guide/hosted-workspaces.md#company-services).
@@ -84,19 +90,22 @@ The real DeepSeek Key must not enter personal-container environment variables, c
 <a id="acceptance"></a>
 ## Acceptance
 
-The first delivery validates the local Docker composition with synthetic data and mock external identity/model services while exercising the actual DSH runtime and tools. Company SSO and real DeepSeek validation remain a later acceptance stage, after registration and the company entry are available. Both stages retain the following isolation and failure requirements.
+The first delivery validates the local Docker composition with synthetic data and mock external identity/model services while exercising the actual DSH runtime and tools. Company acceptance additionally exercises real SSO and DeepSeek through the intended entry. Both stages retain the following isolation and failure requirements; their executed results are recorded separately below.
 
 | Scenario | Required observable result |
 | --- | --- |
+| Open the portal without a DSH session, then revisit with a live session. | Sign-in starts automatically; a live session restores the current account's own workspace without another portal click. |
+| Open an anonymous or expired personal home bookmark, then authenticate as another account. | The verified current account selects its own personal origin; the old host cannot select a runtime or expose its data. |
+| Reopen an empty implicit callback with a live session, or supply a real state-bearing fragment. | The empty callback resumes through the portal; a real response still passes normal token and flow validation. |
 | Users A and B log in concurrently. | Each sees only their own history, workspaces, settings, downloads, and live tool output; direct requests for the other's resources are denied. |
 | A uses file and shell tools with absolute paths, traversal, symlinks, and network requests. | B's volumes, runtime, process data, and the host control plane remain inaccessible. A can still read and modify permitted files in A's environment. |
 | Both users have pending approvals, questions, terminals, or subagents. | Each interaction reaches only its owner; replaying the other user's interaction identifier does not approve or control it. |
 | A logs out, switches accounts, or lets a session expire while a WebSocket is open. | The affected connection loses access; cached UI does not expose A's data to the next account. B's independent session stays available. |
 | A container or the server restarts. | The identity mapping and private conversations/files recover from their owned volumes; another identity cannot claim them. |
 | A inspects environment variables, credential files, or model errors. | The upstream DeepSeek Key is absent; only A's restricted proxy credential may be visible. Limits remain enforceable outside A's runtime. |
-| A logs out while a background tool is active. | Browser access is revoked, the tool remains confined to A's runtime, and the UI states that background work and files are retained. |
+| A logs out while a background tool is active. | Browser access is revoked, the tool remains confined to A's runtime, and the retained-work confirmation waits for an explicit sign-in action. |
 | An implicit ID token is forged, expired, has the wrong audience, or is replayed. | Authentication fails without creating a browser session or selecting a runtime. |
-| SSO, container startup, model requests, or resource allocation fail. | The affected operation reports its failure without routing to another runtime, claiming success, or deleting private data. |
+| SSO, container startup, model requests, or resource allocation fail. | The affected operation reports its failure and recovery action without routing to another runtime, claiming success, deleting private data, or printing credentials in diagnostics. |
 
 Local acceptance requires two mock identities, streamed chat through the real DSH runtime, a real file/shell tool result, and observed isolation, persistence, logout, and failure outcomes. Unit checks and container startup alone do not satisfy that stage. Company acceptance additionally requires real SSO and a real streamed DeepSeek conversation through the intended entry; both stages require independent user acceptance.
 
@@ -105,7 +114,7 @@ Local acceptance requires two mock identities, streamed chat through the real DS
 
 Docker is the current implementation target; Kubernetes is outside this delivery. The exact Linux host, company entry domain/TLS, network/firewall controls, persistent storage quotas, and operational recovery remain deferred. None of those choices blocks the local mock composition.
 
-Company integration needs an administrator-assigned OIDC client for the selected flow, matching discovery/JWKS metadata, and the exact portal `/auth/callback`; personal subdomains need no callback registration. The confirmed company path uses implicit login without a client secret. Authorization-code remains available for providers supporting it. The gateway does not call provider logout. The [registration checklist](../user/guide/hosted-workspaces.md#sso-registration) owns administrator settings and secret requirements by flow. Real company SSO validation and deployment remain pending.
+Company integration needs an administrator-assigned OIDC client for the selected flow, matching discovery/JWKS metadata, and the exact portal `/auth/callback`; personal subdomains need no callback registration. The confirmed company path uses implicit login without a client secret. Authorization-code remains available for providers supporting it. The gateway does not call provider logout. The [registration checklist](../user/guide/hosted-workspaces.md#sso-registration) owns administrator settings and secret requirements by flow. Full company integration and deployment acceptance remain pending.
 
 <a id="dev-note"></a>
 ## Dev Note
@@ -127,8 +136,14 @@ A real Chromium browser completed mock implicit sign-in and automatically opened
 
 The final `doc-sync` run passed 41 of 43 gates, including documentation build, pairing, catalogs, and links. The CLI-help check rejected a diagnostic caused by the inherited SOCKS `ALL_PROXY` setting; the same check passed after unsetting only `ALL_PROXY` and `all_proxy`. The other failure is the unchanged `python/sdk/uv.lock:113` repository reference.
 
-Company SSO discovery is reachable, but authorization attempts with both `response_type=id_token` and `response_type=id_token token` return `invalid_request`. The exact callback and application registration await user confirmation. This evidence does not establish a working company SSO connection; assigned scopes/callbacks, JWKS token validation, and independent company-browser acceptance remain pending.
+Company callback registration is complete. The company browser checks below do not replace full multi-user company acceptance or independent user acceptance.
 
-Company SSO registration, company server/TLS entry, hard disk quotas, deployment firewall controls, image-attachment fallback, physical second-computer access, backup restoration, and independent user acceptance remain unverified. Kubernetes, a shared SQL database, and production patient-data use are outside this delivery.
+The 2026-10-22 automatic-entry and status-page source passed 277 tests across nine files with 100% statement, branch, function, and line coverage, scoped lint, and all nine `pnpm run build` checks. Local HTTP checks confirmed portal `GET /` returning HTTP 303 to real company SSO, an old synthetic personal home returning HTTP 303 to portal `/auth/login` without a target, and an invalid callback returning HTTP 400 with the DRG Agent status page. Only the gateway image was updated; both existing company runtime containers and their home volumes were retained.
+
+Real browser integration confirmed that an already signed-in company account opens its personal home from the portal without another entry confirmation. Manually opening an old mock personal home recovered to the current account's real personal origin. Opening `/auth/callback` without a fragment while signed in resumed through the portal and opened the home page. Logout stayed on the DRG Agent confirmation page without automatic sign-in; clicking company sign-in completed the cached company SSO session, ID-token fragment response, and gateway validation before returning to the same account's home.
+
+The new DRG Agent error state was also opened and verified in the real browser. A focused read-only security review found no additional confirmed defects.
+
+Company sign-in without a cached provider session, company server/TLS entry, hard disk quotas, deployment firewall controls, image-attachment fallback, physical second-computer access, backup restoration, and independent user acceptance remain unverified. Kubernetes, a shared SQL database, and production patient-data use are outside this delivery.
 
 </details>

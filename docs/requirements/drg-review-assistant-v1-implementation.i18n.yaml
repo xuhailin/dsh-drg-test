@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for drg-review-assistant-v1-implementation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/drg-review-assistant-v1-implementation.md
+/drg-dip-review-assistant-v1-implementation-proposal:
+  en: 841953e3a80236d4
+  zh: bce542a3d0e63c8f
+/drg-dip-review-assistant-v1-implementation-proposal/summary:
+  en: a89a4a234172d016
+  zh: 4ba35c5d7dd793b0
+/drg-dip-review-assistant-v1-implementation-proposal/table-of-contents:
+  en: 6aef3daaabdaf4be
+  zh: 3dbeda79ea583fd5
+/drg-dip-review-assistant-v1-implementation-proposal/baseline-and-integration-points:
+  en: ce1086812b35cc3a
+  zh: d5fdd6d2edb27ecf
+/drg-dip-review-assistant-v1-implementation-proposal/resource-storage-and-publication:
+  en: 9953f62de2edadf0
+  zh: 77cd8613bb38d7c6
+/drg-dip-review-assistant-v1-implementation-proposal/resource-storage-and-publication/storage-and-identities:
+  en: d5ea4c79dbc15940
+  zh: 84fd26d3eb8d8752
+/drg-dip-review-assistant-v1-implementation-proposal/resource-storage-and-publication/complete-grouping-resources-planned:
+  en: 6669ad1550a9851c
+  zh: 90989290976be2dc
+/drg-dip-review-assistant-v1-implementation-proposal/resource-storage-and-publication/publication-and-reads:
+  en: 9d71f1b6b81bb093
+  zh: 4c3b5e6e383ea076
+/drg-dip-review-assistant-v1-implementation-proposal/resource-storage-and-publication/ownership-backup-and-later-distribution:
+  en: b4414f6324e5cfc6
+  zh: e7bbc56708d118e3
+/drg-dip-review-assistant-v1-implementation-proposal/runtime-and-session-integration:
+  en: 6d58e110c0a26cc0
+  zh: 69208605976d3856
+/drg-dip-review-assistant-v1-implementation-proposal/implementation-sequence:
+  en: 206cab3fd5fac4f5
+  zh: b5fe4e38a4775ef7
+/drg-dip-review-assistant-v1-implementation-proposal/validation-and-acceptance:
+  en: 424fb46fabf69cbe
+  zh: 5c506a091f272c19
+/drg-dip-review-assistant-v1-implementation-proposal/compatibility-and-recovery:
+  en: 39fa65c90b15b33a
+  zh: a20fc946c9b9c85d
+/drg-dip-review-assistant-v1-implementation-proposal/decisions-and-progress:
+  en: fe46532c09e65e99
+  zh: ec0d10b72435ed27
+/drg-dip-review-assistant-v1-implementation-proposal/dev-note:
+  en: b12b4e17a886abdc
+  zh: 27be46a43ea3ae22

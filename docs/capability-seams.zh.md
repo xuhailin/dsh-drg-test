@@ -9,6 +9,10 @@
 
 ```mermaid
 flowchart LR
+  pkg_experimental_emr_encounter["experimental-emr-encounter"]
+  svc_encounterReader["ctx.encounterReader<br/>Authorized encounter evidence capture"]
+  pkg_experimental_emr_reader_broker["experimental-emr-reader-broker"]
+  pkg_experimental_clinical_review["experimental-clinical-review"]
   pkg_experimental_client_ui_cot_translation["experimental-client-ui-cot-translation"]
   svc_cotTranslation["ctx.cotTranslation<br/>Reasoning translation Remote"]
   pkg_experimental_translator["experimental-translator"]
@@ -345,8 +349,11 @@ flowchart LR
   pkg_experimental_browser_use_stagehand_native --> svc_browserUse
   pkg_experimental_claude_code_mods --> svc_claudeCodeMods
   pkg_experimental_client_ui_cot_translation --> svc_cotTranslation
+  pkg_experimental_clinical_review --> svc_encounterReader
   pkg_experimental_computer_use_cua_driver_mcp --> svc_computerUse
   pkg_experimental_computer_use_cua_driver_native --> svc_computerUse
+  pkg_experimental_emr_encounter --> svc_encounterReader
+  pkg_experimental_emr_reader_broker --> svc_encounterReader
   pkg_experimental_ptc_runtime_python --> svc_ptcRuntime
   pkg_experimental_speech_to_text --> svc_speechToText
   pkg_experimental_speech_to_text_sensevoice --> svc_speechToText
@@ -489,6 +496,7 @@ flowchart LR
   svc_deepseekLlmApiExtensions --> pkg_llm_deepseek
   svc_directoryPicker --> pkg_api_workspace_controller
   svc_dynamicCordisRunner --> pkg_tool_cordis
+  svc_encounterReader --> pkg_experimental_clinical_review
   svc_fileReferences --> pkg_api_session_controller
   svc_fileUploads --> pkg_api_session_controller
   svc_fs --> pkg_tool_fs
@@ -613,6 +621,7 @@ flowchart LR
 
 | ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ctx.encounterReader` | `seam` | [`experimental-emr-encounter`](../packages/experimental/emr-encounter) | [`experimental-emr-reader-broker`](../packages/experimental/emr-reader-broker), [`experimental-clinical-review`](../packages/experimental/clinical-review) | [`experimental-clinical-review`](../packages/experimental/clinical-review) | - | 代理读取已授权的数据源记录；运行时 HTTP 提供方返回同一份不可变快照，供参考性核查使用。 |
 | `ctx.cotTranslation` | `service` | [`experimental-client-ui-cot-translation`](../packages/experimental/client-ui-cot-translation) | - | - | - | 为展开的思考内容提供有界的 Session 翻译请求，不改变模型可见历史。 |
 | `ctx.translator` | `service` | [`experimental-translator`](../packages/experimental/translator) | - | [`experimental-client-ui-cot-translation`](../packages/experimental/client-ui-cot-translation) | - | 解析 Google 或 Bing 请求，并可选保留统一的实验性 Session 记录。 |
 | `ctx.hmr` | `core` | [`hmr`](../packages/boot/hmr) | - | [`app-boot`](../packages/boot/app-boot) | - | 负责模块和精确配置监听；应用修改共用其队列，自动重载等待应用文件锁。 |

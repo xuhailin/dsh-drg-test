@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/emr-encounter/README.md
+/:
+  en: 65c3f910ff318812
+  zh: 5bc85c6067f66b49
+/deepseek-ai-dsh-experimental-emr-encounter:
+  en: ed9b440a5c09035c
+  zh: 1248c54b5c90ad8e
+/deepseek-ai-dsh-experimental-emr-encounter/summary:
+  en: 8058d809a54b1177
+  zh: a53d10802705af77
+/deepseek-ai-dsh-experimental-emr-encounter/table-of-contents:
+  en: 23386452a66b2fbd
+  zh: 4a8d91b2f313fead
+/deepseek-ai-dsh-experimental-emr-encounter/use-this-package:
+  en: 5f58010a40be0ee3
+  zh: 2b793f37fdd91dc1
+/deepseek-ai-dsh-experimental-emr-encounter/understand-the-implementation:
+  en: 10ca7030eefbaecc
+  zh: 11c09f7430121bc7
+/deepseek-ai-dsh-experimental-emr-encounter/further-exploration:
+  en: ab0216be7656b0cd
+  zh: 1b7ed4501389153a
+/deepseek-ai-dsh-experimental-emr-encounter/model-experience:
+  en: 75773c247a2930f8
+  zh: b7ee88c8d33e8bae
+/deepseek-ai-dsh-experimental-emr-encounter/model-experience/kv-cache-effect:
+  en: 6f60bc91eae3f58d
+  zh: 905e34dc35ceae02
+/deepseek-ai-dsh-experimental-emr-encounter/known-limitations-and-deferred-work:
+  en: 2564582bfec5b932
+  zh: 613158568f182209
+/deepseek-ai-dsh-experimental-emr-encounter/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 8ec3e73528ddb1a6
