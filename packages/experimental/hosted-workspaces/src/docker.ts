@@ -10,6 +10,12 @@ import type { HostedUserId } from './state.ts'
 export interface DockerRuntimeOptions {
   socketPath: string
   image: string
+  /** Normalized Linux daemon-host directory shared read-only; omission adds no shared mount or environment entry. */
+  sharedResourcesPath?: string
+  /** Optional read-only image patch applied to each runtime after its normal Web profile. */
+  runtimePatchFile?: string
+  /** Explicit Responses route; omission retains the existing DeepSeek Messages environment. */
+  model?: { readonly id: string; readonly contextWindow: number; readonly maxTokens: number }
   gatewayContainer: string
   gatewayPort: number
   prefix: string
@@ -61,6 +67,7 @@ interface ContainerInspection {
     PidsLimit?: number | null | undefined
     Tmpfs?: Record<string, string> | null | undefined
     Binds?: string[] | null | undefined
+    Mounts?: ResourceMount[] | null | undefined
     Devices?: unknown[] | null | undefined
     PortBindings?: Record<string, unknown> | null | undefined
     PublishAllPorts?: boolean | undefined
@@ -69,10 +76,22 @@ interface ContainerInspection {
     UTSMode?: string | undefined
   }
   State: { Running: boolean; Status: string; StartedAt: string }
-  Mounts: { Type: string; Name?: string | undefined; Destination: string; RW: boolean }[]
+  Mounts: {
+    Type: string
+    Name?: string | undefined
+    Source?: string | undefined
+    Destination: string
+    RW?: boolean | undefined
+    Propagation?: string | undefined
+  }[]
   NetworkSettings: {
     Networks: Record<string, { NetworkID: string; IPAddress: string; Aliases?: string[] | null | undefined }>
   }
+}
+
+/** Engine API bind fields not yet declared by @types/dockerode; submounts must never enter the shared tree. */
+interface ResourceMount extends Docker.MountSettings {
+  BindOptions?: { Propagation: Docker.MountPropagation; NonRecursive?: boolean | undefined } | undefined
 }
 
 interface NetworkInspection {
@@ -145,6 +164,7 @@ export class DockerRuntimeError extends Error {
 }
 
 const OWNER_LABEL = 'ai.deepseek.dsh.hosted-workspaces'
+const SHARED_RESOURCES_ROOT = '/opt/dsh/resources'
 
 function exchangeRequest(url: string, init: { headers: { host: string }; signal: AbortSignal }): Promise<Response> {
   return new Promise<Response>((resolve, reject) => {
@@ -389,9 +409,25 @@ export class DockerRuntimes {
     signal.throwIfAborted()
     const env = [
       'HOME=/home/node', 'DSH_HOME=/home/node/.dsh', 'DSH_AGENTS_HOME=/home/node/.agents',
-      `DEEPSEEK_API_KEY=${user.modelToken}`, `DEEPSEEK_BASE_URL=http://gateway:${String(this.options.gatewayPort)}/model`,
+      ...(this.options.model === undefined
+        ? [`DEEPSEEK_API_KEY=${user.modelToken}`, `DEEPSEEK_BASE_URL=http://gateway:${String(this.options.gatewayPort)}/model`]
+        : [`HOSTED_MODEL_API_KEY=${user.modelToken}`, `HOSTED_MODEL_BASE_URL=http://gateway:${String(this.options.gatewayPort)}/model/v1`,
+          'HOSTED_MODEL_PROTOCOL=openai-responses', `HOSTED_MODEL_ID=${this.options.model.id}`,
+          `HOSTED_MODEL_CONTEXT_WINDOW=${String(this.options.model.contextWindow)}`, `HOSTED_MODEL_MAX_TOKENS=${String(this.options.model.maxTokens)}`]),
       `HOSTED_PUBLIC_URL=${user.origin}`, `HOSTED_RUNTIME_PORT=${String(this.options.runtimePort)}`,
+      ...(this.options.runtimePatchFile === undefined ? [] : [
+        `HOSTED_RUNTIME_PATCH_FILE=${this.options.runtimePatchFile}`, `HOSTED_RUNTIME_OWNER_ID=${user.id}`,
+        `HOSTED_RUNTIME_API_KEY=${user.modelToken}`, `HOSTED_RUNTIME_GATEWAY_URL=http://gateway:${String(this.options.gatewayPort)}`,
+      ]),
+      ...(this.options.sharedResourcesPath === undefined ? [] : [`DSH_SHARED_RESOURCES_ROOT=${SHARED_RESOURCES_ROOT}`]),
     ]
+    const mounts: ResourceMount[] = [{ Type: 'volume', Source: volumeName, Target: '/home/node', ReadOnly: false }]
+    if (this.options.sharedResourcesPath !== undefined) {
+      mounts.push({
+        Type: 'bind', Source: this.options.sharedResourcesPath, Target: SHARED_RESOURCES_ROOT, ReadOnly: true,
+        BindOptions: { Propagation: 'rprivate', NonRecursive: true },
+      })
+    }
     const image = await this.docker.inspectImage(this.options.image)
     const config: Docker.ContainerCreateOptions = {
       name, Image: this.options.image, User: '1000:1000', Env: env, Labels: labels,
@@ -400,7 +436,7 @@ export class DockerRuntimes {
         SecurityOpt: ['no-new-privileges:true'], Init: true,
         Memory: this.options.memoryBytes, NanoCpus: this.options.nanoCpus, PidsLimit: this.options.pidsLimit,
         Tmpfs: { '/tmp': `rw,nosuid,nodev,size=${String(this.options.tmpBytes)},mode=1777` },
-        Mounts: [{ Type: 'volume', Source: volumeName, Target: '/home/node', ReadOnly: false }],
+        Mounts: mounts,
       },
     }
     let runtime = this.docker.getContainer(name)
@@ -444,13 +480,26 @@ export class DockerRuntimes {
       && Object.keys(host.PortBindings ?? {}).length === 0 && host.PublishAllPorts !== true
       && (host.PidMode ?? '') === '' && (host.UTSMode ?? '') === ''
       && ['', 'private'].includes(host.IpcMode ?? '')
-      && value.Mounts.length === 1 && value.Mounts[0]?.Type === 'volume' && value.Mounts[0].Name === volume
-      && value.Mounts[0].Destination === '/home/node' && value.Mounts[0].RW
+      && this.checkMounts(value, volume)
       && Object.keys(value.NetworkSettings.Networks).length === 1
       && endpoint !== undefined)
     // Docker assigns the private network ID when a created container first starts.
     const pendingNetwork = phase === 'before-start' && !value.State.Running && value.State.Status === 'created'
     requireIsolation((pendingNetwork ? ['', networkId] : [networkId]).includes(endpoint.NetworkID))
+  }
+
+  private checkMounts(value: ContainerInspection, volume: string): boolean {
+    const home = value.Mounts.filter(mount => mount.Destination === '/home/node')
+    if (home.length !== 1 || home[0]?.Type !== 'volume' || home[0].Name !== volume || !home[0].RW) return false
+    if (this.options.sharedResourcesPath === undefined) return value.Mounts.length === 1
+    const shared = value.Mounts.filter(mount => mount.Destination === SHARED_RESOURCES_ROOT)
+    const configured = value.HostConfig.Mounts
+    const bind = configured?.find(mount => mount.Target === SHARED_RESOURCES_ROOT)
+    return value.Mounts.length === 2 && shared.length === 1
+      && shared[0]?.Type === 'bind' && shared[0].Source === this.options.sharedResourcesPath
+      && shared[0].RW === false && shared[0].Propagation === 'rprivate'
+      && configured?.length === 2 && bind?.Type === 'bind' && bind.Source === this.options.sharedResourcesPath
+      && bind.ReadOnly === true && bind.BindOptions?.Propagation === 'rprivate' && bind.BindOptions.NonRecursive === true
   }
 
   private async waitForBrowser(

@@ -227,6 +227,12 @@ describe('client bundle purity gate', () => {
     expect(() => resolveId('@deepseek-ai/dsh-plugin-manager/registry/internal')).toThrow(/purity/)
   })
 
+  it('inlines only the encounter JSON entry without the Host reader service', () => {
+    expect(resolveId('@deepseek-ai/dsh-experimental-emr-encounter/wire')).toBeNull()
+    expect(() => resolveId('@deepseek-ai/dsh-experimental-emr-encounter')).toThrow(/purity/)
+    expect(() => resolveId('@deepseek-ai/dsh-experimental-emr-encounter/wire/internal')).toThrow(/purity/)
+  })
+
   it('admits only the pure spill notice entry, not its Host policy', () => {
     expect(resolveId('@deepseek-ai/dsh-spill-policy/notice')).toBeNull()
     expect(resolveId('@deepseek-ai/dsh-output-retention')).toBeNull()

@@ -13,6 +13,8 @@ services:
 
   mock-oidc:
     image: ${HOSTED_IMAGE:-dsh-hosted-workspaces:local}
+    environment:
+      MOCK_OIDC_REDIRECT_URI: ${HOSTED_PUBLIC_ORIGIN:-http://chat.localhost:8080}/auth/callback
     entrypoint: [node, /opt/dsh/packages/experimental/hosted-workspaces/tests/fixtures/mock-oidc.mjs]
     volumes:
       - ../../packages/experimental/hosted-workspaces/tests/fixtures/mock-oidc.mjs:/opt/dsh/packages/experimental/hosted-workspaces/tests/fixtures/mock-oidc.mjs:ro

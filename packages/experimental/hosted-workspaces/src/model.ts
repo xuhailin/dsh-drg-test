@@ -4,12 +4,27 @@ import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import type { ReadableStream } from 'node:stream/web'
 import { z } from 'zod'
-import type { Config } from './config.ts'
-import type { HostedState } from './state.ts'
+import { resolveModel, type Config, type ResolvedModel } from './config.ts'
+import type { HostedState, HostedUser } from './state.ts'
 
 const messageRequest = z.object({
   model: z.string(), max_tokens: z.number().int().positive(), stream: z.literal(true),
 }).loose()
+
+const responsesRequest = z.object({
+  model: z.string(), max_output_tokens: z.number().int().positive(), stream: z.literal(true),
+  store: z.literal(false).default(false), background: z.literal(false).optional(),
+  previous_response_id: z.never().optional(), conversation: z.never().optional(), prompt: z.never().optional(),
+  tools: z.array(z.object({ type: z.literal('function') }).loose()).optional(),
+}).loose()
+
+/** Authenticated extension requests expose identity without the reusable runtime credential. */
+export type RuntimeRequestHandler = (
+  user: Pick<HostedUser, 'id' | 'issuer' | 'subject'>,
+  request: IncomingMessage,
+  response: ServerResponse,
+  signal: AbortSignal,
+) => Promise<boolean>
 
 /** Stable JSON errors intentionally omit upstream payloads and credentials. */
 function reject(res: ServerResponse, status: number, code: string): void {
@@ -23,8 +38,16 @@ interface Usage { start: number; count: number; active: number }
 function hasUpstreamFile(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(hasUpstreamFile)
   if (value === null || typeof value !== 'object') return false
-  if ('type' in value && value.type === 'file' && 'file_id' in value) return true
+  if ('file_id' in value || ('type' in value && value.type === 'item_reference')) return true
   return Object.values(value).some(hasUpstreamFile)
+}
+
+function runtimeCredential(req: IncomingMessage): string | undefined {
+  const key = req.headers['x-api-key']
+  const authorization = req.headers.authorization
+  const bearer = authorization?.match(/^Bearer ([^\s]+)$/iu)?.[1]
+  if (key !== undefined && (typeof key !== 'string' || (bearer !== undefined && key !== bearer))) return undefined
+  return typeof key === 'string' ? key : bearer
 }
 
 /** Bounded per-user request admission and streaming to the configured upstream. */
@@ -33,8 +56,19 @@ export class ModelProxy {
   private readonly lifetime = new AbortController()
   private readonly pending = new Set<Promise<void>>()
   private readonly listeners = new Map<string, Promise<Server>>()
-  /** @param config - deployment limits. @param state - account registry. @param upstreamKey - gateway-only key. */
-  constructor(private readonly config: Config, private readonly state: HostedState, private readonly upstreamKey: string) {}
+  private readonly route: ResolvedModel
+  /**
+   * @param config - deployment limits.
+   * @param state - account registry.
+   * @param upstreamKey - gateway-only key.
+   * @param runtimeHandler - optional authenticated extension; must settle when its signal aborts.
+   */
+  constructor(
+    private readonly config: Config,
+    private readonly state: HostedState,
+    private readonly upstreamKey: string,
+    private readonly runtimeHandler?: RuntimeRequestHandler,
+  ) { this.route = resolveModel(config) }
 
   /**
    * Serve model requests on one newly attached private Docker interface.
@@ -77,26 +111,15 @@ export class ModelProxy {
 
   private async serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (this.lifetime.signal.aborted) { reject(res, 503, 'model_proxy_unavailable'); return }
-    const token = req.headers['x-api-key']
-    const user = this.state.modelUser(typeof token === 'string' ? token : undefined)
+    const user = this.state.modelUser(runtimeCredential(req))
     if (user === undefined) { reject(res, 401, 'invalid_runtime_credential'); return }
-    // Files are intentionally unavailable: DSH's Messages adapter falls back to inline images.
-    if (req.url?.split('?')[0] !== '/model/v1/messages' || req.method !== 'POST') {
+    const path = req.url?.split('?')[0]
+    const runtimeRequest = path?.startsWith('/runtime/') === true
+    const modelPath = this.route.protocol === 'openai-responses' ? '/model/v1/responses' : '/model/v1/messages'
+    if (!runtimeRequest && (path !== modelPath || req.method !== 'POST')) {
       reject(res, 404, 'unsupported_model_operation'); return
     }
-    const now = Date.now()
-    let usage = this.usage.get(user.id)
-    if (usage === undefined) {
-      usage = { start: now, count: 0, active: 0 }
-      this.usage.set(user.id, usage)
-    }
-    if (now - usage.start >= this.config.rateWindowMs) { usage.start = now; usage.count = 0 }
-    if (usage.count >= this.config.maxRequestsPerWindow || usage.active >= this.config.maxConcurrentModelRequests) {
-      res.setHeader('retry-after', Math.ceil(this.config.rateWindowMs / 1000))
-      reject(res, 429, 'runtime_rate_limit'); return
-    }
-    usage.count++
-    usage.active++
+    let admitted: Usage | undefined
     const lifetime = new AbortController()
     const disconnected = () => { lifetime.abort() }
     res.on('close', disconnected)
@@ -104,6 +127,25 @@ export class ModelProxy {
     const abortInput = () => { if (!req.complete) req.destroy() }
     signal.addEventListener('abort', abortInput, { once: true })
     try {
+      if (runtimeRequest) {
+        const handled = await this.runtimeHandler?.({ id: user.id, issuer: user.issuer, subject: user.subject }, req, res, signal)
+        if (handled !== true) reject(res, 404, 'unsupported_runtime_operation')
+        return
+      }
+      const now = Date.now()
+      let usage = this.usage.get(user.id)
+      if (usage === undefined) {
+        usage = { start: now, count: 0, active: 0 }
+        this.usage.set(user.id, usage)
+      }
+      if (now - usage.start >= this.config.rateWindowMs) { usage.start = now; usage.count = 0 }
+      if (usage.count >= this.config.maxRequestsPerWindow || usage.active >= this.config.maxConcurrentModelRequests) {
+        res.setHeader('retry-after', Math.ceil(this.config.rateWindowMs / 1000))
+        reject(res, 429, 'runtime_rate_limit'); return
+      }
+      usage.count++
+      usage.active++
+      admitted = usage
       let size = 0
       const chunks: Buffer[] = []
       for await (const chunk of req) {
@@ -119,14 +161,19 @@ export class ModelProxy {
       let raw: unknown
       try { raw = JSON.parse(Buffer.concat(chunks).toString('utf8')) }
       catch (_invalidJson) { reject(res, 400, 'invalid_model_json'); return }
-      const parsed = messageRequest.safeParse(raw)
-      if (!parsed.success || !this.config.allowedModels.includes(parsed.data.model)
-        || parsed.data.max_tokens > this.config.maxOutputTokens || hasUpstreamFile(parsed.data)) {
+      const parsed = this.route.protocol === 'openai-responses' ? responsesRequest.safeParse(raw) : messageRequest.safeParse(raw)
+      if (!parsed.success) { reject(res, 400, 'model_request_not_allowed'); return }
+      const outputTokens = this.route.protocol === 'openai-responses' ? parsed.data.max_output_tokens : parsed.data.max_tokens
+      if (!this.config.allowedModels.includes(parsed.data.model) || typeof outputTokens !== 'number'
+        || outputTokens > this.config.maxOutputTokens || hasUpstreamFile(parsed.data)) {
         reject(res, 400, 'model_request_not_allowed'); return
       }
-      const upstream = await fetch(`${this.config.deepseekBaseUrl.replace(/\/$/u, '')}/v1/messages`, {
+      const responses = this.route.protocol === 'openai-responses'
+      const upstream = await fetch(`${this.route.baseUrl}${responses ? '/responses' : '/v1/messages'}`, {
         method: 'POST', signal, redirect: 'error',
-        headers: { 'content-type': 'application/json', 'x-api-key': this.upstreamKey, 'anthropic-version': '2023-06-01' },
+        headers: { 'content-type': 'application/json', ...responses
+          ? { authorization: `Bearer ${this.upstreamKey}` }
+          : { 'x-api-key': this.upstreamKey, 'anthropic-version': '2023-06-01' } },
         body: JSON.stringify(parsed.data),
       })
       if (!upstream.ok || upstream.body === null) {
@@ -138,11 +185,11 @@ export class ModelProxy {
       await pipeline(Readable.fromWeb(upstream.body as ReadableStream<Uint8Array>), res, { signal })
     } catch (_requestError) {
       // pipeline closes a failed downstream response before rejecting.
-      if (!res.headersSent && !res.destroyed) reject(res, 502, 'model_request_failed')
+      if (!res.headersSent && !res.destroyed) reject(res, 502, runtimeRequest ? 'runtime_request_failed' : 'model_request_failed')
     } finally {
       res.removeListener('close', disconnected)
       signal.removeEventListener('abort', abortInput)
-      usage.active--
+      if (admitted !== undefined) admitted.active--
     }
   }
 

@@ -6,9 +6,25 @@ import { request } from 'node:http'
 import { setTimeout as delay } from 'node:timers/promises'
 import WebSocket from 'ws'
 
-const portal = 'http://chat.localhost:8080'
+const port = process.env.HOSTED_PORT ?? '8080'
+assert.match(port, /^[1-9][0-9]{0,4}$/u)
+assert.ok(Number(port) <= 65535, 'HOSTED_PORT must be a valid TCP port')
+const portal = `http://chat.localhost:${port}`
 const prefix = process.env.HOSTED_PREFIX ?? 'dsh-workspace'
-const composeArgs = ['compose', '-f', 'deploy/hosted-workspaces/compose.yml', '-f', 'deploy/hosted-workspaces/compose.test.yml']
+const composeArgs = [
+  'compose', ...(process.env.HOSTED_COMPOSE_PROJECT ? ['-p', process.env.HOSTED_COMPOSE_PROJECT] : []),
+  '-f', 'deploy/hosted-workspaces/compose.yml', '-f', 'deploy/hosted-workspaces/compose.test.yml',
+  ...(process.env.HOSTED_RESOURCE_COMPOSE_FILE ? ['-f', process.env.HOSTED_RESOURCE_COMPOSE_FILE] : []),
+]
+const resourcePackId = process.env.HOSTED_RESOURCE_SMOKE_PACK_ID
+const resourceSha256 = process.env.HOSTED_RESOURCE_SMOKE_SHA256
+const resourceSource = process.env.HOSTED_SHARED_RESOURCES_PATH
+const resourcesEnabled = resourcePackId !== undefined || resourceSha256 !== undefined || resourceSource !== undefined
+if (resourcesEnabled) {
+  assert.match(resourcePackId ?? '', /^[a-z0-9][a-z0-9._-]{0,127}$/u, 'Set HOSTED_RESOURCE_SMOKE_PACK_ID to a published source-only package')
+  assert.match(resourceSha256 ?? '', /^[a-f0-9]{64}$/u, 'Set HOSTED_RESOURCE_SMOKE_SHA256 to the independently verified source SHA-256')
+  assert.ok(resourceSource?.startsWith('/'), 'Set HOSTED_SHARED_RESOURCES_PATH to the exact Docker daemon host published directory')
+}
 function passed(message) { console.log(message) }
 const sockets = new Set()
 
@@ -166,6 +182,75 @@ function assistantText(history) {
     .flatMap(record => record.event.data.message.content).filter(block => block.type === 'text').map(block => block.text).join('\n')
 }
 
+function messageText(content) {
+  return content.flatMap(block => block.type === 'text' ? [block.text] : block.type === 'tool-result' ? [messageText(block.content)] : []).join('\n')
+}
+
+async function resourceRound(user, marker, tool, isError = false) {
+  const session = await rpc(user, 'session/create', { request: { cwd: '/home/node/workspace' } })
+  const permission = await rpc(user, 'commands/execute', { agentId: session.sessionId, line: '/permission danger-full-access', submittedAttachments: [] })
+  assert.equal(permission.result.kind, 'success')
+  await rpc(user, 'session/prompt', { request: { requestId: randomUUID(), sessionId: session.sessionId, mode: 'queue', content: [{ type: 'text', text: `${marker} ${resourcePackId}` }] } })
+  await waitFor(async () => /Tool (?:result|failed):/u.test(assistantText(await page(user, session.sessionId))), 'Shared-reference tool round did not settle')
+  const history = await page(user, session.sessionId)
+  const events = history.records.filter(record => record.type === 'event').map(record => record.event)
+  const calls = events.filter(event => event.type === 'tool/call')
+  assert.equal(calls.length, 1, 'The resource round invokes exactly one real tool')
+  assert.equal(calls[0].data.name, tool)
+  const results = events.filter(event => event.type === 'tool/result')
+  assert.equal(results.length, 1, 'The real tool result is persisted in the Session')
+  const message = results[0].data.message
+  const nested = message.content.find(block => block.type === 'tool-result')
+  assert.equal(nested?.isError ?? message.isError ?? false, isError, 'The persisted tool result records the expected outcome')
+  const resultText = messageText(message.content)
+  let identity
+  if (isError) {
+    assert.match(resultText, /EROFS|EACCES|read.only|permission denied/iu, 'The file tool reaches a filesystem write denial')
+  } else {
+    assert.doesNotMatch(resultText, /\[exit code: (?:[1-9][0-9]*|-[0-9]+)\]/u, `The shared-reference Bash command must exit successfully: ${resultText}`)
+    const output = /\{"packId":[^\n]+\}/u.exec(resultText)?.[0]
+    assert.ok(output, `The real tool result must contain the resource identity: ${resultText}`)
+    identity = JSON.parse(output)
+    assert.equal(identity.packId, resourcePackId)
+    assert.equal(identity.sourceSha256, resourceSha256, 'The real tool reads the independently verified source bytes')
+    assert.equal(identity.profile, 'source-only')
+    assert.equal(identity.groupingReady, false)
+  }
+  return { sessionId: session.sessionId, resultText, identity }
+}
+
+function sharedSourceHash(user) {
+  return docker('exec', user.container, 'node', '--input-type=module', '-e', `import { createHash } from 'node:crypto'; import { readFileSync } from 'node:fs'; console.log(createHash('sha256').update(readFileSync(${JSON.stringify(`/opt/dsh/resources/${resourcePackId}/sources/national.pdf`)})).digest('hex'))`)
+}
+
+function inspectMounts(item) {
+  assert.equal(item.Mounts.length, resourcesEnabled ? 2 : 1)
+  const home = item.Mounts.find(mount => mount.Destination === '/home/node')
+  assert.ok(home, 'The private home mount is present')
+  assert.equal(home.Type, 'volume')
+  assert.equal(home.RW, true)
+  if (resourcesEnabled) {
+    const resource = item.Mounts.find(mount => mount.Destination === '/opt/dsh/resources')
+    assert.ok(resource, 'The sole shared-resource mount is present')
+    assert.equal(resource.Type, 'bind')
+    assert.equal(resource.Source, resourceSource)
+    assert.equal(resource.RW, false)
+    assert.equal(resource.Propagation, 'rprivate')
+    assert.equal(item.HostConfig.Mounts.length, 2)
+    const configured = item.HostConfig.Mounts.find(mount => mount.Target === '/opt/dsh/resources')
+    assert.ok(configured)
+    assert.equal(configured.Type, 'bind')
+    assert.equal(configured.Source, resourceSource)
+    assert.equal(configured.ReadOnly, true)
+    assert.equal(configured.BindOptions.Propagation, 'rprivate')
+    assert.equal(configured.BindOptions.NonRecursive, true)
+    assert.ok(item.Config.Env.includes('DSH_SHARED_RESOURCES_ROOT=/opt/dsh/resources'))
+  } else {
+    assert.ok(!item.Config.Env.some(value => value.startsWith('DSH_SHARED_RESOURCES_ROOT=')))
+  }
+  return home
+}
+
 async function main() {
   assert.equal((await http(`${portal}/healthz`)).status, 200)
   const alice = await login('alice')
@@ -219,21 +304,44 @@ async function main() {
     assert.equal(item.HostConfig.ReadonlyRootfs, true)
     assert.deepEqual(item.HostConfig.CapDrop, ['ALL'])
     assert.deepEqual(item.HostConfig.SecurityOpt, ['no-new-privileges:true'])
-    assert.equal(item.Mounts.length, 1)
-    assert.equal(item.Mounts[0].Destination, '/home/node')
+    inspectMounts(item)
     assert.ok(!item.Config.Env.some(value => value.includes('fake-deepseek-upstream-key')))
     assert.ok(!Object.keys(item.NetworkSettings.Ports ?? {}).some(port => item.NetworkSettings.Ports[port]?.length))
   }
-  assert.notEqual(a.Mounts[0].Name, b.Mounts[0].Name)
+  assert.notEqual(inspectMounts(a).Name, inspectMounts(b).Name)
   assert.notEqual(a.HostConfig.NetworkMode, b.HostConfig.NetworkMode)
   docker('exec', alice.container, 'sh', '-c', 'test ! -e /var/run/docker.sock && test ! -e /run/secrets/deepseek_api_key && test ! -e /home/node/workspace/bob-private.txt')
   const bobIp = Object.values(b.NetworkSettings.Networks)[0].IPAddress
   docker('exec', alice.container, 'node', '--input-type=module', '-e', `try { await fetch('http://${bobIp}:3080/', {signal:AbortSignal.timeout(1500)});process.exit(1) } catch { process.exit(0) }`)
   passed('Distinct volumes/networks; no published runtime ports, control socket or real upstream key; peer network unreachable: PASS')
 
+  let sharedSession
+  if (resourcesEnabled) {
+    const first = await resourceRound(alice, 'READ_SHARED_REFERENCE', 'bash')
+    const otherUser = await resourceRound(bob, 'READ_SHARED_REFERENCE', 'bash')
+    const newSession = await resourceRound(alice, 'READ_SHARED_REFERENCE', 'bash')
+    assert.notEqual(first.sessionId, newSession.sessionId)
+    assert.deepEqual(first.identity, otherUser.identity)
+    assert.deepEqual(first.identity, newSession.identity)
+    sharedSession = first.sessionId
+    passed('Two users and a new private Session read the same published source identity through real Bash and persisted tool results: PASS')
+    for (const user of [alice, bob]) {
+      const denied = await resourceRound(user, 'DENY_SHARED_MUTATION', 'bash')
+      assert.deepEqual(denied.identity.denied, ['source-write', 'directory-create', 'file-create', 'catalog-replace', 'source-delete'])
+      assert.equal(denied.identity.readOnlyMount, true)
+      assert.ok(Object.values(denied.identity.deniedErrors).every(code => code === 'EROFS' || code === 'EACCES'))
+      assert.equal(denied.identity.sqliteReadOnly, true)
+      await resourceRound(user, 'WRITE_SHARED_FILE', 'write', true)
+      assert.equal(sharedSourceHash(user), resourceSha256)
+      docker('exec', user.container, 'sh', '-c', 'test ! -e /opt/dsh/resources/staging && test ! -e /opt/dsh/staging && test ! -e /var/run/docker.sock')
+    }
+    passed('Real Bash and file tools cannot change sources, catalog or directories; SQLite is read-only and staging remains absent: PASS')
+  }
+
   docker('restart', alice.container)
   assert.equal((await http(alice.origin, { cookie: alice.cookie })).status, 200)
   assert.match(docker('exec', alice.container, 'cat', '/home/node/workspace/alice-private.txt'), /hosted-workspaces-marker:/u)
+  if (resourcesEnabled) assert.equal(sharedSourceHash(alice), resourceSha256)
   passed('Personal runtime restart preserves access and private files: PASS')
   docker(...composeArgs, 'restart', 'gateway')
   await waitFor(async () => {
@@ -251,6 +359,24 @@ async function main() {
   assert.match(restoredTranscript, /Tool result:/u)
   assert.doesNotMatch(restoredTranscript, /bob-private\.txt/u)
   passed('Runtime and gateway restart preserve login, files/history and restore new model requests: PASS')
+
+  if (resourcesEnabled) {
+    const prior = JSON.parse(docker('inspect', alice.container))[0]
+    inspectMounts(prior)
+    assert.equal(prior.Config.Labels['ai.deepseek.dsh.hosted-workspaces.user'], alice.id)
+    docker('rm', '-f', alice.container)
+    assert.equal((await http(alice.origin, { cookie: alice.cookie })).status, 200)
+    const replacement = JSON.parse(docker('inspect', alice.container))[0]
+    assert.notEqual(replacement.Id, prior.Id)
+    assert.equal(inspectMounts(replacement).Name, inspectMounts(prior).Name)
+    assert.equal(sharedSourceHash(alice), resourceSha256)
+    assert.equal(sharedSourceHash(bob), resourceSha256)
+    assert.match(docker('exec', alice.container, 'cat', '/home/node/workspace/alice-private.txt'), /hosted-workspaces-marker:/u)
+    assert.match(docker('exec', bob.container, 'cat', '/home/node/workspace/bob-private.txt'), /hosted-workspaces-marker:/u)
+    assert.ok(assistantText(await page(alice, sharedSession)).includes(resourceSha256))
+    await resourceRound(alice, 'READ_SHARED_REFERENCE', 'bash')
+    passed('Runtime replacement retains the private home/history and shared source; gateway restart keeps both users on the same package: PASS')
+  }
 
   const freshAlice = await login('alice')
   assert.equal(freshAlice.id, alice.id)

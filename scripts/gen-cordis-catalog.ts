@@ -50,6 +50,7 @@ export { REGION_BEGIN, REGION_END }
  * errors, so the partition can never silently drift from the service API.
  */
 export const SERVICE_PAGE: Record<string, string> = {
+  encounterReader: 'clinical-review.md',
   translator: 'translation.md',
   cotTranslation: 'translation.md',
   speechToText: 'voice-input.md',
@@ -170,6 +171,7 @@ export const SERVICE_PAGE: Record<string, string> = {
  * to a model as `cordis_runtime_inspect what:"client"`).
  */
 export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
+  clinicalReview: 'plugin-local coordinator installed through ctx.provide; packages/experimental/clinical-review/README.md owns its HTTP and tool API',
   invocation: 'not a service: per-call accessor (RemoteInvocation | undefined) the Gateway derives for each Remote call — packages/api/gateway/README.md owns the contract',
   webTerminals: 'client-side terminal view models — packages/api/terminal-controller/README.md owns the API',
   appReady: 'not a service: launcher-provided successful-startup signal — packages/boot/cmdline/README.md owns the launcher contract',
@@ -230,6 +232,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'approval': 'approval.md',
   'commands': 'commands.md',
   'connection': 'web-server.md',
+  'hosted-workspaces': 'web-server.md',
   'compaction': 'compaction.md',
   'cordis': 'extensions.md',
   'authorization': 'credentials.md',
@@ -284,6 +287,9 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
  * appear on more than one page.
  */
 export const LINK_MAP: Readonly<Record<string, string>> = {
+  ClinicalActor: 'clinical-review.md',
+  EncounterBinding: 'clinical-review.md',
+  EncounterSnapshot: 'clinical-review.md',
   Principal: 'typert.md',
   PrincipalMap: 'typert.md',
   RemoteAccessResource: 'typert.md',
@@ -870,6 +876,7 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
 
 /** Project types deliberately documented outside the subsystems catalog. */
 export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
+  HostedRuntimeRequest: 'authenticated runtime extension requests are owned by packages/experimental/hosted-workspaces/README.md and src/runtime-access.ts',
   ProductEvent: 'Desktop event fields are owned by packages/client/product-analytics/README.md and src/events.ts',
   ConnectionFetchHandler: 'shared Fetch dispatch is owned by packages/client/connection/src/rpc.ts',
   ConnectionRequestRejection: 'transport rejection status is owned by packages/client/connection/src/rpc.ts',

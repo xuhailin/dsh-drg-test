@@ -1,0 +1,19 @@
+- insert:
+    - id: clinical-review
+      name: '@deepseek-ai/dsh-experimental-clinical-review'
+      config:
+        brokerBaseUrl: !!js process.env.HOSTED_RUNTIME_GATEWAY_URL + '/runtime/emr/'
+        runtimeTokenEnv: HOSTED_RUNTIME_API_KEY
+        ownerId: !!js process.env.HOSTED_RUNTIME_OWNER_ID
+        cwd: /home/node/workspace
+        agentPreset: standard
+        timeoutMs: 30000
+        maxResponseBytes: 4194304
+        maxToolBytes: 65536
+        maxSourceChars: 12000
+    - id: client-emr-entry
+      name: '@deepseek-ai/dsh-experimental-client-emr-entry'
+      config:
+        allowedOrigins: []
+        defaultSourceSystem: emr
+        defaultHospitalCode: ''

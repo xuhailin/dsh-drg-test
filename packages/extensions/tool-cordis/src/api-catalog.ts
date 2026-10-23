@@ -1053,6 +1053,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'encounterReader',
+    summary: 'Providers reauthorize every capture and return immutable, bounded original evidence.',
+    description: 'Providers reauthorize every capture and return immutable, bounded original evidence.',
+    methods: [
+      {
+        signature: 'abstract capture(actor: ClinicalActor, binding: EncounterBinding, signal: AbortSignal): Promise<EncounterSnapshot>',
+        description: 'Capture one authorized encounter without modifying its source records.',
+        parameters: [{ name: 'actor', description: 'Authenticated transport identity; never model-selected.' }, { name: 'binding', description: 'Previously accepted actor and encounter binding.' }, { name: 'signal', description: 'Caller cancellation; dependent work stops before publication.' }],
+        returns: 'Complete validated snapshot, or a typed failure with no accepted partial snapshot.',
+      },
+    ],
+  },
+  {
     key: 'fileReferences',
     summary: 'Host capability for cancellable file-reference discovery.',
     description: 'Host capability for cancellable file-reference discovery.',
@@ -4358,6 +4371,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'reloads', description: 'Replaced plugins and their module locations.' }],
   },
   {
+    name: 'hosted-workspaces/runtime-request',
+    mode: 'waterfall',
+    signature: '\'hosted-workspaces/runtime-request\'(request: HostedRuntimeRequest, next: () => Promise<boolean>): Promise<boolean>',
+    summary: 'Serve an optional operation under /runtime/ after runtime credential and live-login checks.',
+    description: 'Serve an optional operation under /runtime/ after runtime credential and live-login checks. A handler owns its response only when returning true; other paths delegate to next(). Each provider must authorize its own resources and recheck isActive before publishing data.',
+    parameters: [{ name: 'request', description: 'verified identity, response, cancellation, and current login check.' }, { name: 'next', description: 'delegate an unhandled path; the terminal continuation returns false.' }],
+  },
+  {
     name: 'llm/adapters-updated',
     mode: 'emit',
     signature: '\'llm/adapters-updated\'(): void',
@@ -4990,12 +5011,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ButtonProps {\n    readonly label: string;\n    readonly hotkey?: string | undefined;\n    readonly disabled?: boolean | undefined;\n    readonly onPress?: (() => unknown) | undefined;\n}',
   },
   {
+    name: 'CaseRevision',
+    declaration: 'export type CaseRevision = Branded<\'ClinicalCaseRevision\'>;',
+  },
+  {
     name: 'ChangeResult',
     declaration: 'export interface ChangeResult {\n    changed: boolean;\n    application: \'applied\' | \'restart-required\' | \'overridden\' | \'failed\' | \'cancelled\';\n    restartReason?: RestartReason;\n    stage: \'install\' | \'enable\' | \'remove\';\n    target: string;\n    enabled?: boolean;\n    error?: ManagementError;\n    warnings?: string[];\n    packageResult?: PackageResult;\n    bundle?: string;\n    version?: string;\n    pendingBuilds?: string[];\n    approvedBuilds?: string[];\n    registries?: Registry[];\n    failedAt?: \'registry\' | \'spec-host\';\n}',
   },
   {
     name: 'ClientArtifactBaseline',
     declaration: 'export interface ClientArtifactBaseline {\n    readonly path: string;\n    readonly mtimeMs: number;\n    readonly ctimeMs: number;\n    readonly size: number;\n}',
+  },
+  {
+    name: 'ClinicalActor',
+    declaration: 'export interface ClinicalActor {\n    readonly id: string;\n    readonly issuer: string;\n    readonly subject: string;\n}',
   },
   {
     name: 'CollectedOutput',
@@ -5458,6 +5487,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface EncodedImageAttachment {\n    mediaType: ImageMediaType;\n    data: string;\n    name?: string;\n}',
   },
   {
+    name: 'EncounterBinding',
+    declaration: 'export interface EncounterBinding {\n    readonly schemaVersion: 1;\n    readonly bindingId: EncounterBindingId;\n    readonly actorId: string;\n    readonly actorIssuer: string;\n    readonly actorSubject: string;\n    readonly sourceSystem: string;\n    readonly hospitalCode: string;\n    readonly inpatId: string;\n    readonly inpatCode?: string | undefined;\n    readonly sourceVisitId?: string | undefined;\n}',
+  },
+  {
+    name: 'EncounterBindingId',
+    declaration: 'export type EncounterBindingId = Branded<\'EncounterBindingId\'>;',
+  },
+  {
+    name: 'EncounterSnapshot',
+    declaration: 'export interface EncounterSnapshot {\n    readonly schemaVersion: 1;\n    readonly bindingId: EncounterBindingId;\n    readonly caseRevision: CaseRevision;\n    readonly providerRevision: string;\n    readonly capturedAt: string;\n    readonly cutoff: string;\n    readonly sources: readonly EvidenceSource[];\n    readonly coverage: readonly EvidenceCoverage[];\n}',
+  },
+  {
     name: 'EpochHeader',
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    tools?: ToolSchema[];\n    system?: never;\n}',
   },
@@ -5472,6 +5513,26 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'EveryScheduleRecord',
     declaration: 'export interface EveryScheduleRecord {\n    readonly id: ScheduleId;\n    readonly kind: \'every\';\n    readonly title: string;\n    readonly prompt: string;\n    readonly everySeconds: number;\n    readonly scheduledAt: string;\n}',
+  },
+  {
+    name: 'EvidenceCategory',
+    declaration: 'export type EvidenceCategory = \'encounter\' | \'diagnoses\' | \'orders\' | \'documents\' | \'labs\' | \'checks\' | \'operations\' | \'administration\';',
+  },
+  {
+    name: 'EvidenceCoverage',
+    declaration: 'export interface EvidenceCoverage {\n    readonly category: EvidenceCategory;\n    readonly status: \'complete\' | \'empty\' | \'unsupported\' | \'unread\';\n    readonly detail?: string | undefined;\n}',
+  },
+  {
+    name: 'EvidenceDigest',
+    declaration: 'export type EvidenceDigest = Branded<\'ClinicalEvidenceDigest\'>;',
+  },
+  {
+    name: 'EvidenceSource',
+    declaration: 'export interface EvidenceSource {\n    readonly sourceRef: EvidenceSourceRef;\n    readonly category: EvidenceCategory;\n    readonly sourceId: string;\n    readonly sourceRevision: string;\n    readonly state: string;\n    readonly occurredAt?: string | undefined;\n    readonly availableAt?: string | undefined;\n    readonly content: string;\n    readonly contentDigest: EvidenceDigest;\n}',
+  },
+  {
+    name: 'EvidenceSourceRef',
+    declaration: 'export type EvidenceSourceRef = Branded<\'ClinicalEvidenceSourceRef\'>;',
   },
   {
     name: 'FeedbackCategory',
@@ -5652,6 +5713,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'HostConnectionRpc',
     declaration: 'export interface HostConnectionRpc {\n    handle(channel: string, handler: ConnectionRpcHandler): () => Promise<void>;\n    intercept(channel: \'/api\', matches: ConnectionRpcEndpointMatcher, handler: ConnectionRpcHandler): () => Promise<void>;\n}',
+  },
+  {
+    name: 'HostedRuntimeActor',
+    declaration: 'export interface HostedRuntimeActor {\n    readonly id: HostedUserId;\n    readonly issuer: string;\n    readonly subject: string;\n}',
+  },
+  {
+    name: 'HostedRuntimeRequest',
+    declaration: 'export interface HostedRuntimeRequest {\n    readonly actor: HostedRuntimeActor;\n    readonly request: IncomingMessage;\n    readonly response: ServerResponse;\n    readonly signal: AbortSignal;\n    readonly isActive: () => boolean;\n}',
+  },
+  {
+    name: 'HostedUserId',
+    declaration: 'export type HostedUserId = Branded<\'HostedUserId\'>;',
   },
   {
     name: 'ImageAttachmentLimits',

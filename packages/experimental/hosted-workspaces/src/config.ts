@@ -8,6 +8,8 @@ export interface Config {
   publicOrigin: string
   /** Locally available Docker image reference used for personal runtimes. */
   image: string
+  /** Absolute normalized Linux daemon-host directory mounted read-only at /opt/dsh/resources; omission adds no shared mount. */
+  sharedResourcesPath?: string
   /** Deployment-specific prefix for owned Docker containers, networks, and volumes. */
   prefix: string
   /** Exact OIDC issuer expected in discovery metadata and validated ID tokens. */
@@ -20,9 +22,23 @@ export interface Config {
   oidcFlow: OidcFlow
   /** Gateway-only client_secret_basic secret file for authorization-code; implicit does not read it. */
   clientSecretFile?: string
-  /** Gateway-only file containing the upstream model API key. */
-  deepseekKeyFile: string
-  /** Upstream base URL to which the model proxy appends /v1/messages. */
+  /** Wire protocol admitted by the private model proxy. */
+  modelProtocol: 'anthropic-messages' | 'openai-responses'
+  /** Gateway-only upstream key file; required for OpenAI Responses and preferred for new deployments. */
+  modelKeyFile?: string
+  /** Protocol API base; Responses appends /responses, Messages appends /v1/messages. */
+  modelBaseUrl?: string
+  /** Default personal-runtime model; Responses requires an identifier in allowedModels. */
+  runtimeModel?: string
+  /** Deployment context budget advertised by the personal Responses route. */
+  runtimeContextWindow: number
+  /** Per-request output-token budget configured on the personal Responses route. */
+  runtimeMaxTokens: number
+  /** Optional image-owned runtime overlay beneath /opt/dsh; user-writable paths are not accepted. */
+  runtimePatchFile?: string
+  /** Legacy Messages key file, used only when modelKeyFile is absent. */
+  deepseekKeyFile?: string
+  /** Legacy Messages API base, used only when modelBaseUrl is absent. */
   deepseekBaseUrl: string
   /** Exact model identifiers admitted by the shared-key model proxy. */
   allowedModels: string[]
@@ -66,7 +82,7 @@ export interface Config {
   runtimePort: number
   /** Maximum complete model-request body bytes before JSON parsing or upstream access. */
   maxModelRequestBytes: number
-  /** Maximum max_tokens value accepted in a model request. */
+  /** Maximum protocol output-token limit accepted in a model request. */
   maxOutputTokens: number
   /** Maximum admitted model requests per account in one rate window. */
   maxRequestsPerWindow: number
@@ -80,13 +96,21 @@ export interface Config {
 export const Config: z<Partial<Config>, Config> = z.object({
   publicOrigin: z.string().required(),
   image: z.string().required(),
+  sharedResourcesPath: z.string().pattern(/^\/(?!\.{1,2}(?:\/|$))[^/\\\p{Cc}]+(?:\/(?!\.{1,2}(?:\/|$))[^/\\\p{Cc}]+)*$/u),
   prefix: z.string().default('dsh-hosted'),
   issuer: z.string().required(),
   discoveryUrl: z.string(),
   clientId: z.string().required(),
   oidcFlow: z.union(['authorization-code', 'implicit']).default('authorization-code'),
   clientSecretFile: z.string(),
-  deepseekKeyFile: z.string().required(),
+  modelProtocol: z.union(['anthropic-messages', 'openai-responses']).default('anthropic-messages'),
+  modelKeyFile: z.string(),
+  modelBaseUrl: z.string(),
+  runtimeModel: z.string(),
+  runtimeContextWindow: z.natural().min(1).default(32768),
+  runtimeMaxTokens: z.natural().min(1).default(8192),
+  runtimePatchFile: z.string().pattern(/^\/opt\/dsh\/(?!\.{1,2}(?:\/|$))[^/\\\p{Cc}]+(?:\/(?!\.{1,2}(?:\/|$))[^/\\\p{Cc}]+)*$/u),
+  deepseekKeyFile: z.string(),
   deepseekBaseUrl: z.string().default('https://api.deepseek.com/anthropic'),
   allowedModels: z.array(String).default(['deepseek-flash', 'deepseek-v4-pro']),
   allowHttp: z.boolean().default(false),
@@ -115,6 +139,43 @@ export const Config: z<Partial<Config>, Config> = z.object({
   maxConcurrentModelRequests: z.natural().min(1).default(2),
 })
 
+/** Resolved gateway-only model route; runtime credentials never contain its key. */
+export interface ResolvedModel {
+  /** Selected request protocol. */
+  protocol: Config['modelProtocol']
+  /** Gateway-only upstream credential file. */
+  keyFile: string
+  /** Validated API base without a trailing slash. */
+  baseUrl: string
+}
+
+/**
+ * Resolve explicit model settings and the existing Messages deployment defaults.
+ * @param config - deployment inputs.
+ * @returns validated protocol, secret-file path, and API base.
+ */
+export function resolveModel(config: Config): ResolvedModel {
+  if (config.modelProtocol === 'openai-responses' && (!config.modelKeyFile || !config.modelBaseUrl)) {
+    throw new Error('hosted-workspaces: openai-responses requires modelKeyFile and modelBaseUrl')
+  }
+  if (config.modelProtocol === 'openai-responses') {
+    if (config.runtimeModel === undefined || !config.allowedModels.includes(config.runtimeModel)) {
+      throw new Error('hosted-workspaces: openai-responses requires runtimeModel in allowedModels')
+    }
+    if (config.runtimeMaxTokens > config.maxOutputTokens || config.runtimeMaxTokens > config.runtimeContextWindow) {
+      throw new Error('hosted-workspaces: runtimeMaxTokens exceeds the proxy or runtime context limit')
+    }
+  }
+  const keyFile = config.modelKeyFile ?? config.deepseekKeyFile
+  if (!keyFile?.trim()) throw new Error('hosted-workspaces: modelKeyFile is required')
+  const upstream = new URL(config.modelBaseUrl ?? config.deepseekBaseUrl)
+  if ((upstream.protocol !== 'https:' && !(config.allowHttp && upstream.protocol === 'http:'))
+    || upstream.username || upstream.password || upstream.search || upstream.hash) {
+    throw new Error('hosted-workspaces: invalid model upstream')
+  }
+  return { protocol: config.modelProtocol, keyFile, baseUrl: upstream.href.replace(/\/$/u, '') }
+}
+
 /**
  * Validate the public entry and derive its canonical origin.
  * @param config - deployment inputs.
@@ -131,10 +192,6 @@ export function publicOrigin(config: Config): URL {
   }
   if (!/^[a-z][a-z0-9-]{0,30}$/u.test(config.prefix)) throw new Error('hosted-workspaces: invalid Docker resource prefix')
   if (config.allowedModels.length === 0) throw new Error('hosted-workspaces: allowedModels must not be empty')
-  const upstream = new URL(config.deepseekBaseUrl)
-  if ((upstream.protocol !== 'https:' && !(config.allowHttp && upstream.protocol === 'http:'))
-    || upstream.username || upstream.password || upstream.search || upstream.hash) {
-    throw new Error('hosted-workspaces: invalid model upstream')
-  }
+  resolveModel(config)
   return url
 }

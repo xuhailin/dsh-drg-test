@@ -1,0 +1,54 @@
+.dialog {
+  max-height: 100%;
+}
+
+.modalContent {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.content {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 0 24px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.form label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+}
+
+.form h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+@container (max-width: 480px) {
+  .reviewLabel {
+    display: none;
+  }
+}

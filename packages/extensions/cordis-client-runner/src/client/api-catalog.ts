@@ -596,6 +596,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface DraftInitializationOptions {\n    readonly prompt?: string;\n    readonly clearPreviousDraft?: boolean;\n}',
   },
   {
+    name: 'EntryKey',
+    declaration: 'export type EntryKey = keyof typeof zh;',
+  },
+  {
     name: 'EntryKeyOf',
     declaration: 'export type EntryKeyOf<K extends keyof SlotMap & string> = SlotMap[K] extends {\n    kind: \'keyed\';\n    keyProps: infer P extends object;\n} ? keyof P & string : string;',
   },

@@ -78,7 +78,9 @@ function fakeDocker(address?: string) {
       state.Config.Env = [...(image.Config.Env ?? []), ...(config.Env ?? [])]
       state.HostConfig = { ...config.HostConfig }
       state.Mounts = (config.HostConfig?.Mounts ?? []).map(value => ({
-        Type: value.Type, Name: value.Source, Destination: value.Target, RW: value.ReadOnly !== true,
+        Type: value.Type, ...(value.Type === 'volume' ? { Name: value.Source } : {}), Source: value.Source,
+        Destination: value.Target, RW: value.ReadOnly !== true,
+        ...(value.BindOptions === undefined ? {} : { Propagation: value.BindOptions.Propagation }),
       }))
       const networkName = config.HostConfig?.NetworkMode ?? absent()
       const network = requireValue(networks.get(networkName))
@@ -510,6 +512,143 @@ describe('personal Docker runtimes', () => {
     expect(fake.volumes.size).toBe(1)
     expect(fake.networks.size).toBe(1)
     expect(fake.events.some(value => value.includes('remove:'))).toBe(false)
+  })
+
+  it('shares only the configured published directory across users and restores established read-only mounts', async () => {
+    const fake = fakeDocker()
+    const options = { ...OPTIONS, sharedResourcesPath: '/srv/dsh-resources/published' }
+    const first = new DockerRuntimes(options, fake)
+    try {
+      await Promise.all([first.ensure(USER), first.ensure(OTHER)])
+      for (const config of fake.created) {
+        expect(config.HostConfig?.Mounts).toEqual([
+          { Type: 'volume', Source: `${config.name ?? ''}-home`, Target: '/home/node', ReadOnly: false },
+          { Type: 'bind', Source: options.sharedResourcesPath, Target: '/opt/dsh/resources', ReadOnly: true,
+            BindOptions: { Propagation: 'rprivate', NonRecursive: true } },
+        ])
+        expect(config.Env).toContain('DSH_SHARED_RESOURCES_ROOT=/opt/dsh/resources')
+      }
+      expect(fake.volumes.size).toBe(2)
+    } finally { await first.dispose() }
+    const restarted = new DockerRuntimes(options, fake)
+    try {
+      await expect(restarted.ensure(USER)).resolves.toMatchObject({ target: 'http://172.28.1.2:3000' })
+      expect(fake.created).toHaveLength(2)
+      expect(fake.events.some(value => value.includes('remove:'))).toBe(false)
+    } finally { await restarted.dispose() }
+  })
+
+  it('keeps company model and extension credentials scoped to each runtime and preserves homes on configuration drift', async () => {
+    const fake = fakeDocker()
+    const options = { ...OPTIONS, model: { id: 'gpt-fixture', contextWindow: 32768, maxTokens: 8192 },
+      runtimePatchFile: '/opt/dsh/deploy/clinical.runtime.patch.yml' }
+    const owner = new DockerRuntimes(options, fake)
+    try {
+      await Promise.all([owner.ensure(USER), owner.ensure(OTHER)])
+      for (const user of [USER, OTHER]) {
+        const created = fake.created.find(entry => entry.name === `test-${user.id}`)
+        expect(created?.Env).toEqual(expect.arrayContaining([
+          `HOSTED_MODEL_API_KEY=${user.modelToken}`, 'HOSTED_MODEL_PROTOCOL=openai-responses',
+          'HOSTED_MODEL_ID=gpt-fixture', 'HOSTED_MODEL_BASE_URL=http://gateway:8080/model/v1',
+          `HOSTED_RUNTIME_OWNER_ID=${user.id}`, `HOSTED_RUNTIME_API_KEY=${user.modelToken}`,
+          'HOSTED_RUNTIME_GATEWAY_URL=http://gateway:8080', `HOSTED_RUNTIME_PATCH_FILE=${options.runtimePatchFile}`,
+        ]))
+        expect(created?.Env?.some(entry => entry.startsWith('DEEPSEEK_'))).toBe(false)
+        expect(created?.Env?.some(entry => entry.startsWith('DRG_EMR_PG_'))).toBe(false)
+      }
+    } finally { await owner.dispose() }
+    const changed = new DockerRuntimes({ ...options, model: { ...options.model, id: 'other-model' } }, fake)
+    try {
+      await expect(changed.ensure(USER)).rejects.toMatchObject({ code: 'resource_conflict' })
+      expect(fake.created).toHaveLength(2)
+      expect(fake.volumes.size).toBe(2)
+    } finally { await changed.dispose() }
+  })
+
+  it('sends non-recursive read-only bind options through the real Docker HTTP adapter', async () => {
+    const fake = fakeDocker()
+    const daemon = await dockerDaemon(fake.docker)
+    const owner = new DockerRuntimes({ ...OPTIONS, socketPath: daemon.socketPath, sharedResourcesPath: '/srv/resources/published' }, { request: fake.request })
+    try {
+      await owner.ensure(USER)
+      const create = daemon.calls.find(value => value.path === '/containers/create')
+      expect(JSON.parse(create?.body ?? '{}')).toMatchObject({ HostConfig: { Mounts: [
+        { Type: 'volume', Target: '/home/node', ReadOnly: false },
+        { Type: 'bind', Source: '/srv/resources/published', Target: '/opt/dsh/resources', ReadOnly: true,
+          BindOptions: { Propagation: 'rprivate', NonRecursive: true } },
+      ] } })
+      expect(daemon.failures).toEqual([])
+    } finally { await owner.dispose() }
+  })
+
+  it.each([
+    ['missing shared mount', (value: Inspection) => { value.Mounts.splice(1, 1) }],
+    ['writable shared mount', (value: Inspection) => { const shared = value.Mounts[1]; if (shared !== undefined) shared.RW = true }],
+    ['unspecified shared write permission', (value: Inspection) => { const shared = value.Mounts[1]; if (shared !== undefined) Reflect.deleteProperty(shared, 'RW') }],
+    ['wrong shared source', (value: Inspection) => { const shared = value.Mounts[1]; if (shared !== undefined) shared.Source = '/srv/private' }],
+    ['missing shared source', (value: Inspection) => { const shared = value.Mounts[1]; if (shared !== undefined) Reflect.deleteProperty(shared, 'Source') }],
+    ['wrong shared destination', (value: Inspection) => { const shared = value.Mounts[1]; if (shared !== undefined) shared.Destination = '/opt/other' }],
+    ['shared mount is a volume', (value: Inspection) => { const shared = value.Mounts[1]; if (shared !== undefined) shared.Type = 'volume' }],
+    ['shared propagation', (value: Inspection) => { const shared = value.Mounts[1]; if (shared !== undefined) shared.Propagation = 'rshared' }],
+    ['additional mount', (value: Inspection) => { value.Mounts.push({ Type: 'bind', Source: '/srv/private', Destination: '/host', RW: false }) }],
+    ['duplicate shared mount', (value: Inspection) => { const shared = value.Mounts[1]; if (shared !== undefined) value.Mounts = [shared, shared] }],
+    ['missing home mount', (value: Inspection) => { value.Mounts.shift() }],
+    ['duplicate home mount', (value: Inspection) => { const home = value.Mounts[0]; if (home !== undefined) value.Mounts = [home, home] }],
+    ['home becomes a bind', (value: Inspection) => { const home = value.Mounts[0]; if (home !== undefined) home.Type = 'bind' }],
+    ['wrong home volume', (value: Inspection) => { const home = value.Mounts[0]; if (home !== undefined) home.Name = 'other-home' }],
+    ['read-only home volume', (value: Inspection) => { const home = value.Mounts[0]; if (home !== undefined) home.RW = false }],
+    ['missing mount configuration', (value: Inspection) => { Reflect.deleteProperty(value.HostConfig, 'Mounts') }],
+    ['null mount configuration', (value: Inspection) => { value.HostConfig.Mounts = null }],
+    ['missing bind configuration', (value: Inspection) => { const mounts = value.HostConfig.Mounts; if (mounts !== undefined && mounts !== null) mounts[1] = { Type: 'volume', Source: 'unexpected', Target: '/other' } }],
+    ['extra mount configuration', (value: Inspection) => { value.HostConfig.Mounts?.push({ Type: 'bind', Source: '/private', Target: '/other' }) }],
+    ['configured shared type', (value: Inspection) => { const bind = value.HostConfig.Mounts?.[1]; if (bind !== undefined) bind.Type = 'volume' }],
+    ['configured shared source', (value: Inspection) => { const bind = value.HostConfig.Mounts?.[1]; if (bind !== undefined) bind.Source = '/private' }],
+    ['configured shared write permission', (value: Inspection) => { const bind = value.HostConfig.Mounts?.[1]; if (bind !== undefined) bind.ReadOnly = false }],
+    ['missing bind options', (value: Inspection) => { const bind = value.HostConfig.Mounts?.[1]; if (bind !== undefined) Reflect.deleteProperty(bind, 'BindOptions') }],
+    ['configured propagation', (value: Inspection) => { const bind = value.HostConfig.Mounts?.[1]?.BindOptions; if (bind !== undefined) bind.Propagation = 'shared' }],
+    ['recursive bind', (value: Inspection) => { const bind = value.HostConfig.Mounts?.[1]?.BindOptions; if (bind !== undefined) bind.NonRecursive = false }],
+  ])('rejects %s without removing an established runtime or private home', async (_name, mutate) => {
+    const fake = fakeDocker()
+    const owner = new DockerRuntimes({ ...OPTIONS, sharedResourcesPath: '/srv/resources/published' }, fake)
+    try {
+      await owner.ensure(USER)
+      const runtime = fake.containers.get(`test-${USER.id}`)
+      if (runtime === undefined) throw new Error('Fixture runtime is missing')
+      mutate(runtime)
+      await expect(owner.ensure(USER)).rejects.toMatchObject({ code: 'resource_conflict' })
+      expect(fake.created).toHaveLength(1)
+      expect(fake.containers.size).toBe(2)
+      expect(fake.volumes.size).toBe(1)
+      expect(fake.events.some(value => value.includes('remove:'))).toBe(false)
+    } finally { await owner.dispose() }
+  })
+
+  it.each(['enabled', 'disabled', 'changed'] as const)('preserves old private data when the shared directory is %s for an established runtime', async (change) => {
+    const fake = fakeDocker()
+    const firstOptions = change === 'enabled' ? OPTIONS : { ...OPTIONS, sharedResourcesPath: '/srv/resources/published' }
+    const first = new DockerRuntimes(firstOptions, fake)
+    try { await first.ensure(USER) } finally { await first.dispose() }
+    const nextOptions = change === 'disabled' ? OPTIONS : { ...OPTIONS, sharedResourcesPath: '/srv/new-resources/published' }
+    const next = new DockerRuntimes(nextOptions, fake)
+    try {
+      await expect(next.ensure(USER)).rejects.toMatchObject({ code: 'resource_conflict' })
+      expect(fake.created).toHaveLength(1)
+      expect(fake.containers.size).toBe(2)
+      expect(fake.volumes.size).toBe(1)
+      expect(fake.events.some(value => value.includes('remove:'))).toBe(false)
+    } finally { await next.dispose() }
+  })
+
+  it('rolls back only newly acquired runtime resources when Docker rejects a missing shared source', async () => {
+    const fake = fakeDocker()
+    fake.docker.createContainer = vi.fn(async () => { throw new Error('bind source path does not exist') })
+    const owner = new DockerRuntimes({ ...OPTIONS, sharedResourcesPath: '/srv/missing/published' }, fake)
+    try {
+      await expect(owner.ensure(USER)).rejects.toMatchObject({ code: 'docker_unavailable' })
+      expect(fake.containers.size).toBe(1)
+      expect(fake.networks.size).toBe(0)
+      expect(fake.volumes.size).toBe(0)
+    } finally { await owner.dispose() }
   })
 
   it('shares one in-flight startup for simultaneous requests from the same user', async () => {

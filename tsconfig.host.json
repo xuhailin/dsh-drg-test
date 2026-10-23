@@ -237,7 +237,12 @@
     "scripts/client-bundle-purity.spec.ts"
   ],
   "references": [
+    { "path": "./packages/experimental/client-emr-entry/tsconfig.host.json" },
     { "path": "./packages/experimental/hosted-workspaces" },
+    { "path": "./packages/experimental/emr-encounter" },
+    { "path": "./packages/experimental/emr-reader-broker" },
+    { "path": "./packages/experimental/clinical-review" },
+    { "path": "./packages/experimental/drg-resources" },
     { "path": "./packages/experimental/client-ui-cot-translation/tsconfig.host.json" },
     { "path": "./packages/experimental/cot-translation-bundle" },
     { "path": "./packages/experimental/session-search" },

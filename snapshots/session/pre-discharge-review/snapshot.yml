@@ -1,0 +1,8 @@
+version: 1
+scenario: pre-discharge-review
+profile: headless
+composition: clinical-review
+recording: authored
+header:
+  class: clinical-review
+  pin: true

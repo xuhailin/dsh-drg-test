@@ -1,6 +1,6 @@
 /** Deployment URLs and resource inputs fail before any hosted listener or runtime starts. */
 import { describe, expect, it } from 'vitest'
-import { Config, publicOrigin } from '../src/config.ts'
+import { Config, publicOrigin, resolveModel } from '../src/config.ts'
 
 function deployment(overrides: Partial<Config> = {}): Config {
   return Config({
@@ -26,6 +26,44 @@ describe('hosted deployment configuration', () => {
     expect(config.oidcFlow).toBe('implicit')
     expect(config.clientSecretFile).toBeUndefined()
     expect(config.maxCallbackBytes).toBe(8192)
+  })
+
+  it('resolves explicit Responses settings without reusing legacy Messages defaults', () => {
+    const config = deployment({ modelProtocol: 'openai-responses', modelKeyFile: '/gateway/company-key', modelBaseUrl: 'https://model.example.test/v1/', runtimeModel: 'gpt-5.5', allowedModels: ['gpt-5.5'] })
+    expect(resolveModel(config)).toEqual({ protocol: 'openai-responses', keyFile: '/gateway/company-key', baseUrl: 'https://model.example.test/v1' })
+    expect(resolveModel(deployment())).toEqual({ protocol: 'anthropic-messages', keyFile: '/fixture/model-key', baseUrl: 'https://api.deepseek.com/anthropic' })
+  })
+
+  it.each([
+    { runtimeModel: '' }, { runtimeModel: 'other-model' }, { runtimeMaxTokens: 257, maxOutputTokens: 256 },
+    { runtimeMaxTokens: 257, runtimeContextWindow: 256 },
+  ])('rejects a default Responses model or budget outside its allowance (%j)', (overrides) => {
+    expect(() => publicOrigin(deployment({ modelProtocol: 'openai-responses', modelKeyFile: '/gateway/key', modelBaseUrl: 'https://model.example.test/v1', runtimeModel: 'gpt-5.5', allowedModels: ['gpt-5.5'], ...overrides }))).toThrow()
+  })
+
+  it('accepts only normalized image-owned runtime overlays', () => {
+    expect(deployment({ runtimePatchFile: '/opt/dsh/deploy/runtime.patch.yml' }).runtimePatchFile).toBe('/opt/dsh/deploy/runtime.patch.yml')
+    for (const runtimePatchFile of ['/home/node/patch.yml', 'patch.yml', '/opt/dsh/../patch.yml', '/opt/dsh//patch.yml', '/opt/dsh/patch.yml/', '/opt/dsh/\npatch.yml']) {
+      expect(() => deployment({ runtimePatchFile })).toThrow()
+    }
+  })
+
+  it.each([
+    { modelProtocol: 'openai-responses' as const },
+    { modelProtocol: 'openai-responses' as const, modelKeyFile: '/gateway/key' },
+    { modelProtocol: 'openai-responses' as const, modelBaseUrl: 'https://model.example.test/v1' },
+    { modelKeyFile: '' },
+  ])('rejects incomplete explicit model configuration before startup (%j)', (overrides) => {
+    expect(() => publicOrigin(deployment(overrides))).toThrow()
+  })
+
+  it('accepts an optional normalized daemon-host path without changing deployments that omit it', () => {
+    expect(deployment().sharedResourcesPath).toBeUndefined()
+    expect(deployment({ sharedResourcesPath: '/srv/dsh-resources/published' }).sharedResourcesPath).toBe('/srv/dsh-resources/published')
+  })
+
+  it.each(['', '/', ' ', 'relative/published', '../published', '/srv/../published', '/srv/./published', '/srv//published', '/srv/published/', '/srv\\published', '/srv/\nprivate', '/srv/\u0000private', '/srv/\u007fprivate', '/srv/\u0085private'])('rejects a shared directory that is not a normalized absolute Linux path (%j)', (sharedResourcesPath) => {
+    expect(() => deployment({ sharedResourcesPath })).toThrow()
   })
 
   it('rejects an unrecognized OIDC flow at configuration parsing', () => {

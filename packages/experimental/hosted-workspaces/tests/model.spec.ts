@@ -1,17 +1,24 @@
 /** Real HTTP model requests exercise credential replacement, admission, and stream ownership. */
 import { once } from 'node:events'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createServer, request as httpRequest, type IncomingHttpHeaders, type Server, type ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { text as readText } from 'node:stream/consumers'
 import { Context } from '@deepseek-ai/cordis'
+import Loader from '@deepseek-ai/cordis-plugin-loader'
+import Include from '@deepseek-ai/cordis-plugin-include'
+import LlmRuntime, { BlockAssembler, createUserMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions } from '@deepseek-ai/dsh-llm'
+import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
+import LocalCredentialProvider from '@deepseek-ai/dsh-credentials-local'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Config } from '../src/config.ts'
-import { ModelProxy } from '../src/model.ts'
+import { ModelProxy, type RuntimeRequestHandler } from '../src/model.ts'
 import { HostedState, hostedDomain } from '../src/state.ts'
 
 const UPSTREAM_KEY = 'fixture-upstream-secret-marker'
@@ -50,7 +57,7 @@ async function close(server: Server): Promise<void> {
   await closed
 }
 
-async function harness(overrides: Partial<Config> = {}) {
+async function harness(overrides: Partial<Config> = {}, runtimeHandler?: RuntimeRequestHandler) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-hosted-model-'))
   const ctx = new Context()
   const servers: Server[] = []
@@ -95,8 +102,11 @@ async function harness(overrides: Partial<Config> = {}) {
     clientId: 'test-client', deepseekKeyFile: '/unused/key', gatewayContainer: 'test-gateway', allowHttp: true,
     allowedModels: ['allowed-model'], requestTimeoutMs: 30_000, ...overrides,
     deepseekBaseUrl: `${upstreamOrigin}/anthropic`,
+    ...(overrides.modelProtocol === 'openai-responses' ? {
+      modelKeyFile: '/unused/company-key', modelBaseUrl: `${upstreamOrigin}/v1`, runtimeModel: 'gpt-5.5', runtimeMaxTokens: 256,
+    } : {}),
   })
-  const model = new ModelProxy(config, state, UPSTREAM_KEY)
+  const model = new ModelProxy(config, state, UPSTREAM_KEY, runtimeHandler)
   resources.model = model
   const tasks: Promise<void>[] = []
   const firstGateway = deferred<undefined>()
@@ -127,7 +137,7 @@ async function harness(overrides: Partial<Config> = {}) {
     })
   }
   return {
-    state, user, model, config, records, tasks, valid, request, gatewayOrigin,
+    ctx, root, state, user, model, config, records, tasks, valid, request, gatewayOrigin,
     firstUpstream: firstUpstream.promise, firstGateway: firstGateway.promise,
     respond: (handler: typeof respond) => { respond = handler },
     extraServer: async (server: Server) => { servers.push(server); return listen(server) },
@@ -135,6 +145,157 @@ async function harness(overrides: Partial<Config> = {}) {
 }
 
 describe('ModelProxy', () => {
+  it('forwards stateless Responses with gateway bearer authentication and an explicit token cap', async () => {
+    const world = await harness({ modelProtocol: 'openai-responses', allowedModels: ['gpt-5.5'], maxOutputTokens: 256 })
+    const body = { model: 'gpt-5.5', input: 'hello', stream: true, max_output_tokens: 256 }
+    const response = await world.request({ path: '/model/v1/responses', credential: null, headers: { authorization: `Bearer ${world.user.modelToken}` }, body })
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe(SSE)
+    const upstream = await world.firstUpstream
+    expect(upstream.path).toBe('/v1/responses')
+    expect(upstream.headers.authorization).toBe(`Bearer ${UPSTREAM_KEY}`)
+    expect(upstream.headers['x-api-key']).toBeUndefined()
+    expect(JSON.parse(upstream.body)).toEqual({ ...body, store: false })
+    const wrongProtocol = await world.request()
+    expect(wrongProtocol.status).toBe(404)
+    await wrongProtocol.text()
+  })
+
+  it.each([
+    { max_output_tokens: 257 }, { max_output_tokens: 257, max_tokens: 1 }, { max_output_tokens: undefined },
+    { max_output_tokens: 0 }, { stream: false },
+    { model: 'other-model' }, { store: true }, { background: true },
+    { previous_response_id: 'another-user-response' }, { conversation: 'another-user-conversation' },
+    { prompt: { id: 'shared-prompt' } }, { tools: [{ type: 'file_search', vector_store_ids: ['shared-store'] }] },
+    { tools: [{ type: 'mcp', server_url: 'https://other-service.test' }] },
+    { input: [{ type: 'item_reference', id: 'another-user-item' }] },
+    { input: [{ role: 'user', content: [{ type: 'input_file', file_id: 'another-user-file' }] }] },
+  ])('denies Responses outside limits or referencing shared upstream state (%j)', async (extra) => {
+    const world = await harness({ modelProtocol: 'openai-responses', allowedModels: ['gpt-5.5'], maxOutputTokens: 256 })
+    const response = await world.request({ path: '/model/v1/responses', body: { model: 'gpt-5.5', stream: true, max_output_tokens: 256, input: 'hello', ...extra } })
+    expect(response.status).toBe(400)
+    expect(await response.text()).toContain('model_request_not_allowed')
+    expect(world.records).toHaveLength(0)
+  })
+
+  it('denies conflicting runtime credentials rather than selecting an identity', async () => {
+    const world = await harness()
+    const response = await world.request({ headers: { authorization: 'Bearer different-token' } })
+    expect(response.status).toBe(401)
+    await response.text()
+    expect(world.records).toHaveLength(0)
+  })
+
+  it('dispatches only authenticated runtime extensions and omits the reusable credential', async () => {
+    const handler = vi.fn<RuntimeRequestHandler>(async (identity, _request, response) => {
+      response.end(JSON.stringify(identity))
+      return true
+    })
+    const world = await harness({}, handler)
+    const denied = await world.request({ path: '/runtime/clinical/context', credential: null })
+    expect(denied.status).toBe(401)
+    await denied.text()
+    expect(handler).not.toHaveBeenCalled()
+    const accepted = await world.request({ path: '/runtime/clinical/context' })
+    expect(await accepted.json()).toEqual({ id: world.user.id, issuer: world.user.issuer, subject: world.user.subject })
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(world.records).toHaveLength(0)
+  })
+
+  it.each([undefined, async () => false])('rejects unhandled runtime routes (%s)', async (handler) => {
+    const world = await harness({}, handler)
+    const response = await world.request({ path: '/runtime/unknown' })
+    expect(response.status).toBe(404)
+    expect(await response.text()).toContain('unsupported_runtime_operation')
+  })
+
+  it('aborts and awaits a runtime extension before disposal settles', async () => {
+    const entered = deferred<AbortSignal>()
+    let settled = false
+    const world = await harness({}, async (_identity, request, _response, signal) => {
+      await readText(request)
+      entered.resolve(signal)
+      await new Promise<void>((resolve) => { signal.addEventListener('abort', () => { resolve() }, { once: true }) })
+      settled = true
+      signal.throwIfAborted()
+      return true
+    })
+    const pending = world.request({ path: '/runtime/clinical/context' })
+    const signal = await entered.promise
+    await world.model.dispose()
+    expect(signal.aborted).toBe(true)
+    expect(settled).toBe(true)
+    const response = await pending
+    expect(response.status).toBe(502)
+    expect(await response.text()).toContain('runtime_request_failed')
+  })
+
+  it('runs a Loader-configured pi-ai tool round trip through the Responses proxy', async () => {
+    const world = await harness({ modelProtocol: 'openai-responses', allowedModels: ['gpt-5.5'] })
+    const credentials = join(world.root, 'runtime-credentials.yaml')
+    await writeFile(credentials, `version: 1\nrefs:\n  HOSTED_MODEL_API_KEY: ${world.user.modelToken}\n`, { mode: 0o600 })
+    const configPath = join(world.root, 'cordis.yml')
+    await writeFile(configPath, JSON.stringify([
+      { id: 'llm', name: 'cordis:llm' },
+      { id: 'credentials', name: 'cordis:credentials', config: { path: credentials, watch: false } },
+      { id: 'company-model', name: 'cordis:company-model', config: { providers: { company: {
+        displayName: 'Company models', apiKeyEnv: 'HOSTED_MODEL_API_KEY', api: 'openai-responses',
+        baseURL: `${world.gatewayOrigin}/model/v1`, transport: 'sse',
+        models: [{ id: 'gpt-5.5', name: 'GPT-5.5', maxTokens: 256, contextWindow: 32768 }],
+      } } } },
+    ]))
+    world.ctx.baseUrl = pathToFileURL(world.root).href + '/'
+    await world.ctx.plugin(Loader)
+    Object.assign(world.ctx.loader.builtins, { include: Include, llm: LlmRuntime, credentials: LocalCredentialProvider, 'company-model': LlmPiAi })
+    await world.ctx.loader.create({ name: 'cordis:include', config: { path: pathToFileURL(configPath).href } })
+    await world.ctx.loader.await()
+    world.respond(({ response }) => {
+      const item = world.records.length === 1
+        ? { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'echo_status', arguments: '{"status":"OK"}' }
+        : { type: 'message', id: 'msg_1', role: 'assistant', content: [{ type: 'output_text', text: 'OK', annotations: [] }] }
+      const events = [
+        { type: 'response.created', response: { id: 'resp_1' } },
+        { type: 'response.output_item.added', output_index: 0, item },
+        ...(world.records.length === 1 ? [] : [{ type: 'response.output_text.delta', output_index: 0, content_index: 0, delta: 'OK' }]),
+        { type: 'response.output_item.done', output_index: 0, item },
+        { type: 'response.completed', response: { id: 'resp_1', status: 'completed', output: [item], usage: { input_tokens: 3, output_tokens: 1, total_tokens: 4 } } },
+      ]
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(''))
+    })
+    async function run(options: GenerateOptions) {
+      const assembler = new BlockAssembler()
+      for await (const chunk of world.ctx.llm.stream(options)) assembler.push(chunk)
+      if (assembler.finish.kind === 'error') throw new Error(JSON.stringify(assembler.finish.failure))
+      return assembler.message({ provider: options.provider, model: options.model,
+        ...assembler.replayState === undefined ? {} : { replayState: assembler.replayState } })
+    }
+    const input = createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'Return the test status.' }] })
+    const options: GenerateOptions = { provider: 'company', model: 'gpt-5.5', messages: [input], tools: [{
+      name: 'echo_status', description: 'Return the supplied status.',
+      parameters: { type: 'object', properties: { status: { type: 'string' } }, required: ['status'] },
+    }] }
+    const first = await run(options)
+    const call = first.content.find(block => block.type === 'tool-call')
+    expect(call).toMatchObject({ name: 'echo_status', arguments: '{"status":"OK"}' })
+    if (call?.type !== 'tool-call') throw new Error('Expected tool call')
+    const result = createToolResultMessage({ callId: call.id, isError: false, content: [{ type: 'text', text: 'OK' }] })
+    const last = await run({ ...options, messages: [input, first, result] })
+    expect(last.content).toEqual([{ type: 'text', text: 'OK' }])
+    expect(world.records).toHaveLength(2)
+    const requests = world.records.map((record): unknown => JSON.parse(record.body))
+    expect(requests[0]).toMatchObject({ model: 'gpt-5.5', max_output_tokens: 256, store: false })
+    expect(requests[1]).toHaveProperty('input', expect.arrayContaining([
+      expect.objectContaining({ type: 'function_call', call_id: 'call_1' }),
+      expect.objectContaining({ type: 'function_call_output', call_id: 'call_1', output: 'OK' }),
+    ]))
+    expect(world.records.every(record => record.headers.authorization === `Bearer ${UPSTREAM_KEY}`)).toBe(true)
+    const entry = [...world.ctx.loader.entries()].find(candidate => candidate.options.id === 'company-model')
+    expect(entry?.fiber).toBeDefined()
+    await entry?.fiber?.dispose()
+    expect(world.ctx.llm.listProviders()).toEqual([])
+  })
+
   it('serves and reuses a private-interface listener and refuses protocol upgrades', async () => {
     const world = await harness()
     world.config.gatewayPort = 0
@@ -221,7 +382,7 @@ describe('ModelProxy', () => {
 
   it('streams upstream bytes using the gateway key and strips runtime authentication', async () => {
     const world = await harness()
-    const response = await world.request({ headers: { authorization: 'Bearer runtime-only', cookie: 'private-cookie=runtime-only' } })
+    const response = await world.request({ headers: { cookie: 'private-cookie=runtime-only' } })
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toBe('text/event-stream')
     expect(await response.text()).toBe(SSE)
@@ -258,6 +419,7 @@ describe('ModelProxy', () => {
   it.each([
     { model: 'unapproved-model' },
     { max_tokens: 257 },
+    { max_tokens: 257, max_output_tokens: 1 },
     { max_tokens: 0 },
     { max_tokens: 1.5 },
     { stream: false },

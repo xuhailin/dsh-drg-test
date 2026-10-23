@@ -30,6 +30,8 @@ const windowsUnsupportedPackages = process.platform === 'win32'
       'packages/shell/bash-local',
       'packages/shell/bash-sandbox',
       'packages/shell/tool-bash',
+      // Publication requires POSIX directory fsync and immutable file modes.
+      'packages/experimental/drg-resources',
       'packages/experimental/hook-protocol',
       'packages/experimental/hooks-claude-code',
       'packages/experimental/hooks-codex',

@@ -1,0 +1,5 @@
+# Opt-in published reference collection; the source belongs to the Docker daemon host.
+services:
+  gateway:
+    environment:
+      HOSTED_SHARED_RESOURCES_PATH: ${HOSTED_SHARED_RESOURCES_PATH:?Set the absolute published collection directory on the Docker daemon host}

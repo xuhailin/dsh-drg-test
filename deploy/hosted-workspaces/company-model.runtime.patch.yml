@@ -1,0 +1,31 @@
+- id: llm-deepseek
+  disabled: true
+- id: llm-deepseek-account
+  disabled: true
+- id: agent-default-model
+  config:
+    provider: company-gateway
+    model: !!js process.env.HOSTED_MODEL_ID
+- id: llm-pi-ai
+  config:
+    providers:
+      company-gateway:
+        displayName: Company models
+        apiKeyEnv: HOSTED_MODEL_API_KEY
+        api: openai-responses
+        transport: sse
+        baseURL: !!js process.env.HOSTED_MODEL_BASE_URL
+        models:
+          - id: !!js process.env.HOSTED_MODEL_ID
+            name: !!js process.env.HOSTED_MODEL_ID
+            contextWindow: !!js Number(process.env.HOSTED_MODEL_CONTEXT_WINDOW)
+            maxTokens: !!js Number(process.env.HOSTED_MODEL_MAX_TOKENS)
+            input: [text]
+- id: compaction-basic
+  config:
+    modelPolicies:
+      - provider: company-gateway
+        model: !!js process.env.HOSTED_MODEL_ID
+        headroomTokens: 4096
+        maxTokens: 4096
+        retainTokens: 4096

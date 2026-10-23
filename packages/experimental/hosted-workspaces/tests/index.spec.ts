@@ -23,14 +23,17 @@ const external = vi.hoisted(() => ({
   finish: vi.fn<OidcLogin['finish']>(),
   oidcClosed: vi.fn<OidcLogin['dispose']>(),
   networkReady: vi.fn<(host: string) => Promise<void>>(),
+  dockerOptions: vi.fn<(options: DockerRuntimeOptions) => void>(),
   ensure: vi.fn<(user: DockerRuntimeUser) => Promise<DockerRuntime>>(),
   dockerClosed: vi.fn<() => Promise<void>>(),
 }))
 
-vi.mock('../src/oidc.ts', () => ({ OidcLogin: { create: external.createOidc } }))
-vi.mock('../src/docker.ts', () => ({
+vi.mock('../src/oidc.ts', async importOriginal => ({ ...await importOriginal<typeof import('../src/oidc.ts')>(), OidcLogin: { create: external.createOidc } }))
+vi.mock('../src/docker.ts', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/docker.ts')>(),
   DockerRuntimes: class {
-    constructor(_options: DockerRuntimeOptions, dependencies: DockerRuntimeDependencies) {
+    constructor(options: DockerRuntimeOptions, dependencies: DockerRuntimeDependencies) {
+      external.dockerOptions(options)
       external.networkReady.mockImplementation(dependencies.onNetwork ?? (async () => {}))
     }
     async ensure(user: DockerRuntimeUser): Promise<DockerRuntime> {
@@ -137,14 +140,69 @@ beforeEach(() => {
 })
 
 describe('hosted workspace profile activation', () => {
+  it('dispatches extension requests with verified identity and revokes them after all logins end', async () => {
+    const world = await harness()
+    const seen: Hosted.HostedRuntimeRequest[] = []
+    const extension = world.ctx.plugin((scope) => {
+      scope.on('hosted-workspaces/runtime-request', async (entry, next) => {
+        if (entry.request.url !== '/runtime/fixture') return next()
+        seen.push(entry)
+        entry.response.writeHead(200)
+        entry.response.end('accepted extension')
+        return true
+      })
+    })
+    await world.ctx.plugin(Hosted, world.config)
+    const callback = await call(world.target, world.origin, '/auth/callback?code=fixture')
+    const cookie = callback.headers['set-cookie']?.find(value => value.startsWith('dsh-sso-dev='))?.split(';', 1)[0]
+    if (cookie === undefined || callback.headers.location === undefined) throw new Error('Missing login handoff')
+    const privateUrl = new URL(callback.headers.location)
+    await call(world.target, privateUrl.origin, '/api/fixture', { cookie })
+    const credential = external.ensure.mock.calls[0]?.[0].modelToken
+    if (credential === undefined) throw new Error('Missing runtime credential')
+    expect((await call(world.target, world.origin, '/runtime/fixture')).status).toBe(401)
+    expect((await call(world.target, world.origin, '/runtime/fixture', { credential })).body).toBe('accepted extension')
+    expect(seen[0]?.actor).toMatchObject({ issuer: world.config.issuer, subject: 'doctor' })
+    expect(seen[0]?.actor).not.toHaveProperty('modelToken')
+    expect((await call(world.target, world.origin, '/runtime/other', { credential })).status).toBe(404)
+    const domain = world.ctx.storageDomain.get('hosted_workspaces')
+    if (domain === undefined) throw new Error('Missing private state')
+    for (const [id] of domain.table('sessions').entries()) await domain.table('sessions').delete(id)
+    expect(seen[0]?.isActive()).toBe(false)
+    expect((await call(world.target, world.origin, '/runtime/fixture', { credential })).status).toBe(401)
+    expect(seen).toHaveLength(1)
+    await extension.dispose()
+  })
+
+  it.each([undefined, '/srv/dsh-resources/published'])('passes the optional daemon shared directory to runtimes (%s)', async (sharedResourcesPath) => {
+    const world = await harness()
+    if (sharedResourcesPath !== undefined) world.config.sharedResourcesPath = sharedResourcesPath
+    const mounted = await world.ctx.plugin(Hosted, world.config)
+    try {
+      const options = external.dockerOptions.mock.calls[0]?.[0]
+      if (sharedResourcesPath === undefined) expect(options).not.toHaveProperty('sharedResourcesPath')
+      else expect(options).toHaveProperty('sharedResourcesPath', sharedResourcesPath)
+    } finally { await mounted.dispose() }
+  })
+
+  it('contains a provider failure during automatic sign-in and keeps private diagnostics out of the page', async () => {
+    const world = await harness()
+    await world.ctx.plugin(Hosted, world.config)
+    external.begin.mockRejectedValueOnce(new Error('private-provider-credential'))
+    const failed = await call(world.target, world.origin, '/')
+    expect(failed.status).toBe(503)
+    expect(failed.body).toContain('Sign-in incomplete')
+    expect(failed.body).not.toContain('private-provider-credential')
+  })
+
   it('serves login, authenticated HTTP and WebSocket routes, then removes them and releases storage on unload', async () => {
     const world = await harness()
     world.config.clientSecretFile = world.clientSecretFile
     world.config.discoveryUrl = 'http://internal-identity.test/.well-known/openid-configuration'
     const mounted = await world.ctx.plugin(Hosted, world.config)
     const entry = await call(world.target, world.origin, '/')
-    expect(entry.status).toBe(200)
-    expect(entry.body).toContain('Company sign in')
+    expect(entry.status).toBe(303)
+    expect(entry.headers.location).toBe('http://identity.test/authorize')
     const beginning = await call(world.target, world.origin, '/auth/login')
     expect(beginning.status).toBe(303)
     expect(beginning.headers.location).toBe('http://identity.test/authorize')
@@ -198,7 +256,7 @@ describe('hosted workspace profile activation', () => {
       const options = external.createOidc.mock.calls[0]?.[0]
       expect(options).toMatchObject({ flow: 'implicit', clientId: 'fixture-client' })
       expect(options).not.toHaveProperty('clientSecret')
-      expect((await call(world.target, world.origin, '/')).status).toBe(200)
+      expect((await call(world.target, world.origin, '/')).status).toBe(303)
     } finally { await mounted.dispose() }
   })
 
@@ -232,7 +290,7 @@ describe('hosted workspace profile activation', () => {
     expect(world.ctx.storageDomain.get('hosted_workspaces')).toBeUndefined()
     expect((await call(world.target, world.origin, '/')).status).toBe(404)
     const retried = await world.ctx.plugin(Hosted, world.config)
-    expect((await call(world.target, world.origin, '/')).status).toBe(200)
+    expect((await call(world.target, world.origin, '/')).status).toBe(303)
     await retried.dispose()
   })
 

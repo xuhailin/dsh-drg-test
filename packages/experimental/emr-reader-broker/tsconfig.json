@@ -1,0 +1,6 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "lib/types" },
+  "include": ["src"],
+  "references": [{ "path": "../emr-encounter" }, { "path": "../hosted-workspaces" }, { "path": "../../util/brand" }, { "path": "../../../vendor/cordis" }, { "path": "../../../vendor/schemastery" }]
+}

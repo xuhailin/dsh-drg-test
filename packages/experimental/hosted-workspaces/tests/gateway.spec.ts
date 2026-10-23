@@ -12,7 +12,9 @@ import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import { WebSocket, WebSocketServer, type RawData } from 'ws'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Config } from '../src/config.ts'
+import { DockerRuntimeError } from '../src/docker.ts'
 import { HostedGateway, readCookie } from '../src/gateway.ts'
+import { OidcLoginError } from '../src/oidc.ts'
 import { ModelProxy } from '../src/model.ts'
 import { WorkspaceProxy } from '../src/proxy.ts'
 import { HostedState, hostedDomain } from '../src/state.ts'
@@ -131,7 +133,8 @@ async function harness(ttlMs = 60000, connectionLimit = 64, overrides: Partial<C
   }
   config.gatewayPort = 0
   const model = new ModelProxy(config, state, 'upstream-secret')
-  const gateway = new HostedGateway(config, state, oidc, manager, model)
+  const failures = vi.fn()
+  const gateway = new HostedGateway(config, state, oidc, manager, model, failures)
   resources.gateway = gateway
   server.on('upgrade', (req, socket, head) => {
     socket.on('error', () => {})
@@ -155,10 +158,84 @@ async function harness(ttlMs = 60000, connectionLimit = 64, overrides: Partial<C
     await once(ws, 'open')
     return ws
   }
-  return { port, origin, gateway, model, manager, state, domain, login, socket, forwarded, targets, config, oidc, server }
+  return { port, origin, gateway, model, manager, state, domain, login, socket, forwarded, targets, config, oidc, server, failures }
 }
 
 describe('HostedGateway', () => {
+  it('starts company sign-in automatically and leaves an explicit logout page without restarting login', async () => {
+    const h = await harness()
+    const begin = vi.spyOn(h.oidc, 'begin')
+    onTestFinished(() => { begin.mockRestore() })
+    const response = await call(h.port, new URL(h.origin).host, '/')
+    expect(response.status).toBe(303)
+    expect(response.headers.location).toBe(`https://issuer.test/login?target=${encodeURIComponent(h.origin)}`)
+    expect(response.headers['set-cookie']?.[0]).toContain('dsh-sso-dev-flow=flow-binding')
+    expect(begin).toHaveBeenCalledWith(h.origin)
+    const loggedOut = await call(h.port, new URL(h.origin).host, '/?signedout=1')
+    expect(loggedOut.status).toBe(200)
+    expect(loggedOut.headers.location).toBeUndefined()
+    expect(begin).toHaveBeenCalledOnce()
+  })
+
+  it('opens the verified account after an expired cookie on an old private document URL', async () => {
+    const h = await harness()
+    const alice = await h.login('alice')
+    const staleHost = `u-${'5'.repeat(40)}.${new URL(h.origin).host}`
+    const oldPage = await call(h.port, staleHost, '/', { cookie: 'dsh-sso-dev=expired-demo-cookie' })
+    expect(oldPage.status).toBe(303)
+    expect(oldPage.headers.location).toBe(`${h.origin}/auth/login`)
+    expect(oldPage.headers.location).not.toContain(staleHost)
+    const portal = await call(h.port, new URL(h.origin).host, '/auth/login', { cookie: alice.cookie })
+    expect(new URL(portal.headers.location ?? '').origin).toBe(alice.origin)
+    expect((await call(h.port, staleHost, '/api/data', { cookie: alice.cookie })).status).toBe(403)
+    expect((await call(h.port, staleHost, '/api/data')).status).toBe(401)
+  })
+
+  it('allows an empty implicit callback to resume a live login without bypassing new fragment validation', async () => {
+    const h = await harness()
+    const alice = await h.login('alice')
+    h.config.oidcFlow = 'implicit'
+    const callback = await call(h.port, new URL(h.origin).host, '/auth/callback', { cookie: alice.cookie })
+    expect(callback.status).toBe(200)
+    expect(callback.body).toContain('data-signed-in="true"')
+    expect(callback.headers.location).toBeUndefined()
+    expect(callback.body).toContain('location.replace')
+  })
+
+  it('separates login and workspace failures and reports only safe operation codes', async () => {
+    const h = await harness()
+    const host = new URL(h.origin).host
+    const provider = vi.spyOn(h.oidc, 'begin').mockRejectedValueOnce(new OidcLoginError('discovery', 'private provider credential'))
+    onTestFinished(() => { provider.mockRestore() })
+    const login = await call(h.port, host, '/', { headers: { 'accept-language': 'zh-CN' } })
+    expect(login.status).toBe(503)
+    expect(login.body).toContain('登录未完成')
+    expect(login.body).not.toContain('private provider credential')
+    expect(h.failures).toHaveBeenLastCalledWith('login', 'discovery')
+    const alice = await h.login('alice')
+    const docker = vi.spyOn(h.manager, 'ensure').mockRejectedValueOnce(new DockerRuntimeError('startup_failed'))
+    onTestFinished(() => { docker.mockRestore() })
+    const workspace = await call(h.port, alice.host, '/', { cookie: alice.cookie, headers: { 'accept-language': 'zh-CN' } })
+    expect(workspace.status).toBe(503)
+    expect(workspace.body).toContain('暂时无法打开工作区')
+    expect(workspace.body).not.toContain('startup_failed')
+    expect(workspace.body).toContain(`href="${h.origin}"`)
+    expect(h.failures).toHaveBeenLastCalledWith('workspace', 'startup_failed')
+  })
+
+  it('provides safe default operator diagnostics when a caller does not inject a reporter', async () => {
+    const h = await harness()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const provider = vi.spyOn(h.oidc, 'begin').mockRejectedValueOnce(new Error('credential-must-not-be-logged'))
+    onTestFinished(() => { warn.mockRestore(); provider.mockRestore() })
+    const gateway = new HostedGateway(h.config, h.state, h.oidc, h.manager, h.model)
+    const server = createServer((req, res) => { void gateway.handle(req, res) })
+    onTestFinished(async () => { await gateway.dispose(); await stop(server) })
+    const port = await listen(server)
+    expect((await call(port, new URL(h.origin).host, '/')).status).toBe(503)
+    expect(warn).toHaveBeenCalledWith('hosted-workspaces: login failed (unexpected)')
+  })
+
   it('bridges an implicit fragment using a hash-pinned script before creating a verified browser session', async () => {
     const h = await harness(60000, 64, { oidcFlow: 'implicit' })
     const host = new URL(h.origin).host
@@ -169,7 +246,7 @@ describe('HostedGateway', () => {
     expect(bridge.headers['cache-control']).toBe('no-store')
     expect(bridge.headers['referrer-policy']).toBe('same-origin')
     expect(bridge.headers['content-security-policy']).toMatch(/script-src 'sha256-[^']+';.*form-action 'self'/u)
-    expect(bridge.body).toContain('正在验证公司登录')
+    expect(bridge.body).toContain('正在验证登录')
     expect(bridge.headers['set-cookie']).toBeUndefined()
     expect(finish).not.toHaveBeenCalled()
     const callback = await call(h.port, host, '/auth/callback', {
@@ -363,7 +440,7 @@ describe('HostedGateway', () => {
     for (const path of ['/', '/index.html']) {
       const response = await call(h.port, alice.host, path)
       expect(response.status).toBe(303)
-      expect(response.headers.location).toContain('/auth/login?target=')
+      expect(response.headers.location).toBe(`${h.origin}/auth/login`)
     }
     expect((await call(h.port, alice.host, '/api/data', { cookie: alice.cookie, origin: 'https://wrong.example' })).status).toBe(403)
     expect((await call(h.port, alice.host, '/api/data', { cookie: alice.cookie, headers: { 'sec-fetch-site': 'cross-site' } })).status).toBe(403)
@@ -623,7 +700,7 @@ describe('HostedGateway', () => {
   it('requires authentication, confines callback and handoff, and proxies only the owning identity', async () => {
     const h = await harness()
     expect((await call(h.port, 'untrusted.example', '/')).status).toBe(421)
-    expect((await call(h.port, new URL(h.origin).host, '/')).body).toContain('Company sign in')
+    expect((await call(h.port, new URL(h.origin).host, '/')).status).toBe(303)
     const alice = await h.login('alice')
     const bob = await h.login('bob')
     expect(alice.origin).not.toBe(bob.origin)
@@ -648,8 +725,8 @@ describe('HostedGateway', () => {
   })
 
   it.each([
-    ['en-US', 'Signed out. Background tasks and private files are retained.', 'Company sign in'],
-    ['zh-CN', '已退出登录。后台任务和私有文件予以保留。', '公司账号登录'],
+    ['en-US', 'Background tasks and private files are retained.', 'Company sign in'],
+    ['zh-CN', '后台任务和私有文件予以保留', '公司账号登录'],
   ])('shows retained work and a direct company sign-in action after logout (%s)', async (locale, message, action) => {
     const h = await harness()
     const alice = await h.login('alice')

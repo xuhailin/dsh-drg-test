@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EMR 就诊接入示例</title>
+  <style>
+    :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
+    body { max-width: 36rem; margin: 3rem auto; padding: 0 1rem; }
+    form, label { display: grid; gap: .5rem; }
+    form { gap: 1rem; }
+    input, button { box-sizing: border-box; width: 100%; font: inherit; padding: .5rem; }
+    h1 { font-size: 1.4rem; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <h1>从 EMR 打开就诊会话</h1>
+  <p>先通过公司 SSO 登录，复制个人工作区地址填入下方。这里只发送就诊标识；打开后点击“出院前核查”开始取数和分析，不阻断出院。</p>
+  <form id="entry">
+    <label>个人工作区地址<input name="workspace" type="url" required placeholder="http://u-…chat.localhost:8080/"></label>
+    <label>来源系统<input name="sourceSystem" required maxlength="512"></label>
+    <label>医院编码<input name="hospitalCode" required maxlength="512"></label>
+    <label>住院记录 ID<input name="inpatId" required pattern="[1-9][0-9]{0,18}" maxlength="19" inputmode="numeric" autocomplete="off"></label>
+    <label>等待时间（毫秒）<input name="waitMs" type="number" min="1000" max="120000" value="30000" required></label>
+    <button type="submit">打开就诊会话</button>
+  </form>
+  <p id="status" role="status"></p>
+  <script type="module">
+    const form = document.querySelector('#entry')
+    const status = document.querySelector('#status')
+    let pending
+    function finish(message) {
+      if (pending) clearTimeout(pending.timer)
+      pending = undefined
+      status.textContent = message
+    }
+    form.addEventListener('submit', event => {
+      event.preventDefault()
+      const fields = new FormData(form)
+      const url = new URL(String(fields.get('workspace')))
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+        finish('请填写已登录的 HTTP(S) 个人工作区地址')
+        return
+      }
+      const child = window.open(url.href, 'dsh-emr-review')
+      if (!child) { finish('浏览器阻止了弹窗，请允许后重试'); return }
+      if (pending) clearTimeout(pending.timer)
+      pending = {
+        child, origin: url.origin, sent: false,
+        claim: {
+          eventId: Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join(''), trigger: 'open',
+          sourceSystem: String(fields.get('sourceSystem')).trim(),
+          hospitalCode: String(fields.get('hospitalCode')).trim(),
+          inpatId: String(fields.get('inpatId')).trim(),
+        },
+        timer: setTimeout(() => { finish('接入结果未确认，请查看工作区；出院流程不受影响') }, Number(fields.get('waitMs'))),
+      }
+      status.textContent = '等待工作区就绪'
+    })
+    window.addEventListener('message', event => {
+      if (!pending || event.source !== pending.child || event.origin !== pending.origin) return
+      if (event.data?.type === 'dsh.emr.ready' && !pending.sent) {
+        pending.sent = true
+        pending.child.postMessage({ type: 'dsh.emr.launch', value: pending.claim }, pending.origin)
+      } else if (event.data?.type === 'dsh.emr.launch.result' && event.data.eventId === pending.claim.eventId) {
+        finish(['bound', 'accepted', 'duplicate'].includes(event.data.status) && event.data.dischargeBlocked === false
+          ? '就诊会话已打开，请在工作区开始核查'
+          : '接入未完成，请查看工作区后重试；出院流程不受影响')
+      }
+    })
+    window.addEventListener('pagehide', () => { if (pending) clearTimeout(pending.timer) })
+  </script>
+</body>
+</html>

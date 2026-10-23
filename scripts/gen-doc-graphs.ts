@@ -108,6 +108,15 @@ const GROUP_ORDER = [
 
 const SERVICE_ROLES: ServiceRole[] = [
   {
+    key: 'encounterReader',
+    pkg: 'experimental-emr-encounter',
+    title: 'Authorized encounter evidence capture',
+    mode: 'seam',
+    implementations: ['experimental-emr-reader-broker', 'experimental-clinical-review'],
+    consumers: ['experimental-clinical-review'],
+    note: 'The broker reads authorized source records; the runtime HTTP provider returns the same immutable snapshot for advisory review.',
+  },
+  {
     key: 'cotTranslation',
     pkg: 'experimental-client-ui-cot-translation',
     title: 'Reasoning translation Remote',

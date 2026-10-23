@@ -496,6 +496,9 @@ const WORKTREE_CHECKOUT_FILTER = "printf 'FILTERED CHECKOUT CONTENT\\n'"
 const WORKTREE_CHECKOUT_ATTRIBUTES = 'tracked.txt filter=dsh-snapshot-checkout\n'
 
 const workspaceSetups: Record<string, (cwd: string) => Promise<void>> = {
+  async 'hosted-reference-skill'(cwd) {
+    await cp(join(repoRoot, 'deploy/hosted-workspaces/skills'), join(cwd, 'hosted-reference-skills'), { recursive: true })
+  },
   async 'windows-acl-skill'(cwd) {
     const target = join(cwd, '.dsh', 'skills', 'diagnose-windows-sandbox-acl', 'SKILL.md')
     await mkdir(dirname(target), { recursive: true })
@@ -1370,6 +1373,21 @@ describe('headless recorded-session snapshots', () => {
             }
             if (scenario.name === 'working-directory') {
               verifyWorkingDirectory(actualLogs[0]!.content, await realpath(cwd))
+            }
+            if (scenario.name === 'shared-national-reference') {
+              const log = actualLogs[0]!.content
+              const events = parseSessionLog(log)
+              const catalog = events.find(event => event.type === 'user/message' && event.data.source.kind === 'skill-catalog')
+              expect(catalog).toMatchObject({ data: { source: { entries: [expect.objectContaining({ name: 'drg-national-reference' })] } } })
+              const calls = events.flatMap(event => event.type === 'tool/call' ? [event.data] : [])
+              expect(calls.map(call => call.name)).toEqual(['skill', 'bash'])
+              expect(calls[0]?.arguments).toBe(JSON.stringify({ name: 'drg-national-reference' }))
+              const results = events.flatMap(event => event.type === 'tool/result' ? [event.data.message] : [])
+              expect(results.every(result => result.isError === false)).toBe(true)
+              expect(JSON.stringify(results[0])).toContain('# National DRG references')
+              expect(JSON.stringify(results[0])).toContain('groupingReady: false')
+              expect(JSON.stringify(results[1])).toContain('synthetic-source-r1')
+              expect(JSON.stringify(results[1])).toContain('groupingReady=false')
             }
             if (scenario.name === 'worktree') {
               await verifyWorktree(actualLogs[0]!.content, await realpath(cwd))

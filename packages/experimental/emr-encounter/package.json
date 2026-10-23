@@ -1,0 +1,16 @@
+{
+  "name": "@deepseek-ai/dsh-experimental-emr-encounter",
+  "version": "0.2.1-rc.2",
+  "description": "Authorized encounter evidence reader service and validated clinical exchange records.",
+  "publishConfig": { "access": "public" },
+  "repository": { "type": "git", "url": "git+https://github.com/deepseek-ai/deepseek-harness.git", "directory": "packages/experimental/emr-encounter" },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": { ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" }, "./wire": { "types": "./lib/types/wire.d.ts", "default": "./lib/wire.js" }, "./src/*": "./src/*", "./package.json": "./package.json" },
+  "files": ["lib/index.js", "lib/wire.js", "lib/types/**/*.d.ts"],
+  "license": "MIT",
+  "dependencies": { "@deepseek-ai/dsh-brand": "workspace:*", "zod": "4.4.3" },
+  "peerDependencies": { "@deepseek-ai/cordis": "workspace:~" },
+  "devDependencies": { "@deepseek-ai/cordis": "workspace:~" }
+}

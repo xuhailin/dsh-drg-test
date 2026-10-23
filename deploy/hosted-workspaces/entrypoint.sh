@@ -41,13 +41,39 @@ case "$mode" in
     : "${HOSTED_PUBLIC_URL:?HOSTED_PUBLIC_URL must name the public user origin}"
     authority=$(node --input-type=module -e 'process.stdout.write(new URL(process.env.HOSTED_PUBLIC_URL).host)')
     mkdir -p "$DSH_HOME" "$DSH_AGENTS_HOME" /home/node/workspace
+    if [ -n "${DSH_SHARED_RESOURCES_ROOT:-}" ]; then
+      test -r "$DSH_SHARED_RESOURCES_ROOT/catalog.json" \
+        || { echo "Shared reference catalog is unavailable; inspect the configured published directory." >&2; exit 1; }
+      export DSH_BUNDLED_SKILL_DIR=/opt/dsh/deploy/hosted-workspaces/skills
+    fi
     cd /home/node/workspace
-    exec node /opt/dsh/apps/cli/lib/bin.js web \
+    runtime_profile=web
+    if [ -n "${HOSTED_RUNTIME_PATCH_FILE:-}" ]; then
+      test -r "$HOSTED_RUNTIME_PATCH_FILE" \
+        || { echo "Configured runtime patch is unavailable." >&2; exit 1; }
+      runtime_profile=hosted
+      mkdir -p "$DSH_HOME/profiles/hosted"
+      if [ ! -e "$DSH_HOME/profiles/hosted/package.json" ]; then
+        cp /opt/dsh/deploy/hosted-workspaces/runtime-profile/package.json "$DSH_HOME/profiles/hosted/package.json"
+      fi
+      if [ ! -e "$DSH_HOME/profiles/hosted/node_modules" ]; then
+        ln -s /opt/dsh/node_modules "$DSH_HOME/profiles/hosted/node_modules"
+      fi
+      set -- --patch "$HOSTED_RUNTIME_PATCH_FILE" "$@"
+    fi
+    if [ "${HOSTED_MODEL_PROTOCOL:-}" = openai-responses ]; then
+      node /opt/dsh/deploy/hosted-workspaces/company-presets.mjs \
+        /opt/dsh /tmp/dsh-company-presets.patch.yml \
+        "$DSH_HOME/profiles/$runtime_profile/cordis.patch.yml"
+      set -- --patch /opt/dsh/deploy/hosted-workspaces/company-model.runtime.patch.yml \
+        --patch /tmp/dsh-company-presets.patch.yml "$@"
+    fi
+    exec node /opt/dsh/apps/cli/lib/bin.js --profile "$runtime_profile" "$@" \
       --host "$HOSTED_BIND_IP" \
       --port "${HOSTED_RUNTIME_PORT:-3080}" \
       --no-open \
       --public-url "$HOSTED_PUBLIC_URL" \
-      --trusted-host "$authority" "$@"
+      --trusted-host "$authority"
     ;;
   *)
     exec "$mode" "$@"

@@ -19,6 +19,7 @@
       config:
         publicOrigin: !!js process.env.HOSTED_PUBLIC_ORIGIN
         image: !!js process.env.HOSTED_IMAGE
+        sharedResourcesPath: !!js process.env.HOSTED_SHARED_RESOURCES_PATH
         prefix: !!js process.env.HOSTED_PREFIX || 'dsh-hosted'
         issuer: !!js process.env.HOSTED_OIDC_ISSUER
         discoveryUrl: !!js process.env.HOSTED_OIDC_DISCOVERY_URL || undefined
@@ -27,6 +28,13 @@
         clientSecretFile: !!js process.env.HOSTED_OIDC_CLIENT_SECRET_FILE || undefined
         deepseekKeyFile: !!js process.env.HOSTED_DEEPSEEK_KEY_FILE
         deepseekBaseUrl: !!js process.env.HOSTED_DEEPSEEK_BASE_URL || 'https://api.deepseek.com/anthropic'
+        modelProtocol: !!js process.env.HOSTED_MODEL_PROTOCOL || 'anthropic-messages'
+        modelKeyFile: !!js process.env.HOSTED_MODEL_KEY_FILE || undefined
+        modelBaseUrl: !!js process.env.HOSTED_MODEL_BASE_URL || undefined
+        runtimeModel: !!js process.env.HOSTED_MODEL_ID || undefined
+        runtimeContextWindow: !!js Number(process.env.HOSTED_MODEL_CONTEXT_WINDOW || 32768)
+        runtimeMaxTokens: !!js Number(process.env.HOSTED_MODEL_MAX_TOKENS || 8192)
+        runtimePatchFile: !!js process.env.HOSTED_RUNTIME_PATCH_FILE || undefined
         allowedModels: !!js JSON.parse(process.env.HOSTED_ALLOWED_MODELS || '["deepseek-flash","deepseek-v4-pro"]')
         allowHttp: !!js process.env.HOSTED_ALLOW_HTTP === 'true'
         gatewayContainer: !!js process.env.HOSTED_GATEWAY_CONTAINER || process.env.HOSTNAME

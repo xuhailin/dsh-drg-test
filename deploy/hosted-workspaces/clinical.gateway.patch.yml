@@ -1,0 +1,12 @@
+- insert:
+    - id: emr-reader-broker
+      name: '@deepseek-ai/dsh-experimental-emr-reader-broker'
+      config:
+        sourceSystem: !!js process.env.EMR_READER_SOURCE_SYSTEM
+        databaseConfigFile: !!js process.env.EMR_READER_DATABASE_CONFIG_FILE
+        allowlistFile: !!js process.env.EMR_READER_ALLOWLIST_FILE
+        bindingKeyFile: !!js process.env.EMR_READER_BINDING_KEY_FILE
+        requestTimeoutMs: !!js Number(process.env.EMR_READER_REQUEST_TIMEOUT_MS || 15000)
+        maxRowsPerCategory: !!js Number(process.env.EMR_READER_MAX_ROWS || 500)
+        maxSourceBytes: !!js Number(process.env.EMR_READER_MAX_SOURCE_BYTES || 262144)
+        maxResponseBytes: !!js Number(process.env.EMR_READER_MAX_RESPONSE_BYTES || 4194304)

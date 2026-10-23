@@ -1,0 +1,22 @@
+# Optional clinical reader. Publish no database or broker port to personal runtimes.
+services:
+  gateway:
+    command: [gateway, --patch, /opt/dsh/deploy/hosted-workspaces/clinical.gateway.patch.yml]
+    environment:
+      HOSTED_RUNTIME_PATCH_FILE: /opt/dsh/deploy/hosted-workspaces/clinical.runtime.patch.yml
+      EMR_READER_SOURCE_SYSTEM: ${EMR_READER_SOURCE_SYSTEM:?Set the verified source system}
+      EMR_READER_DATABASE_CONFIG_FILE: /run/secrets/emr_reader_database
+      EMR_READER_ALLOWLIST_FILE: /run/secrets/emr_reader_allowlist
+      EMR_READER_BINDING_KEY_FILE: /run/secrets/emr_reader_binding_key
+    secrets:
+      - emr_reader_database
+      - emr_reader_allowlist
+      - emr_reader_binding_key
+
+secrets:
+  emr_reader_database:
+    file: ${EMR_READER_DATABASE_CONFIG_PATH:?Set a private database configuration file}
+  emr_reader_allowlist:
+    file: ${EMR_READER_ALLOWLIST_PATH:?Set the authorized encounter list}
+  emr_reader_binding_key:
+    file: ${EMR_READER_BINDING_KEY_PATH:?Set a private stable binding key file}

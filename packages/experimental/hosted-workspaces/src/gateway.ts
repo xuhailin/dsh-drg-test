@@ -2,9 +2,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { Config, publicOrigin } from './config.ts'
-import { DockerRuntimes } from './docker.ts'
+import { DockerRuntimeError, DockerRuntimes } from './docker.ts'
 import { ModelProxy } from './model.ts'
-import { OidcLogin } from './oidc.ts'
+import { OidcLogin, OidcLoginError } from './oidc.ts'
 import { implicitCallbackPage, page } from './pages.ts'
 import { WorkspaceProxy } from './proxy.ts'
 import { HostedState, randomCredential, sessionKey, type HostedLogin, type HostedUser } from './state.ts'
@@ -13,6 +13,8 @@ import { HostedState, randomCredential, sessionKey, type HostedLogin, type Hoste
 interface Handoff { readonly login: HostedLogin; readonly expiresAt: number; readonly origin: string }
 
 type CallbackBody = { readonly status: 200; readonly parameters: URLSearchParams } | { readonly status: 400 | 408 | 413 }
+
+type FailureOperation = 'login' | 'workspace'
 
 /**
  * Read a unique opaque cookie; ambiguous duplicate cookies are rejected.
@@ -43,9 +45,11 @@ export class HostedGateway {
    * @param oidc - OIDC flows.
    * @param runtimes - Docker owner.
    * @param model - key-holding proxy.
+   * @param reportFailure - operator report containing only the operation and a safe failure code.
    */
   constructor(private readonly config: Config, private readonly state: HostedState, private readonly oidc: Pick<OidcLogin, 'begin' | 'finish' | 'dispose'>,
-    private readonly runtimes: Pick<DockerRuntimes, 'ensure' | 'dispose'>, private readonly model: ModelProxy) {
+    private readonly runtimes: Pick<DockerRuntimes, 'ensure' | 'dispose'>, private readonly model: ModelProxy,
+    private readonly reportFailure: (operation: FailureOperation, code: string) => void = (operation, code) => { console.warn(`hosted-workspaces: ${operation} failed (${code})`) }) {
     this.entry = publicOrigin(config)
     this.cookieName = this.entry.protocol === 'https:' ? '__Host-dsh-sso' : 'dsh-sso-dev'
     this.proxy = new WorkspaceProxy(config.maxIndexResponseBytes)
@@ -58,8 +62,10 @@ export class HostedGateway {
    * @returns settles after admission or rejection.
    */
   handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const task = this.serve(req, res).catch(() => {
-      if (!res.headersSent && !res.destroyed) this.html(res, 503, 'failure', req)
+    const task = this.serve(req, res).catch((error: unknown) => {
+      const operation = req.url?.startsWith('/auth/') || this.requestOrigin(req) === this.entry.origin ? 'login' : 'workspace'
+      this.report(operation, error)
+      if (!res.headersSent && !res.destroyed) this.html(res, 503, operation === 'login' ? 'loginFailure' : 'workspaceFailure', req)
       else if (!res.destroyed) res.destroy()
     })
     this.pending.add(task)
@@ -70,7 +76,7 @@ export class HostedGateway {
   private async serve(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (this.closed) { res.writeHead(503); res.end(); return }
     if (req.url === '/healthz' && req.method === 'GET') { res.writeHead(200); res.end('ok'); return }
-    if (req.url?.startsWith('/model/')) return this.model.handle(req, res)
+    if (req.url?.startsWith('/model/') || req.url?.startsWith('/runtime/')) return this.model.handle(req, res)
     const origin = this.requestOrigin(req)
     if (origin === undefined || !req.url?.startsWith('/') || req.url.startsWith('//')) { res.writeHead(421); res.end(); return }
     const url = new URL(req.url, origin)
@@ -79,11 +85,12 @@ export class HostedGateway {
     if (origin === this.entry.origin) {
       if (req.method !== 'GET' || url.pathname !== '/') { res.writeHead(404); res.end(); return }
       if (login !== undefined && !url.searchParams.has('signedout')) { this.handoff(res, login); return }
-      this.html(res, 200, url.searchParams.has('signedout') ? 'signedOut' : 'entry', req); return
+      if (url.searchParams.has('signedout')) { this.html(res, 200, 'signedOut', req); return }
+      await this.beginLogin(res, this.entry.origin); return
     }
     if (login === undefined) {
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-        this.redirect(res, `${this.entry.origin}/auth/login?target=${encodeURIComponent(origin)}`); return
+        this.redirect(res, `${this.entry.origin}/auth/login`); return
       }
       res.writeHead(401); res.end(); return
     }
@@ -104,27 +111,25 @@ export class HostedGateway {
         if (target !== this.entry.origin && target !== this.userOrigin(login.user)) { res.writeHead(403); res.end(); return }
         this.handoff(res, login); return
       }
-      const flow = await this.oidc.begin(target)
-      this.cookie(res, `${this.cookieName}-flow`, flow.flowCookie, this.config.flowTtlMs)
-      this.redirect(res, flow.authorizationUrl); return
+      await this.beginLogin(res, target); return
     }
     if (url.pathname === '/auth/callback' && origin === this.entry.origin) {
       const flowCookie = readCookie(req.headers.cookie, `${this.cookieName}-flow`)
       if (this.config.oidcFlow === 'implicit') {
-        if (url.search !== '') { this.html(res, 400, 'failure', req); return }
+        if (url.search !== '') { this.html(res, 400, 'loginFailure', req); return }
         if (req.method === 'GET') {
-          const bridge = implicitCallbackPage(req.headers['accept-language'])
+          const bridge = implicitCallbackPage(req.headers['accept-language'], login !== undefined)
           res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'same-origin', 'x-content-type-options': 'nosniff', 'content-security-policy': `default-src 'none'; script-src 'sha256-${bridge.scriptHash}'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'` })
           res.end(bridge.html); return
         }
         if (req.method !== 'POST') { res.writeHead(405, { allow: 'GET, POST' }); res.end(); return }
         if (req.headers.origin !== origin || req.headers['sec-fetch-site'] === 'cross-site') { res.writeHead(403); res.end(); return }
         if (req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/x-www-form-urlencoded') { res.writeHead(415); res.end(); return }
-        if (flowCookie === undefined) { this.cookie(res, `${this.cookieName}-flow`, '', 0); this.html(res, 400, 'failure', req); return }
+        if (flowCookie === undefined) { this.cookie(res, `${this.cookieName}-flow`, '', 0); this.html(res, 400, 'loginFailure', req); return }
         if (this.callbackRequests.size >= this.config.maxPendingFlows) { res.writeHead(503, { connection: 'close' }); res.end(); return }
         const body = await this.callbackBody(req)
         if (body.status !== 200) {
-          if (!res.destroyed) { res.setHeader('connection', 'close'); this.html(res, body.status, 'failure', req) }
+          if (!res.destroyed) { res.setHeader('connection', 'close'); this.html(res, body.status, 'loginFailure', req) }
           return
         }
         url.hash = body.parameters.toString()
@@ -132,7 +137,7 @@ export class HostedGateway {
       this.cookie(res, `${this.cookieName}-flow`, '', 0)
       let completed: Awaited<ReturnType<OidcLogin['finish']>>
       try { completed = await this.oidc.finish(url, flowCookie) }
-      catch (_failedLogin) { this.html(res, 400, 'failure', req); return }
+      catch (error) { this.report('login', error); this.html(res, 400, 'loginFailure', req); return }
       if (this.callbackAbandoned(res)) return
       const user = await this.state.user(completed.identity)
       if (this.callbackAbandoned(res)) return
@@ -162,6 +167,17 @@ export class HostedGateway {
       this.redirect(res, `${this.entry.origin}/?signedout=1`); return
     }
     res.writeHead(404); res.end()
+  }
+
+  private async beginLogin(res: ServerResponse, returnOrigin: string): Promise<void> {
+    const flow = await this.oidc.begin(returnOrigin)
+    this.cookie(res, `${this.cookieName}-flow`, flow.flowCookie, this.config.flowTtlMs)
+    this.redirect(res, flow.authorizationUrl)
+  }
+
+  private report(operation: FailureOperation, error: unknown): void {
+    const code = error instanceof OidcLoginError ? error.kind : error instanceof DockerRuntimeError ? error.code : 'unexpected'
+    this.reportFailure(operation, code)
   }
 
   private callbackAbandoned(res: ServerResponse): boolean {
@@ -261,7 +277,7 @@ export class HostedGateway {
     res.writeHead(303, { location: target, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' }); res.end()
   }
 
-  private html(res: ServerResponse, status: number, state: 'entry' | 'failure' | 'handoff' | 'signedOut', req: IncomingMessage, handoffTarget?: string): void {
+  private html(res: ServerResponse, status: number, state: 'entry' | 'failure' | 'handoff' | 'signedOut' | 'loginFailure' | 'workspaceFailure', req: IncomingMessage, handoffTarget?: string): void {
     res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" })
     res.end(page(req.headers['accept-language'], state, this.entry.origin, handoffTarget))
   }

@@ -1,0 +1,11 @@
+version: 1
+scenario: shared-national-reference
+profile: headless
+composition: default
+recording: authored
+header:
+  class: default
+environment:
+  DSH_BUNDLED_SKILL_DIR: hosted-reference-skills
+workspace:
+  setup: hosted-reference-skill

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-storage-domain'
-import { Config, publicOrigin } from './config.ts'
+import { Config, publicOrigin, resolveModel } from './config.ts'
 import { hostedDomain, HostedState } from './state.ts'
 import { OidcLogin } from './oidc.ts'
 import { DockerRuntimes } from './docker.ts'
@@ -11,6 +11,7 @@ import { ModelProxy } from './model.ts'
 import { HostedGateway } from './gateway.ts'
 
 export { Config }
+export type { HostedRuntimeActor, HostedRuntimeRequest } from './runtime-access.ts'
 /** Cordis plugin identity. */
 export const name = 'hosted-workspaces'
 /** Required Host services; this optional profile mounts no agent in the gateway. */
@@ -30,7 +31,7 @@ async function secret(path: string): Promise<string> {
  */
 export async function apply(ctx: Context, config: Config): Promise<void> {
   const entry = publicOrigin(config)
-  const key = await secret(config.deepseekKeyFile)
+  const key = await secret(resolveModel(config).keyFile)
   const domain = await ctx.storageDomain.open(hostedDomain)
   ctx.effect(() => () => domain.close(), 'hosted-workspaces: private records')
   const oidc = await OidcLogin.create({
@@ -42,14 +43,27 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     maxPendingFlows: config.maxPendingFlows, requestTimeoutMs: config.requestTimeoutMs,
   })
   const state = new HostedState(domain, config.maxUsers, config.maxBrowserSessions)
-  const model = new ModelProxy(config, state, key)
+  const model = new ModelProxy(config, state, key, async (actor, request, response, signal) => {
+    const isActive = (): boolean => !signal.aborted && state.hasActiveLogin(actor.id)
+    if (!isActive()) {
+      response.writeHead(401, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+      response.end(JSON.stringify({ error: 'runtime_login_required' }))
+      return true
+    }
+    return ctx.waterfall('hosted-workspaces/runtime-request', { actor, request, response, signal, isActive }, () => Promise.resolve(false))
+  })
   const runtimes = new DockerRuntimes({
     socketPath: config.dockerSocket, image: config.image, gatewayContainer: config.gatewayContainer,
     gatewayPort: config.gatewayPort, prefix: config.prefix, memoryBytes: config.containerMemoryBytes,
     nanoCpus: config.containerNanoCpus, pidsLimit: config.containerPidsLimit, tmpBytes: config.containerTmpBytes,
     startupTimeoutMs: config.startupTimeoutMs, runtimePort: config.runtimePort, maxUsers: config.maxUsers,
+    ...(config.sharedResourcesPath === undefined ? {} : { sharedResourcesPath: config.sharedResourcesPath }),
+    ...(config.runtimePatchFile === undefined ? {} : { runtimePatchFile: config.runtimePatchFile }),
+    ...(config.modelProtocol === 'openai-responses' && config.runtimeModel !== undefined
+      ? { model: { id: config.runtimeModel, contextWindow: config.runtimeContextWindow, maxTokens: config.runtimeMaxTokens } } : {}),
   }, { onNetwork: host => model.listenOn(host) })
-  const gateway = new HostedGateway(config, state, oidc, runtimes, model)
+  const gateway = new HostedGateway(config, state, oidc, runtimes, model,
+    (operation, code) => { ctx.logger.warn(`hosted-workspaces: ${operation} failed (${code})`) })
   ctx.effect(() => () => gateway.dispose(), 'hosted-workspaces: admitted work')
   ctx.effect(() => ctx.webServer.registerFallback((req, res) => gateway.handle(req, res)), 'hosted-workspaces: HTTP entry')
   ctx.effect(() => ctx.webServer.registerUpgrade({ path: '/api/remote.mux', handler: (req, socket, head) => gateway.upgrade(req, socket, head) }), 'hosted-workspaces: WebSocket entry')

@@ -114,6 +114,20 @@ export class HostedState {
   async logout(token: string): Promise<void> { await this.domain.table('sessions').delete(sessionKey(token)) }
 
   /**
+   * Require an unexpired browser login before admitting protected runtime extensions.
+   * @param userId - account resolved from the gateway-owned runtime credential.
+   * @returns whether the enrolled account currently has at least one live login.
+   */
+  hasActiveLogin(userId: HostedUserId): boolean {
+    if (this.domain.table('users').get(userId) === undefined) return false
+    const now = Date.now()
+    for (const [, login] of this.domain.table('sessions').entries()) {
+      if (login.userId === userId && login.expiresAt > now) return true
+    }
+    return false
+  }
+
+  /**
    * Resolve a restricted runtime model credential.
    * @param token - runtime's model-proxy credential.
    * @returns owning account; no upstream credential is returned.

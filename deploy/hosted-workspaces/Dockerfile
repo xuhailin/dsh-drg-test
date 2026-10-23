@@ -4,7 +4,7 @@ ARG NODE_IMAGE=node:24.21.0-bookworm-slim
 FROM ${NODE_IMAGE} AS base
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
-        bash bubblewrap ca-certificates curl git procps python3 ripgrep util-linux \
+        bash bubblewrap ca-certificates curl git poppler-utils procps python3 ripgrep util-linux \
     && rm -rf /var/lib/apt/lists/* \
     && npm install --global pnpm@11.28.5
 

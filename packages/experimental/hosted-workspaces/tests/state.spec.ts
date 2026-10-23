@@ -31,6 +31,21 @@ async function harness(maxUsers = 4, maxSessions = 200) {
 }
 
 describe('HostedState', () => {
+  it('admits protected extensions only while the account has a live browser login', async () => {
+    const { state } = await harness()
+    const user = await state.user(ALICE)
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1_000_000)
+    onTestFinished(() => { clock.mockRestore() })
+    expect(state.hasActiveLogin(user.id)).toBe(false)
+    const first = await state.login(user, 1_000)
+    const second = await state.login(user, 2_000)
+    expect(state.hasActiveLogin(user.id)).toBe(true)
+    await state.logout(first.token)
+    expect(state.hasActiveLogin(user.id)).toBe(true)
+    clock.mockReturnValue(second.expiresAt)
+    expect(state.hasActiveLogin(user.id)).toBe(false)
+  })
+
   it('keeps account and model credentials stable for one issuer and subject', async () => {
     const { state } = await harness()
     const alice = await state.user(ALICE)

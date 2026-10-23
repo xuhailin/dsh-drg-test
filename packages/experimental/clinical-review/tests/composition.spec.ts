@@ -1,0 +1,42 @@
+import { readFile, readdir, writeFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { runLoaderSmoke, LOADER_SMOKE_TEST_TIMEOUT_MS } from '@deepseek-ai/dsh-loader-smoke'
+
+const root = fileURLToPath(new URL('../../../../', import.meta.url))
+const fixture = fileURLToPath(new URL('./snapshot-fixture.ts', import.meta.url))
+
+describe('clinical review through the shipped headless profile', () => {
+  it('repairs an unread-source proposal through real evidence tools and saves a cited report without a discharge decision', async () => {
+    const patchName = 'clinical-review.patch.yml'
+    const output = await runLoaderSmoke({ label: 'clinical-review', tempDirPrefix: 'dsh-clinical-composition-',
+      binScript: join(root, 'apps/cli/src/bin.ts'), tsconfigPath: join(root, 'tsconfig.json'), sourceImport: 'tsx/esm', configPath: patchName,
+      binArgs: ['--profile', 'headless', '--patch', patchName, '--json', '核查当前合成病例的出院文书，列出有原文依据的问题。'],
+      env: { DEEPSEEK_API_KEY: undefined },
+      prepare: async (cwd) => {
+        await writeFile(join(cwd, patchName), [
+          '- id: llm-deepseek', '  disabled: true', '- id: session-title-llm', '  disabled: true',
+          '- id: agent-default-model', '  config:', '    provider: clinical-fixture', '    model: fixture',
+          '- id: session-persistence-jsonl', '  config:', "    root: !!js dshHomePath('sessions')", '    compression: none',
+          '- insert:', '    - id: clinical-review-fixture', `      name: ${JSON.stringify(fixture)}`, '      config:', '        scriptModel: true', '',
+        ].join('\n'))
+      },
+      inspect: async (cwd) => {
+        const sessions = join(cwd, '.dsh/sessions')
+        const paths = await readdir(sessions, { recursive: true })
+        const logs = await Promise.all(paths.filter(path => /session\.v[0-9]+\.jsonl$/.test(path)).map(path => readFile(join(sessions, path), 'utf8')))
+        const text = logs.join('\n')
+        expect(text).toContain('review_read_evidence')
+        expect(text).toContain('review_submit_findings')
+        expect(text).toContain('pending-human-review')
+        expect(text).toContain('肺炎描述不一致')
+        expect(text).toContain('"isError":true')
+        expect(text).toContain('Source synthetic-document-1 at reviewedSourceRefs[0] has not been fully read.')
+        expect(text).toContain('"drg":"unavailable"')
+        expect(text).toContain('"dip":"unavailable"')
+      },
+    })
+    expect(output.stdout).toContain('不影响出院')
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+})
