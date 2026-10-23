@@ -22,6 +22,8 @@ export interface Config {
   maxSourceBytes: number
   /** Maximum records accepted per supported evidence category. */
   maxRowsPerCategory: number
+  /** Maximum patients returned in one directory page. */
+  maxDirectoryPageSize: number
   /** Maximum bytes read from the encounter allowlist file. */
   maxPolicyBytes: number
   /** Deadline in milliseconds for one broker operation and its database queries. */
@@ -36,6 +38,7 @@ export const Config: z<Partial<Config>, Config> = z.object({
   grantTtlMs: z.number().min(1000).max(600000).default(300000), maxPendingGrants: z.number().min(1).max(10000).default(200),
   maxRequestBytes: z.number().min(1).max(1048576).default(16384), maxResponseBytes: z.number().min(1).max(67108864).default(4194304),
   maxSourceBytes: z.number().min(1).max(16777216).default(262144), maxRowsPerCategory: z.number().min(1).max(10000).default(500),
+  maxDirectoryPageSize: z.number().min(1).max(1000).default(50),
   maxPolicyBytes: z.number().min(1).max(16777216).default(1048576), requestTimeoutMs: z.number().min(100).max(120000).default(15000),
   maxConcurrentReads: z.number().min(1).max(100).default(4),
 })

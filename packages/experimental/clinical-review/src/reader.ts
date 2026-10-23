@@ -4,6 +4,8 @@ import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { Context } from '@deepseek-ai/cordis'
 import { EncounterReader, EncounterReadError, parseBinding, parseLaunchGrantResult, parseSnapshot } from '@deepseek-ai/dsh-experimental-emr-encounter'
+import { departmentDirectorySchema, patientDirectorySchema, type DepartmentDirectoryRequest, type DepartmentDirectory,
+  type PatientDirectoryRequest, type PatientDirectory } from '@deepseek-ai/dsh-experimental-emr-encounter'
 import type { ClinicalActor, EncounterBinding, EncounterSnapshot, LaunchClaim } from '@deepseek-ai/dsh-experimental-emr-encounter'
 import type { Config } from './config.ts'
 import { ClinicalReviewError } from './error.ts'
@@ -16,6 +18,12 @@ export interface ReviewLaunchAccess {
  * @returns Verified binding.
  */
   authorize(claim: LaunchClaim, signal: AbortSignal): Promise<EncounterBinding>
+  /** Verify current account, signed binding and encounter access without source reads.
+   * @param binding - Existing owned encounter binding.
+   * @param signal - Cancellation.
+   * @returns Completion after current authorization succeeds.
+   */
+  reauthorize(binding: EncounterBinding, signal: AbortSignal): Promise<void>
 }
 
 /** Bounded HTTP client; no upstream response diagnostics or credentials enter model output. */
@@ -43,6 +51,35 @@ export class BrokerAccess implements ReviewLaunchAccess {
     const binding = parseBinding(await this.request('consume', { grant: grant.grant }, signal))
     this.checkOwner(binding)
     return binding
+  }
+
+  /** Recheck access to an unchanged binding independently from evidence capture.
+   * @param binding - Existing Session binding.
+   * @param signal - Caller cancellation.
+   * @returns Completion, or a denied/unavailable authorization failure.
+   */
+  async reauthorize(binding: EncounterBinding, signal: AbortSignal): Promise<void> {
+    this.checkOwner(binding)
+    const current = parseBinding(await this.request('authorize', { binding }, signal))
+    if (JSON.stringify(current) !== JSON.stringify(binding)) throw new ClinicalReviewError('source-mismatch', 'The encounter binding changed. Reopen the authorized encounter.')
+  }
+
+  /** List only departments granted to the currently authenticated runtime account.
+   * @param request - Empty directory request; actor and grants come from transport.
+   * @param signal - Caller cancellation.
+   * @returns Authorized department labels.
+   */
+  async departments(request: DepartmentDirectoryRequest, signal: AbortSignal): Promise<DepartmentDirectory> {
+    return departmentDirectorySchema.parse(await this.request('departments', request, signal))
+  }
+
+  /** Read one bounded authorized department patient page without clinical bodies.
+   * @param request - Exact department, hospital, source, search and page selection.
+   * @param signal - Caller cancellation.
+   * @returns Current minimal inpatient page, or an authorization/source failure.
+   */
+  async patients(request: PatientDirectoryRequest, signal: AbortSignal): Promise<PatientDirectory> {
+    return patientDirectorySchema.parse(await this.request('patients', request, signal))
   }
 
   /** Reauthorize one existing binding and validate its complete evidence response.

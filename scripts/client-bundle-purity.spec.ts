@@ -229,6 +229,8 @@ describe('client bundle purity gate', () => {
 
   it('inlines only the encounter JSON entry without the Host reader service', () => {
     expect(resolveId('@deepseek-ai/dsh-experimental-emr-encounter/wire')).toBeNull()
+    expect(resolveId('@deepseek-ai/dsh-experimental-clinical-review/result')).toBeNull()
+    expect(() => resolveId('@deepseek-ai/dsh-experimental-clinical-review/result/internal')).toThrow(/purity/)
     expect(() => resolveId('@deepseek-ai/dsh-experimental-emr-encounter')).toThrow(/purity/)
     expect(() => resolveId('@deepseek-ai/dsh-experimental-emr-encounter/wire/internal')).toThrow(/purity/)
   })

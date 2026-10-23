@@ -6,6 +6,7 @@ import { Config } from '../src/config.ts'
 import { ClinicalReviewService } from '../src/state.ts'
 import { ClinicalReviewError } from '../src/error.ts'
 import { registerReviewBridge } from '../src/bridge.ts'
+import { resultsResponseSchema, rerunRequestSchema } from '../src/result.ts'
 
 const contexts: Context[] = []
 afterEach(async () => {
@@ -22,7 +23,7 @@ function setup(maxRequestBytes = 65536) {
     return ctx.effect(() => async () => { routes.delete(route.path) })
   } } })
   const config = Config({ brokerBaseUrl: 'https://gateway.example/runtime/emr/', runtimeTokenEnv: 'TEST_TOKEN', ownerId: 'owner', cwd: '/tmp', maxRequestBytes })
-  const review = new ClinicalReviewService(ctx, config, { authorize: () => Promise.reject(new Error('unused launch authority')) }, () => {})
+  const review = new ClinicalReviewService(ctx, config, { authorize: () => Promise.reject(new Error('unused launch authority')), reauthorize: async () => {} }, () => {})
   registerReviewBridge(ctx, review, config)
   const request = async (path: string, body: unknown) => {
     const route = routes.get(`/api/clinical-review/${path}`)
@@ -79,9 +80,35 @@ describe('authenticated review route payloads', () => {
     expect(await forbidden.json()).toMatchObject({ error: { code: 'forbidden' }, dischargeBlocked: false })
   })
 
+  it('serves versioned saved references, admits correlated reruns and rejects invalid or conflicting selections', async () => {
+    const { review, request } = setup()
+    const selected = { sessionId: receipt.sessionId, resultId: `clinical-result:${receipt.sessionId}`, revision: 1,
+      encounterRef: 'clinical-encounter:fixture', requestId: 'rerun-request' }
+    const list = resultsResponseSchema.parse({ schemaVersion: 1, resultType: 'pre-discharge-review', sessionId: receipt.sessionId,
+      encounterRef: selected.encounterRef, encounterLabel: 'Synthetic visit', results: [],
+      progress: { revision: 0, status: 'bound', errorCode: null }, freshness: { status: 'unknown', lastCheckedAt: null, scope: 'none' }, dischargeBlocked: false })
+    const results = vi.spyOn(review, 'results').mockResolvedValue(list)
+    const rerun = vi.spyOn(review, 'rerun').mockResolvedValue({ ...receipt, requestId: selected.requestId })
+    const loaded = await request('results', { sessionId: receipt.sessionId })
+    expect(loaded.status).toBe(200)
+    expect(loaded.headers.get('cache-control')).toBe('no-store')
+    expect(await loaded.json()).toEqual(list)
+    expect(results).toHaveBeenCalledWith({ sessionId: receipt.sessionId }, expect.any(AbortSignal))
+    expect((await request('rerun', selected)).status).toBe(202)
+    expect(rerun).toHaveBeenCalledWith(rerunRequestSchema.parse(selected), expect.any(AbortSignal))
+    expect((await request('rerun', { ...selected, clinicalText: 'untrusted text' })).status).toBe(400)
+    expect((await request('result', { ...selected, revision: 0 })).status).toBe(400)
+    const { requestId, ...exact } = selected
+    vi.spyOn(review, 'result').mockRejectedValue(new ClinicalReviewError('result-not-found', 'This report revision is unavailable.'))
+    expect((await request('result', exact)).status).toBe(404)
+    rerun.mockRejectedValueOnce(new ClinicalReviewError('request-conflict', 'This request ID has different parameters.'))
+    expect((await request('rerun', selected)).status).toBe(409)
+    expect(requestId).toBe('rerun-request')
+  })
+
   it('removes all registered review routes when their owning scope is disposed', async () => {
     const { ctx, routes } = setup()
-    expect(routes.size).toBe(4)
+    expect(routes.size).toBe(7)
     await ctx.fiber.dispose()
     expect(routes.size).toBe(0)
   })

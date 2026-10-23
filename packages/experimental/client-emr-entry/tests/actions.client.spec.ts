@@ -35,7 +35,7 @@ describe('EMR entry requests', () => {
     actions.show()
     await actions.launch(claim)
     expect(send).toHaveBeenCalledOnce()
-    expect(send.mock.calls[0]).toMatchObject(['/api/clinical-review/launch', {
+    expect(send.mock.calls[0]).toMatchObject(['api/clinical-review/launch', {
       method: 'POST', credentials: 'same-origin', body: JSON.stringify(claim),
     }])
     expect(open).toHaveBeenCalledWith('session-1')
@@ -43,7 +43,7 @@ describe('EMR entry requests', () => {
     await actions.review('session-1' as SessionId)
     await actions.refresh('session-1' as SessionId)
     expect(send.mock.calls.map(([url]) => url)).toEqual([
-      '/api/clinical-review/launch', '/api/clinical-review/review', '/api/clinical-review/refresh',
+      'api/clinical-review/launch', 'api/clinical-review/review', 'api/clinical-review/refresh',
     ])
     expect(JSON.parse(send.mock.calls[1]![1]!.body as string)).toMatchObject({ sessionId: 'session-1', trigger: 'manual-review' })
     expect(actions.view.getSnapshot().notice).toBe('refreshed')
@@ -120,7 +120,7 @@ describe('encounter review status', () => {
   it('reads progress without a model request or transport receiver and discards clinical fields', async () => {
     const send = vi.fn(function (this: unknown, url: Parameters<typeof fetch>[0], options?: Parameters<typeof fetch>[1]) {
       if (this !== undefined) throw new TypeError('Illegal invocation')
-      expect(url).toBe('/api/clinical-review/status')
+      expect(url).toBe('api/clinical-review/status')
       expect(options).toMatchObject({ method: 'POST', credentials: 'same-origin', cache: 'no-store', body: JSON.stringify({ sessionId: 'session-1' }) })
       return Promise.resolve(Response.json({ ...progress(), report: { summary: 'Not UI data' } }))
     })

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Open an explicitly authorized test encounter and capture original admission, diagnosis, order and document evidence without writing to EMR. Personal runtimes receive only their approved encounter data; database credentials and the binding key remain in the gateway. Missing document bodies and unsupported sources remain visible. This development allowlist is not hospital production access control.
+Browse explicitly authorized development departments and inpatients, open an encounter, and capture original admission, diagnosis, order and document evidence without writing to EMR. Personal runtimes receive only their approved encounter data; database credentials and the binding key remain in the gateway. Missing document bodies and unsupported sources remain visible. This development allowlist is not hospital production access control.
 
 ## Table of Contents
 
@@ -36,11 +36,13 @@ Mount this plugin in the dedicated hosted gateway composition, alongside hosted 
 
 The database file is JSON with `host`, `port`, `database`, `user`, `password` and optional boolean `ssl`. Use a dedicated SELECT-only account. Every capture additionally starts a `REPEATABLE READ READ ONLY` transaction. The binding-key file contains at least 32 characters; keep it stable across restarts and rotate it to invalidate old bindings. Mount these files only in the gateway, with operator-controlled permissions.
 
-The allowlist JSON contains `schemaVersion: 1` and `entries`. Each entry requires `issuer`, `subject`, `sourceSystem`, `hospitalCode` and decimal-string `inpatId`; `inpatCode` and `sourceVisitId` are optional verified mappings. The broker requires exactly one matching entry and rereads the file on each operation. An empty list grants no encounters; malformed or duplicate entries fail closed.
+The allowlist JSON contains `schemaVersion: 1`, `entries`, and optional `departments`. Exact encounter entries require `issuer`, `subject`, `sourceSystem`, `hospitalCode` and decimal-string `inpatId`; `inpatCode` and `sourceVisitId` are optional verified mappings. Department grants require the same account, source and hospital fields plus `departmentCode`, and admit only valid current inpatients with source state `4` or `5`. The broker rereads policy on every operation. Empty grant lists authorize nothing; malformed or duplicate grants fail closed. Exact encounter grants remain independently valid, so remove the corresponding exact entry when replacing it with department-only permission.
 
-The [configuration schema](src/config.ts) owns all limits. Defaults allow 500 records per supported category, 256 KiB per source body and 4 MiB for the complete response, with a 15-second request deadline and four concurrent requests. Exceeding any limit rejects the capture; no truncated snapshot is accepted.
+The [configuration schema](src/config.ts) owns all limits. Defaults allow 500 records per supported category, 50 patients per directory page, 256 KiB per source body and 4 MiB for the complete response, with a 15-second request deadline and four concurrent requests. Exceeding a capture limit rejects the capture; no truncated snapshot is accepted.
 
 A launch validates claimed identifiers and returns a five-minute, one-use grant bound to the account. Consume exchanges that grant for a signed encounter binding; capture revalidates the binding and current allowlist. Grants are memory-only and disappear on restart. Launch events do not modify discharge transactions, create model requests or establish a hospital authorization policy.
+
+The [directory](src/directory.ts) lists only granted departments and pages their current inpatients using literal search and bound SQL values. It returns encounter identity, patient name and bed only; browsing creates no model request or additional permission. `/authorize` checks a signed binding without recapturing evidence. Exact encounter grants need no database read for this check; department grants require the current admission and reject transferred or discharged patients, revoked permission, and source outage.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
@@ -48,7 +50,7 @@ A launch validates claimed identifiers and returns a five-minute, one-use grant 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-The [broker](src/http.ts) owns the fixed `/runtime/emr/launch`, `/runtime/emr/consume` and `/runtime/emr/capture` POST routes. [Authorization](src/policy.ts) authenticates binding fields with a gateway-only HMAC key. [Fixed SQL](src/sql.ts) selects explicit columns using parameter values, verifies hospital ownership and joins document content through its parent record. No arbitrary SQL, path, URL or doctor override is accepted.
+The [broker](src/http.ts) owns fixed `/runtime/emr/launch`, `/runtime/emr/consume`, `/runtime/emr/authorize`, `/runtime/emr/capture`, `/runtime/emr/departments` and `/runtime/emr/patients` POST routes. [Authorization](src/policy.ts) authenticates binding fields with a gateway-only HMAC key. [Fixed SQL](src/sql.ts) selects explicit columns using parameter values, verifies hospital ownership and joins document content through its parent record. No arbitrary SQL, path, URL or doctor override is accepted.
 
 The [reader](src/reader.ts) hashes exact retained content, source metadata, coverage, binding and provider version into `caseRevision`; unchanged evidence retains that revision across capture times. `capturedAt` and `cutoff` record the current capture independently. It marks unavailable document text as unread and keeps order state distinct from administration evidence. It rejects overflow before publication, rechecks login before each query, and rereads authorization before returning. Cancellation closes the source connection; unloading stops requests and removes the runtime handler.
 

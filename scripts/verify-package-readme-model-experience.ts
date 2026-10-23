@@ -48,6 +48,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/experimental/emr-encounter': { kind: 'none', reason: 'The schema and reader service define controlled evidence transfer without tools, prompts, or Session context.' },
   'packages/experimental/emr-reader-broker': { kind: 'none', reason: 'Authenticated reads return evidence to consumers without creating model context.' },
   'packages/experimental/client-emr-entry': { kind: 'indirect', reason: 'Browser actions delegate evidence, review prompts, and report persistence to clinical-review.' },
+  'packages/experimental/client-clinical-results': { kind: 'indirect', reason: 'Saved-result viewing adds no model input; explicit reruns delegate evidence and model requests to clinical-review.' },
   'packages/experimental/drg-resources': { kind: 'none', reason: 'The source archive library publishes and verifies files without registering tools, prompts, or Session events.' },
   'packages/experimental/client-ui-cot-translation': { kind: 'indirect', reason: 'The translator owns optional paid queries; normal Session activation delegates startup context to the preset.' },
   'packages/experimental/cot-translation-bundle': { kind: 'indirect', reason: 'The GUI consumer delegates paid query prompts to the translator and normal activation context to the Session preset.' },

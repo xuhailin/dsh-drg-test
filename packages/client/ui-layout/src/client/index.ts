@@ -14,7 +14,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PanelInfo } from './service.ts'
-import { AppFrame } from './AppFrame.tsx'
+import { PageFrame } from './PageFrame.tsx'
+import { PageRegistry, type ClientPages } from './pages.ts'
 import { createLayoutStore } from './stores.ts'
 import { LayoutController } from './service.ts'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
@@ -36,6 +37,8 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     /** The outward face only; the concrete service stays inside this plugin. */
     layout: import('./service.ts').ILayout
+    /** Query-selected full-page registrations, independent of Session navigation. */
+    clientPages: ClientPages
   }
 }
 
@@ -117,6 +120,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * the lights or the controls.
      */
     'shell.leading': { kind: 'single'; scope: 'root' }
+    /** Full-page entry selected by the document query before the frame mounts. */
+    'shell.page': { kind: 'keyed'; scope: 'root' }
   }
 }
 
@@ -173,6 +178,10 @@ export function apply(ctx: ClientContext): void {
     }
     const layout = new LayoutController(instance.actions, id =>
       ctx.slots.entries('main').some(entry => entry.options.key === id), panelInfo)
+    const pages = new PageRegistry(() => window.location.search)
+    const disposePages = ctx.reflect.provide('clientPages', pages)
+    const refreshPage = (): void => { pages.refresh() }
+    window.addEventListener('popstate', refreshPage)
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo: layout.panelInfo } })
     const disposeService = ctx.reflect.provide('layout', layout)
     const disposeRegistration = ctx.slots.register({
@@ -185,9 +194,11 @@ export function apply(ctx: ClientContext): void {
         'shell.bottom': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.leading': { kind: 'single', scope: 'root' },
+        'shell.page': { kind: 'keyed', scope: 'root' },
       },
       store,
-    }, AppFrame)
+      inject: () => ({ hooks: { page: pages.selection } }),
+    }, PageFrame)
     const disposeShortcut = ctx.shortcuts.register({
       id: 'sidebar.left.toggle' as ShortcutCommandId, label: () => t('toggle'), aliases: ['sidebar', 'toggle left sidebar'],
       defaults: {
@@ -204,6 +215,8 @@ export function apply(ctx: ClientContext): void {
     retainMainPanels()
     return () => {
       disposeShortcut()
+      window.removeEventListener('popstate', refreshPage)
+      void disposePages()
       layout.dispose()
       disposePanels()
       disposeRegistration()

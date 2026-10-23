@@ -1,5 +1,7 @@
 /** Synthetic evidence and optional scripted model for real-profile review regression tests. */
 import { createHash } from 'node:crypto'
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { LlmAdapter, ToolCallId, type GenerateOptions, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm'
@@ -7,12 +9,13 @@ import { EncounterReader, parseBinding, parseSnapshot, type ClinicalActor, type 
 import { appendPluginRecord } from '@deepseek-ai/dsh-session'
 import { ClinicalReviewService } from '../src/state.ts'
 import { reviewProjection } from '../src/projection.ts'
+import { resultProjection } from '../src/result-projection.ts'
 import { registerReviewTools } from '../src/tools.ts'
 import { Config as ReviewConfig } from '../src/config.ts'
 
 export const name = 'clinical-review-snapshot-fixture'
 export const inject = ['agents', 'sessions', 'sessionProjections', 'tools', 'llm']
-export const Config = z.object({ scriptModel: z.boolean().default(false) })
+export const Config = z.object({ scriptModel: z.boolean().default(false), saveResult: z.boolean().default(false) })
 
 const binding = parseBinding({ schemaVersion: 1, bindingId: '11111111-1111-4111-8111-111111111111', actorId: 'synthetic-actor',
   actorIssuer: 'https://synthetic.example', actorSubject: 'synthetic-doctor', sourceSystem: 'synthetic-emr', hospitalCode: '1001', inpatId: '123' })
@@ -34,6 +37,7 @@ class SyntheticReader extends EncounterReader {
 
 class ScriptedModel extends LlmAdapter {
   private step = 0
+  constructor(private readonly ctx: Context, private readonly saveResult: boolean) { super() }
   override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
     return Promise.resolve({ provider, id: model, name: model })
   }
@@ -63,6 +67,12 @@ class ScriptedModel extends LlmAdapter {
       return
     }
     if (step !== calls.length) throw new Error('fixture model script exhausted')
+    if (this.saveResult) {
+      const agent = this.ctx.agents.requireInitiator()
+      const saved = this.ctx.sessionProjections.stateOf(agent.session, 'clinicalResults')
+      if (saved === undefined) throw new Error('Saved report projection unavailable.')
+      await writeFile(join(process.cwd(), '.dsh/clinical-saved-result.json'), JSON.stringify(saved))
+    }
     const text = '核查已完成：发现出院小结与临床诊断描述不一致，待医生核实；不影响出院。DRG、DIP 预分组暂不可用。'
     yield { type: 'block-start', index: 0, blockType: 'text' }
     yield { type: 'text-delta', index: 0, text }
@@ -73,13 +83,17 @@ class ScriptedModel extends LlmAdapter {
 }
 
 /** Mount synthetic external inputs around the production review service and scoped tools. */
-export function apply(ctx: Context, config: { scriptModel: boolean }): void {
+export function apply(ctx: Context, config: { scriptModel: boolean; saveResult: boolean }): void {
   new SyntheticReader(ctx)
   ctx.sessionProjections.register(reviewProjection)
+  ctx.sessionProjections.register(resultProjection)
   const settings = ReviewConfig({ brokerBaseUrl: 'https://synthetic.example/runtime/emr/', runtimeTokenEnv: 'SYNTHETIC_UNUSED_TOKEN', ownerId: binding.actorId, cwd: process.cwd(), readerMode: 'provided' })
-  const review = new ClinicalReviewService(ctx, settings, { authorize: () => Promise.reject(new Error('fixture has no browser launch issuer')) }, () => {})
+  const review = new ClinicalReviewService(ctx, settings, { authorize: () => Promise.reject(new Error('fixture has no browser launch issuer')), reauthorize: async (requested, signal) => {
+    signal.throwIfAborted()
+    if (requested.bindingId !== binding.bindingId) throw new Error('fixture binding denied')
+  } }, () => {})
   ctx.provide('clinicalReview', review)
-  if (config.scriptModel) ctx.llm.registerAdapter(['clinical-fixture'], new ScriptedModel())
+  if (config.scriptModel) ctx.llm.registerAdapter(['clinical-fixture'], new ScriptedModel(ctx, config.saveResult))
   ctx.on('agent/created', async ({ agent }) => {
     if (!ctx.agents.roots().includes(agent)) return
     appendPluginRecord(agent.session, 'plugin:clinical-review/state', {

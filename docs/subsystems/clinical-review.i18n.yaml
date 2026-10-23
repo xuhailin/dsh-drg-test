@@ -8,6 +8,12 @@
 /clinical-encounter-review/actor-and-encounter-binding:
   en: 0cf9f7061ea9ed26
   zh: 14fe122743895fc5
+/clinical-encounter-review/authorized-directory:
+  en: d0fb699b07be52b0
+  zh: cd7211f10cfded52
 /clinical-encounter-review/evidence-snapshots:
-  en: cf1ebc68308a82a5
-  zh: 13467e466d50b588
+  en: d19d7d8dd377d79d
+  zh: 956a3b0a5a47c90b
+/clinical-encounter-review/saved-results:
+  en: 34c50c12b1f9a59e
+  zh: 009014c9a7b93c6f

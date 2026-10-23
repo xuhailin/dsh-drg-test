@@ -1,0 +1,43 @@
+.root { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; overflow: auto; padding: 20px 18px 32px; color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.document { display: grid; gap: 20px; max-width: 960px; margin: 0 auto; min-width: 0; }
+.header { display: flex; gap: 12px; justify-content: space-between; align-items: start; flex-wrap: wrap; }
+.heading { min-width: 0; }
+.heading h1 { margin: 4px 0 6px; font-size: 20px; line-height: 1.4; font-weight: 500; }
+.heading p, .section p, .notice p { margin: 0; white-space: pre-wrap; }
+.eyebrow, .secondary { color: var(--dsw-alias-label-secondary); }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.badges span { border: 0.5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-sm); padding: 3px 8px; }
+.notice { margin: 0; padding: 10px 12px; background: var(--dsw-alias-bg-layer-2); border: 0.5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-sm); color: var(--dsw-alias-label-secondary); }
+.metadata { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px 20px; margin: 0; min-width: 0; }
+.metadata div { min-width: 0; }
+.metadata dt { color: var(--dsw-alias-label-secondary); }
+.metadata dd { margin: 2px 0 0; white-space: pre-wrap; }
+.selector { display: grid; gap: 6px; min-width: 0; color: var(--dsw-alias-label-secondary); }
+.selector select { box-sizing: border-box; min-width: 0; width: 100%; min-height: 36px; padding: 6px 8px; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-sm); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; }
+.section { display: grid; gap: 12px; min-width: 0; }
+.section h2 { margin: 0; font-size: 16px; line-height: 1.5; font-weight: 500; }
+.section h3 { margin: 0; font-size: 14px; font-weight: 500; }
+.section h4 { margin: 0; font-size: 13px; font-weight: 500; }
+.finding { display: grid; gap: 10px; padding: 16px; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-lg); min-width: 0; }
+.evidence { border-block: 0.5px solid var(--dsw-alias-border-l1); padding: 10px 0; }
+.evidence summary { cursor: pointer; font-weight: 500; }
+.quotation { display: grid; gap: 10px; padding-top: 14px; }
+.quotation blockquote { margin: 0; padding: 10px 12px; border-inline-start: 2px solid var(--dsw-alias-border-l3); background: var(--dsw-alias-bg-layer-2); white-space: pre-wrap; }
+.coverage { display: grid; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.coverage li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding-block: 8px; border-bottom: 0.5px solid var(--dsw-alias-border-l1); }
+.coverage p { grid-column: 1 / -1; color: var(--dsw-alias-label-secondary); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.empty { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; min-height: 160px; max-width: 640px; margin: 0 auto; padding: 24px 12px; text-align: center; color: var(--dsw-alias-label-secondary); }
+.empty .selector { width: 100%; text-align: left; }
+.spinner { width: 20px; height: 20px; border: 2px solid var(--dsw-alias-border-l1); border-top-color: var(--dsw-alias-label-secondary); border-radius: 50%; animation: spin 900ms linear infinite; }
+.cards { display: grid; gap: 8px; }
+.card { display: flex; align-items: start; gap: 12px; width: 100%; box-sizing: border-box; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-lg); padding: 12px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font: inherit; text-align: left; cursor: pointer; }
+.cardIcon { flex: none; margin-top: 2px; }
+.cardText { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.cardText strong { font-weight: 500; font-size: 14px; }
+.cardText span { color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.selector select:focus-visible, .evidence summary:focus-visible, .card:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color); outline-offset: 3px; }
+@media (hover: hover) { .card:hover { background: var(--dsw-alias-bg-layer-3); } }
+@media (max-width: 480px) { .root { padding: 16px 12px 24px; } .finding { padding: 12px; } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+@keyframes spin { to { transform: rotate(360deg); } }

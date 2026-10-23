@@ -7,6 +7,7 @@ import { readBoundedFile } from './files.ts'
 import { ClinicalBroker } from './http.ts'
 import { EncounterPolicy } from './policy.ts'
 import { PgEncounterReader } from './reader.ts'
+import { PgEncounterDirectory } from './directory.ts'
 export { Config }
 /** Optional clinical runtime plugin identity. */
 export const name = 'emr-reader-broker'
@@ -24,8 +25,9 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   if (key.length < 32) throw new Error('emr-reader-broker: binding key must contain at least 32 characters')
   const policy = new EncounterPolicy(config.allowlistFile, config.maxPolicyBytes, key, config.sourceSystem)
   await policy.validate()
-  const reader = new PgEncounterReader(ctx, config, policy, new PgReadDatabase(database, config.requestTimeoutMs))
-  const broker = new ClinicalBroker(config, policy, reader)
+  const source = new PgReadDatabase(database, config.requestTimeoutMs)
+  const reader = new PgEncounterReader(ctx, config, policy, source)
+  const broker = new ClinicalBroker(config, policy, reader, new PgEncounterDirectory(config, policy, source))
   ctx.effect(() => () => broker.dispose(), 'emr-reader-broker: clinical requests')
   ctx.on('hosted-workspaces/runtime-request', async (request, next) => await broker.handle(request) || await next())
 }

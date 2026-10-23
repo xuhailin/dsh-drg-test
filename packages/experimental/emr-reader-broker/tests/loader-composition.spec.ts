@@ -14,7 +14,7 @@ import type { HostedRuntimeRequest } from '@deepseek-ai/dsh-experimental-hosted-
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as Broker from '../src/index.ts'
 
-const database = vi.hoisted(() => ({ statements: [] as string[], closed: 0 }))
+const database = vi.hoisted(() => ({ statements: [] as string[], closed: 0, department: 'dept-one' }))
 vi.mock('pg', () => ({ default: { Client: class {
   on() { return this }
   off() { return this }
@@ -22,7 +22,9 @@ vi.mock('pg', () => ({ default: { Client: class {
   async end() { database.closed++ }
   async query(sql: string) {
     database.statements.push(sql)
-    if (sql.startsWith('SELECT inpat_id')) return { rows: [{ id: '100', inpat_code: 'visit-100' }] }
+    if (sql.startsWith('WITH authorized')) return { rows: [{ hospital_code: '1001', department_code: 'dept-one', department_name: 'Synthetic Department' }] }
+    if (sql.startsWith('SELECT r.inpat_id::text AS inpat_id')) return { rows: [{ inpat_id: '100', inpat_code: 'visit-100', patient_name: 'Synthetic Patient', bed_name: '1' }] }
+    if (sql.startsWith('SELECT inpat_id')) return { rows: [{ id: '100', inpat_code: 'visit-100', current_dept_code: database.department, inpat_state_code: '4' }] }
     if (!sql.startsWith('WITH evidence')) return { rows: [] }
     return { rows: [{ id: '1', state: 'recorded', occurred_at: null, available_at: null, oversized: false, body: { text: 'Synthetic case evidence.' } }] }
   }
@@ -72,6 +74,12 @@ describe('clinical broker Loader composition', () => {
     const binding = parseBinding(await consumed.json())
     expect(binding.actorId).toBe(actor.id)
     expect((await call('/runtime/emr/consume', { grant })).status).toBe(410)
+    const statements = database.statements.length
+    const authorized = await call('/runtime/emr/authorize', { binding })
+    expect(authorized.status).toBe(200)
+    expect(parseBinding(await authorized.json())).toEqual(binding)
+    expect(database.statements).toHaveLength(statements)
+    expect((await call('/runtime/emr/authorize', { binding: { ...binding, inpatId: '101' } })).status).toBe(403)
     const captured = await call('/runtime/emr/capture', { binding })
     expect(captured.status).toBe(200)
     const snapshot = parseSnapshot(await captured.json())
@@ -80,8 +88,26 @@ describe('clinical broker Loader composition', () => {
     expect(database.statements).toContain('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
     expect(database.closed).toBeGreaterThanOrEqual(2)
     expect((await call('/runtime/emr/capture', { binding: { ...binding, inpatId: '101' } })).status).toBe(403)
-    active = false
+    await writeFile(config.allowlistFile, JSON.stringify({ schemaVersion: 1, entries: [], departments: [{ issuer: actor.issuer, subject: actor.subject, sourceSystem: 'fixture-emr', hospitalCode: '1001', departmentCode: 'dept-one' }] }))
+    const departments = await call('/runtime/emr/departments', {})
+    expect(departments.status).toBe(200)
+    expect(await departments.json()).toEqual({ departments: [{ sourceSystem: 'fixture-emr', hospitalCode: '1001', departmentCode: 'dept-one', departmentName: 'Synthetic Department' }] })
+    const patientRequest = { sourceSystem: 'fixture-emr', hospitalCode: '1001', departmentCode: 'dept-one', pageIndex: 1, pageSize: 10 }
+    const patients = await call('/runtime/emr/patients', patientRequest)
+    expect(patients.status).toBe(200)
+    expect(await patients.json()).toMatchObject({ patients: [{ inpatId: '100', patientName: 'Synthetic Patient' }], hasMore: false })
+    expect((await call('/runtime/emr/patients', { ...patientRequest, hospitalCode: 'other' })).status).toBe(403)
+    expect((await call('/runtime/emr/authorize', { binding })).status).toBe(200)
+    database.department = 'other-department'
+    expect((await call('/runtime/emr/authorize', { binding })).status).toBe(403)
     expect((await call('/runtime/emr/capture', { binding })).status).toBe(403)
+    database.department = 'dept-one'
+    active = false
+    expect((await call('/runtime/emr/authorize', { binding })).status).toBe(403)
+    expect((await call('/runtime/emr/capture', { binding })).status).toBe(403)
+    active = true
+    await writeFile(config.allowlistFile, JSON.stringify({ schemaVersion: 1, entries: [] }))
+    expect((await call('/runtime/emr/authorize', { binding })).status).toBe(403)
     expect((await call('/runtime/unrelated', {})).status).toBe(404)
     const entry = [...ctx.loader.entries()].find(item => item.options.name === 'cordis:clinical-broker')
     if (!entry?.fiber) throw new Error('Missing broker fiber')

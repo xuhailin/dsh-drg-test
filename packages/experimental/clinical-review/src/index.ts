@@ -5,9 +5,11 @@ import { Config } from './config.ts'
 import { BrokerAccess, HttpEncounterReader } from './reader.ts'
 import { ClinicalReviewService } from './state.ts'
 import { reviewProjection } from './projection.ts'
+import { resultProjection } from './result-projection.ts'
 import { registerReviewTools } from './tools.ts'
 import { registerReviewBridge } from './bridge.ts'
 import { ClinicalReviewError } from './error.ts'
+import { registerClinicalDirectory } from './directory.ts'
 
 export { Config } from './config.ts'
 export { ClinicalReviewError } from './error.ts'
@@ -24,6 +26,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   if (config.readerMode === 'http') new HttpEncounterReader(ctx, access)
   else if (ctx.get('encounterReader') === undefined) throw new ClinicalReviewError('reader-unavailable', 'Mount an EncounterReader provider before clinical review.')
   ctx.sessionProjections.register(reviewProjection)
+  ctx.sessionProjections.register(resultProjection)
   const attached = new WeakSet<Agent>()
   const review = new ClinicalReviewService(ctx, config, access, attach)
   ctx.provide('clinicalReview', review)
@@ -46,4 +49,5 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       && state.binding.actorId === config.ownerId) attach(agent)
   }
   registerReviewBridge(ctx, review, config)
+  registerClinicalDirectory(ctx, config, access)
 }

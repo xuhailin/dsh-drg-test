@@ -1,0 +1,18 @@
+.workspace { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); height: 100%; min-width: 0; color: var(--dsw-alias-label-primary); }
+.directory { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; padding: 20px 16px; overflow: auto; border-inline-end: 0.5px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-2); }
+.directory h1 { margin: 0; font-size: 16px; font-weight: 500; }
+.directory label { display: grid; gap: 6px; font-size: 13px; }
+.directory select, .directory input { width: 100%; min-width: 0; box-sizing: border-box; font: inherit; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-1); border: 0.5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-sm); padding: 8px; }
+.directory select:focus-visible, .directory input:focus-visible, .patient:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color); outline-offset: 2px; }
+.search { display: grid; gap: 8px; }
+.patients { display: grid; list-style: none; padding: 0; margin: 0; gap: 8px; }
+.patient { display: grid; gap: 4px; text-align: start; width: 100%; padding: 10px; border: 0.5px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-sm); font: inherit; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); cursor: pointer; overflow-wrap: anywhere; }
+.patient[aria-pressed='true'] { border-color: var(--dsw-alias-label-primary); }
+.patient span, .notice { font-size: 13px; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; margin: 0; }
+.detail { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 20px; align-items: center; border-bottom: 0.5px solid var(--dsw-alias-border-l1); }
+.toolbar p { flex-basis: 100%; }
+.result { min-height: 0; flex: 1; overflow: auto; }
+.paging { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (hover: hover) { .patient:hover { background: var(--dsw-alias-bg-layer-3); } }
+@media (max-width: 640px) { .workspace { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 100%; } .directory { max-height: 40vh; border-inline-end: 0; border-bottom: 0.5px solid var(--dsw-alias-border-l1); } .detail { min-height: 50vh; } }

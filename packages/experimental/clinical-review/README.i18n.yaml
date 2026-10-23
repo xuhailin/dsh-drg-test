@@ -18,17 +18,20 @@
   en: 4bdc7d27803580db
   zh: 4af683d6d6ea2ac5
 /deepseek-ai-dsh-experimental-clinical-review/use-this-package/configuration:
-  en: 8b68d00b1b02d161
-  zh: a8a82e8b5a333a3e
+  en: 9f6deda3130327d2
+  zh: b87765b293db068f
 /deepseek-ai-dsh-experimental-clinical-review/use-this-package/entry-review-and-refresh:
-  en: 0688a93c5b3f73f6
-  zh: 4d66503e74ba89f7
+  en: c111c7fcefb26c0c
+  zh: 49d3437f2b4e3b74
+/deepseek-ai-dsh-experimental-clinical-review/use-this-package/saved-results:
+  en: b11ba97b538d3f99
+  zh: f88664d5331d933e
 /deepseek-ai-dsh-experimental-clinical-review/use-this-package/failures-and-recovery:
   en: fa8f79c2b91a2995
   zh: f443088cca8a6d3c
 /deepseek-ai-dsh-experimental-clinical-review/understand-the-implementation:
-  en: 5b4105d8979728d0
-  zh: f16949dc3f531105
+  en: 6a9ff81d44430dab
+  zh: c9e19930a45462d8
 /deepseek-ai-dsh-experimental-clinical-review/further-exploration:
   en: e591a1e71e58918f
   zh: 612fcf86cbf0fec9
@@ -48,8 +51,8 @@
   en: f46ec34c10ca18b6
   zh: 68a07580b1504c22
 /deepseek-ai-dsh-experimental-clinical-review/known-limitations-and-deferred-work:
-  en: f6d004451f8fe913
-  zh: cfbad94e6283fdad
+  en: a9e222143b0bd043
+  zh: 4a86b2d744fd0cd7
 /deepseek-ai-dsh-experimental-clinical-review/known-limitations-and-deferred-work/dev-note:
   en: fb0fe8ae82c17bd6
   zh: 6eb35744df4e1f02

@@ -31,7 +31,7 @@ async function fixture(overrides: Partial<Config> = {}) {
   const rows = new Map(sourceQueries.map(query => [query.category, [row(query.category)]]))
   const query = vi.fn<ReadTransaction['query']>(async (sql) => {
     const source = sourceQueries.find(item => item.sql === sql)
-    return source === undefined ? [{ id: '100', inpat_code: 'visit-100' }] : rows.get(source.category) ?? []
+    return source === undefined ? [{ id: '100', inpat_code: 'visit-100', current_dept_code: 'dept-one', inpat_state_code: '4' }] : rows.get(source.category) ?? []
   })
   const database: ReadDatabase = { read: async (_signal, read) => read({ query }) }
   const reader = new PgEncounterReader(context, config, policy, database)
@@ -81,7 +81,7 @@ describe('controlled encounter reader', () => {
   it('rejects aliases that disagree with either approved mapping or current database', async () => {
     const world = await fixture()
     await expect(world.reader.resolve(actor, { ...claim, sourceVisitId: 'unverified-source-id' }, new AbortController().signal)).rejects.toMatchObject({ code: 'source-mismatch' })
-    world.query.mockResolvedValueOnce([{ id: '100', inpat_code: 'changed-admission' }])
+    world.query.mockResolvedValueOnce([{ id: '100', inpat_code: 'changed-admission', current_dept_code: 'dept-one', inpat_state_code: '4' }])
     await expect(world.reader.capture(actor, world.binding, new AbortController().signal)).rejects.toMatchObject({ code: 'source-mismatch' })
   })
   it('rejects category overflow and complete UTF-8 response overflow without a partial snapshot', async () => {
@@ -94,7 +94,7 @@ describe('controlled encounter reader', () => {
   })
   it('rejects oversized single source and does not interpret a missing body as empty', async () => {
     const world = await fixture()
-    world.query.mockImplementation(async sql => sql === sourceQueries[0]!.sql ? [{ ...row('1'), body: null, oversized: true }] : [{ id: '100', inpat_code: 'visit-100' }])
+    world.query.mockImplementation(async sql => sql === sourceQueries[0]!.sql ? [{ ...row('1'), body: null, oversized: true }] : [{ id: '100', inpat_code: 'visit-100', current_dept_code: 'dept-one', inpat_state_code: '4' }])
     await expect(world.reader.capture(actor, world.binding, new AbortController().signal)).rejects.toMatchObject({ code: 'limit-exceeded' })
   })
   it('stops on logout between source queries and rejects pre-cancelled capture', async () => {

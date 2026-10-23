@@ -230,6 +230,7 @@ describe('neutral solid borders are hairlines', () => {
    */
   const RING_TRACKS = new Set([
     'boot-page.module.css .spinner',
+    'ResultView.module.css .spinner',
   ])
 
   it('rejects a wide neutral border and a wide filled divider', () => {

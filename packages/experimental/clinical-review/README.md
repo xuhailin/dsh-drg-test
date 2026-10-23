@@ -33,7 +33,7 @@ The hosted-workspace deployment supplies the broker URL, opaque owner identity, 
 
 | Field | Default | Meaning |
 |---|---|---|
-| `brokerBaseUrl` | Required | HTTP(S) base for broker `launch`, `consume`, and `capture` requests |
+| `brokerBaseUrl` | Required | HTTP(S) base for broker `launch`, `consume`, `authorize`, and `capture` requests |
 | `runtimeTokenEnv` | Required | Credential/environment name for the private runtime token |
 | `ownerId` | Required | Fixed authenticated owner identity supplied by the gateway |
 | `cwd` | Required | Private working directory for new encounter Sessions |
@@ -57,9 +57,17 @@ The [configuration schema](src/config.ts) validates deployment bounds. To replac
 
 The [EMR entry plugin](../client-emr-entry/README.md) opens an encounter and exposes review controls. The authenticated POST routes under `/api/clinical-review/` accept JSON: `launch` takes a validated EMR launch claim; `review` takes `sessionId`, `eventId`, and `trigger` (`manual-review` or `discharge-order`); `refresh` takes `sessionId` and `eventId`; `status` takes `sessionId`. Responses are not cached. Opening with `trigger: open` binds metadata without fetching clinical text or waking the model.
 
-Review and refresh acknowledge durable admission with `sessionId`, `revision`, `status: accepted | duplicate`, and `dischargeBlocked: false`. Source collection continues asynchronously. Repeating an event ID never starts a second review. A new intended operation needs a new event ID. Review wakes the existing DSH Agent after an authorized snapshot is durable; refresh captures evidence and invalidates the previous report without a model wake. Status exposes progress and report availability only; clinical report text is read through the reauthorized chat tool.
+Review and refresh acknowledge durable admission with `sessionId`, `revision`, `status: accepted | duplicate`, and `dischargeBlocked: false`. Source collection continues asynchronously. Repeating an event ID never starts a second review. A new intended operation needs a new event ID. Review wakes the existing DSH Agent after an authorized snapshot is durable; refresh captures evidence and invalidates the previous report without a model wake. Status exposes progress and active report availability only; saved report text is available through the authorized result API.
 
 One owner/source/hospital/inpatient identity selects one private Session. A Session cannot switch patients. Reopening the same encounter with a changed authorized binding invalidates its old snapshot, read ranges, and report. Forks retain historical text but receive no inherited encounter read authority. Other conversations receive no clinical tools or review instructions.
+
+### Saved results
+
+The browser-safe [`/result` entry](src/result.ts) owns versioned request and response schemas. Authenticated `results` lists saved references for `sessionId`; `result` reads `sessionId`, `resultId`, and the exact accepted-report `revision`. An optional `encounterRef` must match the current binding. Results include original `reportId`, generation and evidence times, exact quotations with retained source metadata, coverage, and separate unavailable DRG/DIP states. Listing can be empty; an unavailable reference returns `result-not-found`. Reads recheck the signed binding and current encounter policy through the broker's authorization-only route, without evidence capture or a model request. Exact encounter grants require no source query; department grants also verify current department membership and fail closed if that verification is unavailable. A later explicit refresh or review capture compares the complete accepted source inventory and coverage, including additions and deletions; results expose `unchanged`, `changed`, or `unknown`, the check time, and `accepted-snapshot` scope. This comparison makes no claim about sources outside the provider's coverage.
+
+The logical `resultId` remains stable within its Session. Revisions count accepted unique reports rather than review attempts; failed or cancelled attempts do not create report revisions. A separate projection recovers each report's original snapshot from complete retained Session records. Old quotations remain unchanged after refresh. Missing retained metadata is null or explicitly unavailable, and legacy findings map only their existing validated classification to the three registered issue codes (`inconsistency`, `missing-information`, `needs-verification`), with no inferred clinical rule, semantic field, or navigation target. Generation time is recovered from the original report record; a history-only legacy report has no inferred generation time.
+
+`rerun` accepts the exact result selection, required `encounterRef`, and `requestId`, then acknowledges asynchronous review admission. Every retry rechecks current authorization. The same request and parameters return its original admission revision without redispatch; changing the selected revision or other parameters under that ID is rejected. Current review progress is independent of the selected report, and failed reviews preserve earlier accepted reports. The API does not navigate or write EMR records.
 
 ### Failures and recovery
 
@@ -77,7 +85,7 @@ An uncertain Session flush stops dependent review work and reports `durability: 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-[The bridge](src/bridge.ts) uses Connection's authenticated fetch registry. [The reader](src/reader.ts) obtains a one-use launch grant, consumes the binding, and verifies bounded evidence responses against the fixed owner. [The coordinator](src/state.ts) serializes each Session's writes, flushes durable admission before asynchronous work, and rejects superseded results. [The projection](src/projection.ts) rebuilds state from complete plugin records. [Scoped tools](src/tools.ts) expose only the exact Agent's accepted snapshot and proposal; the standard Session Controller and Agent followup mechanism own model execution.
+[The bridge](src/bridge.ts) uses Connection's authenticated fetch registry. [The reader](src/reader.ts) obtains a one-use launch grant, consumes the binding, and verifies bounded evidence responses against the fixed owner. [The coordinator](src/state.ts) serializes each Session's writes, flushes durable admission before asynchronous work, and rejects superseded results. [The state projection](src/projection.ts) rebuilds active review state; the [result projection](src/result-projection.ts) retains immutable report and evidence associations across refresh and restart. [Scoped tools](src/tools.ts) expose only the exact Agent's accepted snapshot and proposal; the standard Session Controller and Agent followup mechanism own model execution.
 
 Disposing the plugin aborts source work, waits for admitted tasks, and removes routes and scoped tools. Binding, snapshots, read ranges, proposals, and event outcomes are stored in the private Session log. No runtime token or database credential is written there.
 
@@ -122,7 +130,7 @@ This plugin supports advisory review within the current provider's declared cove
 - It does not calculate DRG groups, DIP scores, reimbursement, confirmed codes, or discharge eligibility, and performs no EMR writeback.
 - Freshness currently recaptures the full authorized snapshot for every clinical tool call. The provider can replace this implementation while preserving revision and authorization guarantees.
 - There is no automatic retry after interruption or unknown persistence, and no cross-patient selector tool. Retention limits require operator capacity review.
-- Saved reports and source text remain private conversation history; reauthorization controls new source/report tool reads, not removal of previously displayed messages.
+- Saved reports and source text remain private conversation history; reauthorization controls new API and tool reads, not removal of previously displayed messages. Saved-result reads do not recapture evidence or initiate freshness comparisons, and provide no verified EMR navigation mappings.
 
 <a id="dev-note"></a>
 ### Dev Note

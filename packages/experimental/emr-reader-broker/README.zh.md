@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-打开明确授权的测试就诊，只读捕获就诊、诊断、医嘱及文书证据。个人运行实例仅接收其获准访问的就诊资料；数据库凭据与绑定密钥留在网关。缺失文书正文及不支持的来源会明确标出。此开发白名单不等于医院生产权限控制。
+浏览明确授权的开发科室与在院患者、打开就诊，只读捕获就诊、诊断、医嘱及文书证据。个人运行实例仅接收其获准访问的就诊资料；数据库凭据与绑定密钥留在网关。缺失文书正文及不支持的来源会明确标出。此开发白名单不等于医院生产权限控制。
 
 ## 目录
 
@@ -36,11 +36,13 @@ kind: "package-reference"
 
 数据库文件为 JSON，包含 `host`、`port`、`database`、`user`、`password` 及可选布尔值 `ssl`。使用仅有 SELECT 权限的专用账号。每次捕获还会开启 `REPEATABLE READ READ ONLY` 事务。绑定密钥文件至少包含 32 个字符；重启时保持稳定，轮换后旧绑定失效。这些文件仅挂载到网关，并由运维控制权限。
 
-白名单 JSON 包含 `schemaVersion: 1` 和 `entries`。每条记录必须包含 `issuer`、`subject`、`sourceSystem`、`hospitalCode` 及十进制字符串 `inpatId`；`inpatCode` 和 `sourceVisitId` 为可选的已核实映射。代理要求恰好匹配一条记录，并在每次操作时重读文件。空列表不授权任何病例；格式错误或重复记录会拒绝访问。
+白名单 JSON 包含 `schemaVersion: 1`、`entries` 及可选的 `departments`。精确就诊记录必须包含 `issuer`、`subject`、`sourceSystem`、`hospitalCode` 及十进制字符串 `inpatId`；`inpatCode` 和 `sourceVisitId` 为可选的已核实映射。科室授权包含相同的账号、来源和医院字段，以及 `departmentCode`，仅允许来源状态为 `4` 或 `5` 的有效在院患者。代理在每次操作时重读策略。授权列表均为空时不允许访问；格式错误或重复授权会拒绝访问。精确就诊授权独立有效，将其替换为仅科室授权时必须移除对应精确记录。
 
-[配置校验](src/config.ts)拥有所有限值。默认每个受支持类别允许 500 条记录、每条来源正文 256 KiB、完整响应 4 MiB，请求期限 15 秒、并发请求 4 个。任一限值超出都拒绝本次捕获，不接受截断快照。
+[配置校验](src/config.ts)拥有所有限值。默认每个受支持类别允许 500 条记录、目录每页 50 名患者、每条来源正文 256 KiB、完整响应 4 MiB，请求期限 15 秒、并发请求 4 个。任一捕获限值超出都拒绝本次捕获，不接受截断快照。
 
 启动操作校验声明的标识，返回绑定账号、有效五分钟的一次性凭据。消费操作将其换成经认证的就诊绑定；捕获操作再次校验绑定及当前白名单。启动凭据仅保留在内存中，重启后失效。启动事件不修改出院事务、不创建模型请求，也不建立医院授权策略。
+
+[目录](src/directory.ts)仅列出已授权科室，采用字面搜索及 SQL 绑定值分页读取其在院患者。仅返回就诊标识、患者姓名及床位；浏览不创建模型请求或额外权限。`/authorize` 检查已签名绑定，不重新采集证据。精确就诊授权的此项检查无需读库；科室授权必须读取当前住院记录，转科、出院、撤权或来源不可用时拒绝访问。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现
@@ -48,7 +50,7 @@ kind: "package-reference"
 <details>
 <summary>实现细节 — 点击展开</summary>
 
-[代理](src/http.ts)拥有固定的 `/runtime/emr/launch`、`/runtime/emr/consume` 及 `/runtime/emr/capture` POST 路由。[授权](src/policy.ts)使用仅网关持有的 HMAC 密钥认证绑定字段。[固定 SQL](src/sql.ts)采用参数值选择明确列、校验医院归属，并通过文书主记录关联正文。不接受任意 SQL、路径、URL 或医生身份覆盖。
+[代理](src/http.ts)拥有固定的 `/runtime/emr/launch`、`/runtime/emr/consume`、`/runtime/emr/authorize`、`/runtime/emr/capture`、`/runtime/emr/departments` 及 `/runtime/emr/patients` POST 路由。[授权](src/policy.ts)使用仅网关持有的 HMAC 密钥认证绑定字段。[固定 SQL](src/sql.ts)采用参数值选择明确列、校验医院归属，并通过文书主记录关联正文。不接受任意 SQL、路径、URL 或医生身份覆盖。
 
 [读取器](src/reader.ts)将保存的原始内容、来源元数据、覆盖情况、绑定及提供方版本计算为 `caseRevision`；证据未变时，不同采集时间保持相同版本。`capturedAt` 和 `cutoff` 独立记录本次采集时间。不可用文书正文标为未读，医嘱状态与实际执行证据保持区分。发布前拒绝超限，每条查询前重验登录，并在返回前重读授权。取消会关闭来源连接；卸载会停止请求并移除运行实例处理器。
 

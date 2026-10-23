@@ -8,11 +8,19 @@ The experimental [encounter reader](../../packages/experimental/emr-encounter/RE
 
 `ClinicalActor` identifies the authenticated account by its runtime ID, issuer, and subject. `EncounterBinding` associates that identity with an authorized source system, hospital, and inpatient encounter. Browser launch claims require server authorization before they become a binding; model arguments cannot select the actor or replace the binding. The [reader broker](../../packages/experimental/emr-reader-broker/README.md) owns the current source authorization and capture implementation.
 
+## Authorized directory
+
+The browser-safe [directory records](../../packages/experimental/emr-encounter/src/directory.ts) use `DepartmentDirectory` for authorized labels and `PatientDirectoryRequest` / `PatientDirectory` for bounded inpatient pages. The broker binds department grants to the exact account issuer and subject, source system, hospital, and department. Current source records must be valid inpatients with state `4` or `5`. Browsing grants no additional permission and does not start review. The [broker README](../../packages/experimental/emr-reader-broker/README.md) owns grant configuration and query limits.
+
 ## Evidence snapshots
 
 `EncounterSnapshot` contains immutable original sources, category coverage, a capture cutoff, and a content-derived case revision. Source state and coverage contribute to the revision. An empty supported query means no rows were returned; it does not establish clinical absence. Failed or cancelled capture publishes no accepted partial snapshot. The [source types](../../packages/experimental/emr-encounter/src/types.ts) define the exchanged fields.
 
-The review plugin stores its binding, snapshot, operations, and findings through Session plugin records. A report belongs to an exact case revision; refreshing evidence requires another review before presenting current findings. The package README owns report validation, authorization freshness, and recovery limitations.
+## Saved results
+
+The [clinicalResults projection](../../packages/experimental/clinical-review/src/result-projection.ts) recovers accepted reports and their original snapshots from retained Session plugin records without changing the persisted review format. The versioned [saved-result records](../../packages/experimental/clinical-review/src/result.ts), `ResultsResponse` and `ResultResponse`, distinguish the logical result, immutable report revision, finding identities, retained source quotations, progress, coverage, and freshness. Reading results neither invokes the model nor recaptures evidence; an unavailable historical snapshot is explicit.
+
+Each saved-result read and rerun rechecks the owning account and current encounter permission. Exact encounter grants can be checked without the clinical database. Department grants require the current admission, so transfer, discharge, revocation, or source outage prevents access. A previously accepted report is not deleted when a later review fails. The [viewer plugin](../../packages/experimental/client-clinical-results/README.md) shares presentation between chat cards, the right panel, and an independent page; unverified EMR navigation stays unavailable.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
