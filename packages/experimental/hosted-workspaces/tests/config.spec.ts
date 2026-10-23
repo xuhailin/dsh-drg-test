@@ -18,6 +18,8 @@ describe('hosted deployment configuration', () => {
     expect(config.gatewayPort).toBe(8443)
     expect(config.runtimePort).toBe(3081)
     expect(config.oidcFlow).toBe('authorization-code')
+    expect(config.oidcNameClaim).toBe('name')
+    expect(config.oidcCodeClaim).toBe('preferred_username')
     expect(config.maxCallbackBytes).toBe(65536)
   })
 
@@ -26,6 +28,14 @@ describe('hosted deployment configuration', () => {
     expect(config.oidcFlow).toBe('implicit')
     expect(config.clientSecretFile).toBeUndefined()
     expect(config.maxCallbackBytes).toBe(8192)
+  })
+
+  it('accepts explicit name and account-code claim mappings and rejects empty claim names', () => {
+    const config = deployment({ oidcNameClaim: 'nickname', oidcCodeClaim: 'name' })
+    expect(config.oidcNameClaim).toBe('nickname')
+    expect(config.oidcCodeClaim).toBe('name')
+    expect(() => deployment({ oidcNameClaim: '' })).toThrow()
+    expect(() => deployment({ oidcCodeClaim: 'user code' })).toThrow()
   })
 
   it('resolves explicit Responses settings without reusing legacy Messages defaults', () => {

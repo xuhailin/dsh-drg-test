@@ -11,6 +11,7 @@ import { AccountAvatar } from './AccountAvatar.tsx'
 import type { AccountAvatarSnapshot } from './account-avatar.ts'
 import { authorizeUrlWithTheme } from './authorize-url.ts'
 import type { BonusNotice } from './bonus-notices.ts'
+import type { WorkspaceAccount } from './workspace-account.ts'
 import css from './AccountSection.module.css'
 
 /** Safe account snapshot shared by the settings page and launcher. */
@@ -40,6 +41,8 @@ export interface AccountSnapshot {
 
 /** Host operations injected into the Cordis-free account component. */
 export interface AccountSectionInjected {
+  /** Gateway-authenticated workspace account, independent of the DeepSeek model credential. */
+  workspaceAccount?: WorkspaceAccount
   /** @param snapshot - picture attempt whose rendered image failed; superseded attempts are ignored. */
   avatarFailed: (snapshot: AccountAvatarSnapshot) => void
   /** Subscribe to live credential-expiry notifications.
@@ -90,7 +93,9 @@ export interface AccountSectionInjected {
 export type AccountSectionProps =
   PropsRuntime<'settings.section'> & PropsLocale<'settings.account'> & InjectFace<AccountSectionInjected>
 /** @param props - localized actions, account subscription, and the shared Platform page channel. @returns account settings UI. */
-export function AccountSection({ t, useAccount, useTheme, start, cancel, openPlatformPage, avatarFailed }: AccountSectionProps) {
+export function AccountSection({
+  t, useAccount, useTheme, start, cancel, openPlatformPage, avatarFailed, workspaceAccount,
+}: AccountSectionProps) {
   const { view: state, details, avatar, failed: streamFailed } = useAccount(value => value)
   const colorScheme = useTheme(snapshot => snapshot.active.colorScheme)
   // The shared host owns the native view; this page holds only its own request,
@@ -146,6 +151,19 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
     : attempt?.phase === 'expired' ? t('expired')
       : active ? t(attempt.phase === 'initializing' ? 'initializing' : attempt.phase === 'waiting-browser' ? 'waiting' : 'completing')
         : signedIn ? profile?.contact ?? t(details?.profile === undefined ? 'loading' : 'profileUnavailable') : t('signInDescription')
+  if (workspaceAccount) return (
+    <section className={css.section} aria-label={t('workspaceNav')}>
+      <div className={css.card}>
+        <div className={css.identity}>
+          <span className={css.avatar}><AccountAvatar avatar={undefined} avatarFailed={avatarFailed} /></span>
+          <div className={css.identityCopy}>
+            <span className={css.name}>{workspaceAccount.name}</span>
+            <span className={css.status}>{t('workspaceSignedIn')}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
   if (!signedIn && !active) return (
     <section className={css.signedOut} aria-label={t('nav')}>
       <div className={css.signedOutContent}>

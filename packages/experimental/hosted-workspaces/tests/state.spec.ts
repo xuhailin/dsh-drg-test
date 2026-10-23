@@ -57,11 +57,26 @@ describe('HostedState', () => {
     expect(alice.modelToken).toMatch(/^[A-Za-z0-9_-]{43}$/u)
     expect(renamed.id).toBe(alice.id)
     expect(renamed.modelToken).toBe(alice.modelToken)
+    expect(renamed.name).toBe('New display label')
+    expect(state.modelUser(alice.modelToken)?.name).toBe('New display label')
     expect(new Set([alice.id, otherIssuer.id, otherSubject.id]).size).toBe(3)
     expect(state.modelUser(alice.modelToken)?.id).toBe(alice.id)
     expect(state.modelUser(undefined)).toBeUndefined()
     expect(state.modelUser('short')).toBeUndefined()
     expect(state.modelUser(randomCredential())).toBeUndefined()
+  })
+
+  it('refreshes the verified display label for existing logins and persists it across restart', async () => {
+    const world = await harness()
+    const original = await world.state.user({ ...ALICE, name: '88888' })
+    const login = await world.state.login(original, 60_000)
+    const refreshed = await world.state.user({ ...ALICE, name: '测试医生（88888）' })
+    expect(refreshed.id).toBe(original.id)
+    expect(refreshed.modelToken).toBe(original.modelToken)
+    expect(world.state.find(login.token)?.user.name).toBe('测试医生（88888）')
+    await world.ctx.fiber.dispose()
+    const reopened = await world.open()
+    expect(reopened.state.find(login.token)?.user).toEqual(refreshed)
   })
 
   it('persists browser logins by digest and reopens their account and revocation state', async () => {

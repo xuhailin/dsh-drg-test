@@ -212,6 +212,8 @@ describe('private workspace proxy', () => {
       expect(response.status).toBe(200)
       expect(body).toContain('<main>DSH content</main>')
       expect(body).toContain('action="/auth/logout"')
+      expect(body).toContain('id="dsh-workspace-account"')
+      expect(body).not.toContain('class="dsh-hosted-account"')
       expect(body).toContain('退出登录')
       expect(body).toContain('&lt;script&gt;bad&amp;&quot;label&lt;/script&gt;')
       expect(body).not.toContain('<script>bad')

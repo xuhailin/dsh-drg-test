@@ -44,6 +44,7 @@ kind: "package-bundle"
 | `issuer`, `clientId` | 必填 | 已注册的 OIDC 提供方和应用 |
 | `discoveryUrl` | 从 issuer 发现 | 可选的内部发现 URL；返回的 issuer 仍须匹配 |
 | `oidcFlow` | `authorization-code` | 授权码登录；仅返回 ID token 的提供方可使用 `implicit` |
+| `oidcNameClaim`, `oidcCodeClaim` | `name`, `preferred_username` | 已验证 ID token 中用于显示姓名与账号编码的字段 |
 | `clientSecretFile` | 未设置 | 仅网关读取的授权码机密客户端密钥；implicit 模式忽略此项 |
 | `modelProtocol` | `anthropic-messages` | Messages 或 `openai-responses` 流式协议 |
 | `modelKeyFile`, `modelBaseUrl` | 未设置 | 显式指定仅供网关使用的密钥文件及协议 API 根地址；Responses 两项均必填 |
@@ -70,7 +71,7 @@ Responses 的 `modelBaseUrl` 包含 API 前缀，例如 `https://models.example.
 
 网关从经过验证的 OIDC issuer 和 subject 推导账号。它根据自己的账号记录选择个人运行实例，校验浏览器 origin，并用仅供后端使用的 DSH cookie 替换浏览器凭据。运行实例凭据授权模型代理和可选 `/runtime/` 处理器；上游 Key 不进入个人容器。处理器接收已验证账号、取消信号及当前登录检查，负责资源权限校验。临床读取要求该账号至少保留一个未过期浏览器登录；退出一个浏览器不会撤销另一个仍有效的登录。
 
-退出登录会撤销对应浏览器会话，并关闭该会话获准建立的连接。个人数据和后台工作会保留，公司身份提供方的会话不会退出。网关重启会保留账号记录及既有容器；必须将网关存储与个人数据卷一起备份。
+当姓名与账号编码均存在且不同时，侧栏账号入口显示已验证的公司用户为“姓名（code）”；否则显示可用字段或 subject。每次成功 SSO 登录都会刷新该显示名，同时保留账号身份、模型凭据与私有工作区。其菜单中的“退出登录”会撤销对应浏览器会话，并关闭该会话获准建立的连接。个人数据、后台工作及单独配置的 DeepSeek 凭据会保留，公司身份提供方的会话不会退出。网关重启会保留账号记录及既有容器；必须将网关存储与个人数据卷一起备份。
 
 设置 `sharedResourcesPath` 后，每个个人实例获得 `DSH_SHARED_RESOURCES_ROOT=/opt/dsh/resources`，并以非递归、只读方式绑定已发布集合。实例管理器在复用前核验来源、目标、只读状态及私有传播方式。通过[资料工具](../drg-resources/README.zh.md)准备集合；网关不校验包内容，也不授予分组就绪资格。既有容器挂载不符时返回 `resource_conflict`，由运维保留 home 卷后替换容器。不设置该选项时保留无资料的运行方式。
 
@@ -84,7 +85,7 @@ Responses 的 `modelBaseUrl` 包含 API 前缀，例如 `https://models.example.
 
 网关默认使用 PKCE、nonce 和绑定浏览器的 state 完成授权码登录。implicit 兼容模式仅请求 `id_token`；回调页面移除 URL fragment，再通过同源 POST 提交，由服务端验证签名、issuer、audience、有效期、nonce 和 state。两种模式均不使用密码授权，也不请求 EMR 业务 access token。DSH 不将 ID token 或 access token 保存到 localStorage。[注册指南](../../../docs/user/guide/hosted-workspaces.zh.md#sso-registration)拥有提供方设置。
 
-网关通过短时、一次性的交接，将验证后的浏览器会话转移到该账号独立的 origin。implicit fragment 中转页将表单限制为 CSP `form-action 'self'`。其 POST 返回使用 `form-action 'none'` 的入口 HTTP 200 页面，由 meta refresh 导航到该交接地址。交接返回一个文档，由该文档发起新的同源导航，结束身份提供方的重定向链。账号／退出栏在 DSH 应用上方预留空间。HTTP 和 WebSocket 请求只会到达该有效会话所选择的运行实例。
+网关通过短时、一次性的交接，将验证后的浏览器会话转移到该账号独立的 origin。implicit fragment 中转页将表单限制为 CSP `form-action 'self'`。其 POST 返回使用 `form-action 'none'` 的入口 HTTP 200 页面，由 meta refresh 导航到该交接地址。交接返回一个文档，由该文档发起新的同源导航，结束身份提供方的重定向链。隐藏的账号表单向侧栏提供身份及原生 POST 退出操作，不改变应用布局。HTTP 和 WebSocket 请求只会到达该有效会话所选择的运行实例。
 
 DRG Agent 状态页区分登录恢复和工作区恢复，并在验证及交接期间显示加载状态。已有有效会话的空 implicit 回调会经统一入口恢复；携带 state 的 fragment 仍须验证。网关失败日志只包含操作及安全的分类代码，不输出原始错误消息、OAuth／JWT 值或密钥。
 

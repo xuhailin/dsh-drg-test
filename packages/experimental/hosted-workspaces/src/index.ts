@@ -36,6 +36,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   ctx.effect(() => () => domain.close(), 'hosted-workspaces: private records')
   const oidc = await OidcLogin.create({
     issuer: config.issuer, clientId: config.clientId, flow: config.oidcFlow, redirectUri: `${entry.origin}/auth/callback`,
+    nameClaim: config.oidcNameClaim, codeClaim: config.oidcCodeClaim,
     ...(config.discoveryUrl === undefined ? {} : { discoveryUrl: config.discoveryUrl }),
     ...(config.oidcFlow === 'authorization-code' && config.clientSecretFile !== undefined
       ? { clientSecret: await secret(config.clientSecretFile) } : {}),

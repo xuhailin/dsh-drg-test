@@ -20,6 +20,10 @@ export interface Config {
   clientId: string
   /** OIDC response flow; implicit accepts a signed ID token through the portal callback. */
   oidcFlow: OidcFlow
+  /** Verified ID-token claim containing the person's display name. */
+  oidcNameClaim: string
+  /** Verified ID-token claim containing the account code shown beside the name. */
+  oidcCodeClaim: string
   /** Gateway-only client_secret_basic secret file for authorization-code; implicit does not read it. */
   clientSecretFile?: string
   /** Wire protocol admitted by the private model proxy. */
@@ -102,6 +106,8 @@ export const Config: z<Partial<Config>, Config> = z.object({
   discoveryUrl: z.string(),
   clientId: z.string().required(),
   oidcFlow: z.union(['authorization-code', 'implicit']).default('authorization-code'),
+  oidcNameClaim: z.string().pattern(/^\S+$/u).default('name'),
+  oidcCodeClaim: z.string().pattern(/^\S+$/u).default('preferred_username'),
   clientSecretFile: z.string(),
   modelProtocol: z.union(['anthropic-messages', 'openai-responses']).default('anthropic-messages'),
   modelKeyFile: z.string(),

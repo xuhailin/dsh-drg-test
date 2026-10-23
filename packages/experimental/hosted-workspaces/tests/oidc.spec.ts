@@ -316,6 +316,28 @@ describe('OIDC login', () => {
     expect((await login.finish(await provider.authorize(fallback.authorizationUrl), fallback.flowCookie)).identity.name).toBe('doctor-a')
   })
 
+  it.each(['authorization-code', 'implicit'] as const)('combines configured signed name and account-code claims in %s mode', async (flow) => {
+    provider.claims = { nickname: '测试医生', name: '88888' }
+    const login = await createLogin({ flow, nameClaim: 'nickname', codeClaim: 'name' })
+    const pending = await login.begin(returnOrigin)
+    expect(new URL(pending.authorizationUrl).searchParams.get('scope')).toBe('openid profile')
+    const completed = await login.finish(await provider.authorize(pending.authorizationUrl), pending.flowCookie)
+    expect(completed.identity.name).toBe('测试医生（88888）')
+    expect(completed.identity.subject).toBe('doctor-a')
+  })
+
+  it.each([
+    [{ name: 'Dr Lin', preferred_username: 'lin' }, 'Dr Lin（lin）'],
+    [{ name: 'lin', preferred_username: 'lin' }, 'lin'],
+    [{ name: '  Dr Lin  ', preferred_username: '  lin  ' }, 'Dr Lin（lin）'],
+    [{ name: 'Dr Lin', preferred_username: ['lin'] }, 'Dr Lin'],
+  ])('formats only non-empty string name and code claims', async (claims, expected) => {
+    provider.claims = claims
+    const login = await createLogin()
+    const flow = await login.begin(returnOrigin)
+    expect((await login.finish(await provider.authorize(flow.authorizationUrl), flow.flowCookie)).identity.name).toBe(expected)
+  })
+
   it('expires old flows and reclaims their bounded capacity', async () => {
     const login = await createLogin({ maxPendingFlows: 1, flowTtlMs: 100 })
     const originalNow = Date.now()

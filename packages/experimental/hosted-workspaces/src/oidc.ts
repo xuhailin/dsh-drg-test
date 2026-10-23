@@ -12,6 +12,10 @@ export interface OidcLoginOptions {
   /** Omit to discover through issuer; an internal discovery URL must report the same issuer. */
   discoveryUrl?: string
   clientId: string
+  /** Verified name claim; omission uses the standard name claim. */
+  nameClaim?: string
+  /** Verified account-code claim; omission uses preferred_username. */
+  codeClaim?: string
   /** Code flow uses client_secret_basic when present, otherwise a public client; implicit ignores this value. */
   clientSecret?: string
   redirectUri: string
@@ -26,6 +30,7 @@ export interface OidcLoginOptions {
 export interface OidcIdentity {
   issuer: string
   subject: string
+  /** Verified display name with the account code when both are available and differ. */
   name: string
 }
 
@@ -67,6 +72,8 @@ export class OidcLogin {
     private readonly flowTtlMs: number,
     private readonly maxPendingFlows: number,
     private readonly flow: OidcFlow,
+    private readonly nameClaim: string,
+    private readonly codeClaim: string,
   ) {}
 
   /**
@@ -136,6 +143,8 @@ export class OidcLogin {
       options.flowTtlMs,
       options.maxPendingFlows,
       options.flow,
+      options.nameClaim ?? 'name',
+      options.codeClaim ?? 'preferred_username',
     )
   }
 
@@ -242,11 +251,12 @@ export class OidcLogin {
       if (claims === undefined || typeof claims.sub !== 'string' || !claims.sub.trim()) {
         throw new OidcLoginError('provider', 'OIDC provider did not return a usable subject claim.')
       }
-      const name = typeof claims.name === 'string' && claims.name.trim()
-        ? claims.name
-        : typeof claims.preferred_username === 'string' && claims.preferred_username.trim()
-          ? claims.preferred_username
-          : claims.sub
+      const nameValue = claims[this.nameClaim]
+      const codeValue = claims[this.codeClaim]
+      const displayName = typeof nameValue === 'string' ? nameValue.trim() : ''
+      const code = typeof codeValue === 'string' ? codeValue.trim() : ''
+      const name = displayName && code && displayName !== code
+        ? `${displayName}（${code}）` : displayName || code || claims.sub
       return { identity: { issuer: this.issuer, subject: claims.sub, name }, returnOrigin: flow.returnOrigin }
     } catch (cause) {
       if (cause instanceof OidcLoginError) throw cause

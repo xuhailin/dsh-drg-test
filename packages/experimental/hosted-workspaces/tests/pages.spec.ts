@@ -197,7 +197,7 @@ describe('hosted account pages', () => {
     expect(result.body.textContent).not.toContain('个人 DSH 工作区')
   })
 
-  it('preserves the actual document while inserting a POST logout control with an escaped identity label', () => {
+  it('preserves the actual document and publishes the escaped identity through a hidden POST form', () => {
     const name = '<img src=x onerror="bad()"> & \'Doctor\''
     const result = document(withLogout('<!doctype html><html><BODY class="chat"><main>Conversation</main></BODY></html>', name, 'zh-CN'))
     expect(result.querySelector('main')?.textContent).toBe('Conversation')
@@ -205,32 +205,22 @@ describe('hosted account pages', () => {
     const form = result.querySelector('form')
     expect(form?.getAttribute('method')).toBe('post')
     expect(form?.getAttribute('action')).toBe('/auth/logout')
-    expect(form?.querySelector('span')?.textContent).toBe(name)
-    expect(form?.querySelector('span')?.getAttribute('title')).toBe(name)
+    expect(form?.id).toBe('dsh-workspace-account')
+    expect(form?.getAttribute('data-name')).toBe(name)
+    expect(form?.hidden).toBe(true)
     expect(form?.querySelector('button')?.textContent).toBe('退出登录')
     expect(form?.querySelector('img')).toBeNull()
   })
 
-  it('reserves an account row without covering workspace controls and truncates a long label', () => {
+  it('keeps a long account label without injecting layout or a visible account bar', () => {
     const name = 'Doctor '.repeat(80)
     const result = document(withLogout('<html><body><div id="root">Workspace controls</div></body></html>', name, 'en-US'))
-    const view = result.defaultView
     const form = result.querySelector('form')
-    const label = form?.querySelector('span')
     const root = result.querySelector('#root')
-    if (view === null || form === null || label === undefined || label === null || root === null) throw new Error('missing account document')
-    expect(view.getComputedStyle(result.body).display).toBe('grid')
-    expect(view.getComputedStyle(result.body).gridTemplateRows).toBe('auto minmax(0,1fr)')
-    expect(view.getComputedStyle(root).gridRow).toBe('2')
-    expect(view.getComputedStyle(root).minHeight).toBe('0px')
-    expect(view.getComputedStyle(root).minWidth).toBe('0px')
-    expect(view.getComputedStyle(form).position).not.toBe('fixed')
-    expect(view.getComputedStyle(form).gridRow).toBe('1')
-    expect(view.getComputedStyle(form).margin).toBe('0px')
-    expect(view.getComputedStyle(label).textOverflow).toBe('ellipsis')
-    expect(view.getComputedStyle(label).minWidth).toBe('0px')
-    expect(label.textContent).toBe(name)
-    expect(label.getAttribute('title')).toBe(name)
+    expect(form?.getAttribute('data-name')).toBe(name)
+    expect(form?.hidden).toBe(true)
+    expect(root?.textContent).toBe('Workspace controls')
+    expect(result.querySelector('style,.dsh-hosted-account')).toBeNull()
   })
 
   it('defaults the logout control to English without a language header', () => {

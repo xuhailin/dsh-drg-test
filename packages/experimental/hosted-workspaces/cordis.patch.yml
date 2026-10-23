@@ -25,6 +25,8 @@
         discoveryUrl: !!js process.env.HOSTED_OIDC_DISCOVERY_URL || undefined
         clientId: !!js process.env.HOSTED_OIDC_CLIENT_ID
         oidcFlow: !!js process.env.HOSTED_OIDC_FLOW || 'authorization-code'
+        oidcNameClaim: !!js process.env.HOSTED_OIDC_NAME_CLAIM || 'name'
+        oidcCodeClaim: !!js process.env.HOSTED_OIDC_CODE_CLAIM || 'preferred_username'
         clientSecretFile: !!js process.env.HOSTED_OIDC_CLIENT_SECRET_FILE || undefined
         deepseekKeyFile: !!js process.env.HOSTED_DEEPSEEK_KEY_FILE
         deepseekBaseUrl: !!js process.env.HOSTED_DEEPSEEK_BASE_URL || 'https://api.deepseek.com/anthropic'

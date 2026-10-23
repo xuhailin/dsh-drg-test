@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /** Account operations in the shipped client composition, in Desktop and in a plain browser. */
-import { afterEach, beforeEach, expect, vi } from 'vitest'
+import { afterEach, beforeEach, expect, onTestFinished, vi } from 'vitest'
 import { ok } from '@deepseek-ai/dsh-remote-mock'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { createClientTest, type TestClient, webApp } from '@deepseek-ai/dsh-client-test-runtime/src/assembly/index.ts'
@@ -75,6 +75,34 @@ it('registers account sign-in in a plain browser without the Desktop-only surfac
     expect(c.ctx.slots.entries('shell.overlay').some(entry => entry.options.id === 'desktop-onboarding')).toBe(false)
     expect(operations(c).hooks.account.getSnapshot().desktopOnboardingVisible).toBe(false)
   }
+}, 60_000)
+
+it('keeps the company account section across DeepSeek sign-out and client reload', async ({ start }) => {
+  const form = document.createElement('form')
+  form.id = 'dsh-workspace-account'
+  form.setAttribute('data-name', 'Company Doctor')
+  form.method = 'post'
+  form.action = '/auth/logout'
+  form.hidden = true
+  document.body.append(form)
+  onTestFinished(() => { form.remove() })
+  const submit = vi.spyOn(form, 'requestSubmit').mockImplementation(() => {})
+  const c = await start()
+  for (const reload of [false, true]) {
+    if (reload) await c.reload(SELF)
+    await c.mock.streams.opened('account/watch', reload ? 2 : 1)
+    const actions = operations(c)
+    expect(actions.workspaceAccount?.name).toBe('Company Doctor')
+    c.mock.streams.push('account/watch', view)
+    await vi.waitFor(() => { expect(actions.hooks.account.getSnapshot().view?.status).toBe('signed-out') })
+    const entries = c.ctx.slots.entries('settings.section').filter(entry => entry.options.id === 'account')
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.inject!()).toBe(actions)
+    expect(resolveSlotLabel(entries[0]!.options.label)).toBe('Account')
+  }
+  operations(c).workspaceAccount?.signOut()
+  expect(submit).toHaveBeenCalledOnce()
+  expect(c.mock.remote.account.signOut).not.toHaveBeenCalled()
 }, 60_000)
 
 it('claims account balance notices from the frame-wide quota chain and declines generic quota', async ({ start }) => {

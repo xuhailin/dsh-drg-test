@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, act, within } from '@testing-librar
 import { useMemo, useSyncExternalStore } from 'react'
 import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
 import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
-import type { AccountDetails, AccountView, SignInAttemptId } from '@deepseek-ai/dsh-deepseek-account/types'
+import type { AccountDetails, AccountUserId, AccountView, SignInAttemptId } from '@deepseek-ai/dsh-deepseek-account/types'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { PlatformBridge } from '../src/client/PlatformOverlay.tsx'
 import { createPlatformPages, type PlatformPages } from '../src/client/platform-pages.ts'
@@ -100,6 +100,47 @@ async function accountMenu(operations: AccountSectionInjected, snapshot: () => A
     useTheme={selector => selector(operations.hooks.theme.getSnapshot())}
     openOnboarding={() => {}} openSettings={() => {}} t={key => en[key as AccountKey]} />
 }
+
+it.each([en, zh].flatMap(copy => (['signed-out', 'credential-stored'] as const).map(status => ({ copy, status }))))(
+  'uses the workspace identity and logout while the DeepSeek credential is $status', async ({ copy, status }) => {
+    const operations = operationsOf({ status, attempt: null }, {
+      profile: { status: 'ready', value: { id: 'deepseek-user' as AccountUserId, name: 'DeepSeek User', contact: null } },
+    })
+    const workspaceAccount = { name: 'Company Doctor', signOut: vi.fn() }
+    const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+    render(<AccountMenu {...({} as GlobalStandardProps)} {...operations} workspaceAccount={workspaceAccount}
+      settingsOpen={false} useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+      useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
+      t={key => key in copy ? copy[key as AccountKey] : key} />)
+    const trigger = screen.getByRole('button', { name: copy.menu })
+    expect(trigger.textContent).toBe(workspaceAccount.name)
+    expect(trigger.getAttribute('data-signed-out')).toBe('false')
+    expect(screen.queryByText('DeepSeek User')).toBeNull()
+    fireEvent.click(trigger)
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([copy.settings, copy.contactUs, copy.signOut])
+    await expect(`${trigger.textContent}\n${screen.getByRole('menu').textContent}\n`)
+      .toMatchFileSnapshot(`./expected/menu-workspace-${copy === en ? 'en' : 'zh'}.txt`)
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: copy.signOut })) })
+    expect(workspaceAccount.signOut).toHaveBeenCalledOnce()
+    expect(operations.signOut).not.toHaveBeenCalled()
+    expect(operations.hasRunningAccountTasks).not.toHaveBeenCalled()
+    expect(operations.start).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  },
+)
+
+it.each([en, zh])('shows the company account in settings without a DeepSeek sign-in prompt', (copy) => {
+  const operations = operationsOf({ status: 'signed-out', attempt: null })
+  render(<AccountSection {...({} as GlobalStandardProps)} {...operations}
+    workspaceAccount={{ name: 'Company Doctor', signOut: vi.fn() }}
+    useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+    useTheme={selector => selector(operations.hooks.theme.getSnapshot())} close={() => {}}
+    t={key => key in copy ? copy[key as AccountKey] : key} />)
+  expect(screen.getByRole('region', { name: copy.workspaceNav }).textContent)
+    .toBe(`Company Doctor${copy.workspaceSignedIn}`)
+  expect(screen.queryByRole('button', { name: copy.signIn })).toBeNull()
+  expect(screen.queryByText(copy.settingsSignedOutTitle)).toBeNull()
+})
 
 it.each([en, zh])('renders account cards without inventing profile or balance data', async (copy) => {
   mount({ status: 'credential-stored', attempt: null }, copy)
@@ -474,31 +515,35 @@ it('opens more account information at the configured Platform origin without inv
   expect(platform.open).not.toHaveBeenCalled()
 })
 
-it.each([en, zh])('shows a localized toast when the account credential expires', async (copy) => {
-  vi.useFakeTimers()
-  onTestFinished(() => { vi.useRealTimers() })
-  const operations = mount({ status: 'signed-out', attempt: null }, copy)
-  cleanup()
-  const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
-  let expire: (() => void) | undefined
-  const unsubscribe = vi.fn()
-  const element = <AccountMenu {...({} as GlobalStandardProps)} {...operations}
-    settingsOpen={false} subscribeSessionExpired={(listener) => { expire = listener; return unsubscribe }}
-    useAccount={selector => selector(operations.hooks.account.getSnapshot())}
-    useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
-    t={key => key in copy ? copy[key as AccountKey] : key} />
-  const view = render(element)
-  expect(screen.queryByRole('alert')).toBeNull()
-  act(() => { expire!() })
-  expect(screen.getByRole('alert').textContent).toContain(copy.sessionExpired)
-  await expect(`${screen.getByRole('alert').textContent}\n`).toMatchFileSnapshot(`./expected/expired-${copy === en ? 'en' : 'zh'}.txt`)
-  await act(async () => { await vi.advanceTimersByTimeAsync(4000) })
-  expect(screen.queryByRole('alert')).toBeNull()
-  view.unmount()
-  expect(unsubscribe).toHaveBeenCalledOnce()
-  render(element)
-  expect(screen.queryByRole('alert')).toBeNull()
-})
+it.each([en, zh].flatMap(copy => [false, true].map(workspace => ({ copy, workspace }))))(
+  'shows a localized credential-expiry toast with workspace account $workspace', async ({ copy, workspace }) => {
+    vi.useFakeTimers()
+    onTestFinished(() => { vi.useRealTimers() })
+    const operations = mount({ status: 'signed-out', attempt: null }, copy)
+    cleanup()
+    const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+    let expire: (() => void) | undefined
+    const unsubscribe = vi.fn()
+    const element = <AccountMenu {...({} as GlobalStandardProps)} {...operations}
+      {...workspace ? { workspaceAccount: { name: 'Company Doctor', signOut: vi.fn() } } : {}}
+      settingsOpen={false} subscribeSessionExpired={(listener) => { expire = listener; return unsubscribe }}
+      useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+      useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
+      t={key => key in copy ? copy[key as AccountKey] : key} />
+    const view = render(element)
+    expect(screen.queryByRole('alert')).toBeNull()
+    act(() => { expire!() })
+    expect(screen.getByRole('alert').textContent).toContain(workspace ? copy.workspaceModelSessionExpired : copy.sessionExpired)
+    await expect(`${screen.getByRole('alert').textContent}\n`)
+      .toMatchFileSnapshot(`./expected/expired-${workspace ? 'workspace-' : ''}${copy === en ? 'en' : 'zh'}.txt`)
+    await act(async () => { await vi.advanceTimersByTimeAsync(4000) })
+    expect(screen.queryByRole('alert')).toBeNull()
+    view.unmount()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+    render(element)
+    expect(screen.queryByRole('alert')).toBeNull()
+  },
+)
 
 it.each(['initializing', 'waiting-browser', 'exchanging'] as const)('shows %s and lets the user cancel the active attempt', async (phase) => {
   const operations = mount({ status: 'signed-out', attempt: { id: 'attempt' as SignInAttemptId, phase, authorizeUrl: 'https://example.test/authorize' } })

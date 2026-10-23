@@ -1223,6 +1223,10 @@ export interface Config {
   clientId: string
   /** OIDC response flow; implicit accepts a signed ID token through the portal callback. */
   oidcFlow: OidcFlow
+  /** Verified ID-token claim containing the person's display name. */
+  oidcNameClaim: string
+  /** Verified ID-token claim containing the account code shown beside the name. */
+  oidcCodeClaim: string
   /** Gateway-only client_secret_basic secret file for authorization-code; implicit does not read it. */
   clientSecretFile?: string
   /** Wire protocol admitted by the private model proxy. */

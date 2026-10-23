@@ -54,14 +54,19 @@ export class HostedState {
   /**
    * Resolve or durably enroll one verified OIDC identity.
    * @param identity - signature-verified issuer, subject and display label.
-   * @returns stable user identity and restricted runtime credential.
+   * @returns stable user identity and runtime credential with the latest verified display label.
    */
   user(identity: { issuer: string; subject: string; name: string }): Promise<HostedUser> {
     const run = this.writes.then(async () => {
       const id = createHash('sha256').update(JSON.stringify([identity.issuer, identity.subject])).digest('hex') as HostedUserId
       const table = this.domain.table('users')
       const existing = table.get(id)
-      if (existing !== undefined) return { ...existing, id }
+      if (existing !== undefined) {
+        if (existing.name === identity.name) return { ...existing, id }
+        const renamed = { ...existing, name: identity.name }
+        await table.put(id, renamed)
+        return { ...renamed, id }
+      }
       if ([...table.entries()].length >= this.maxUsers) throw new Error('hosted-workspaces: user capacity reached')
       const record = { ...identity, modelToken: randomCredential() }
       await table.put(id, record)

@@ -36,6 +36,8 @@ services:
       HOSTED_OIDC_DISCOVERY_URL: ${HOSTED_OIDC_DISCOVERY_URL:-}
       HOSTED_OIDC_CLIENT_ID: ${HOSTED_OIDC_CLIENT_ID:-dsh-workspaces}
       HOSTED_OIDC_FLOW: ${HOSTED_OIDC_FLOW:-authorization-code}
+      HOSTED_OIDC_NAME_CLAIM: ${HOSTED_OIDC_NAME_CLAIM:-name}
+      HOSTED_OIDC_CODE_CLAIM: ${HOSTED_OIDC_CODE_CLAIM:-preferred_username}
       HOSTED_OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc_client_secret
       HOSTED_DEEPSEEK_KEY_FILE: /run/secrets/deepseek_api_key
       HOSTED_MODEL_PROTOCOL: ${HOSTED_MODEL_PROTOCOL:-anthropic-messages}

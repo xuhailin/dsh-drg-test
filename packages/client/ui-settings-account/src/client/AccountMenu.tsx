@@ -22,7 +22,7 @@ export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsLocale<'
 export function AccountMenu({
   subscribeSessionExpired, subscribeModelSignInRequired, wide, settingsShortcut, openSettings, openOnboarding, settingsOpen,
   useAccount, useTheme, signOut, hasRunningAccountTasks, refreshAccount, bonusNoticeShown, bonusNoticeDismissed,
-  contactUs, showLogin, start, cancel, avatarFailed, t,
+  contactUs, showLogin, start, cancel, avatarFailed, workspaceAccount, t,
 }: AccountMenuProps) {
   const anchor = useRef<HTMLDivElement>(null)
   // The launcher outlives the panel, so a false-to-true edge is one Settings entry:
@@ -35,6 +35,7 @@ export function AccountMenu({
   const account = useAccount(state => state)
   const colorScheme = useTheme(snapshot => snapshot.active.colorScheme)
   const signedIn = account.view?.status === 'credential-stored'
+  const hasIdentity = workspaceAccount !== undefined || signedIn
   const [signInNotice, setSignInNotice] = useState(0)
   useEffect(() => subscribeModelSignInRequired?.(() => { setSignInNotice(value => value + 1) }), [subscribeModelSignInRequired])
   const [expiryNotice, setExpiryNotice] = useState(false)
@@ -47,6 +48,7 @@ export function AccountMenu({
   const [busy, setBusy] = useState(false)
   const [signOutImpact, setSignOutImpact] = useState<boolean | 'unknown'>()
   const requestSignOut = async () => {
+    if (workspaceAccount) { setOpen(false); workspaceAccount.signOut(); return }
     setBusy(true)
     try { setSignOutImpact(await hasRunningAccountTasks()); setOpen(false) }
     catch (_error) { setSignOutImpact('unknown'); setOpen(false) }
@@ -56,26 +58,27 @@ export function AccountMenu({
   const beginSignIn = (): void => { setOpen(false); void start().catch(() => undefined) }
   return <div ref={anchor} className={css.root}>
     {signInNotice > 0 && <Toast key={signInNotice} text={t('modelSignInRequired')} onDone={() => { setSignInNotice(0) }} />}
-    {expiryNotice && <Toast text={t('sessionExpired')} onDone={() => { setExpiryNotice(false) }} />}
-    {signedIn && !account.desktopOnboardingVisible && !account.onboarding && account.notices && <AccountNoticeStack
+    {expiryNotice && <Toast text={t(workspaceAccount ? 'workspaceModelSessionExpired' : 'sessionExpired')}
+      onDone={() => { setExpiryNotice(false) }} />}
+    {!workspaceAccount && signedIn && !account.desktopOnboardingVisible && !account.onboarding && account.notices && <AccountNoticeStack
       notices={account.notices}
       anchor={anchor} title={t('bonusNoticeTitle')} closeLabel={t('close')}
       onShown={bonusNoticeShown} onDismiss={bonusNoticeDismissed} />}
-    <Menu open={open} side="top" portal autoFocus className={css.anchor} listClassName={signedIn ? undefined : css.signedOutMenu}
-      anchor={<button ref={trigger} type="button" className={css.trigger} data-collapsed={!wide} data-signed-out={!signedIn} aria-label={t('menu')}
+    <Menu open={open} side="top" portal autoFocus className={css.anchor} listClassName={hasIdentity ? undefined : css.signedOutMenu}
+      anchor={<button ref={trigger} type="button" className={css.trigger} data-collapsed={!wide} data-signed-out={!hasIdentity} aria-label={t('menu')}
         aria-haspopup="menu" aria-expanded={open} onClick={() => { setOpen(value => !value) }}>
-        {signedIn
-          ? <span className={css.avatar} data-avatar-status={account.avatar?.status}>
-            <AccountAvatar avatar={account.avatar} avatarFailed={avatarFailed} />
+        {hasIdentity
+          ? <span className={css.avatar} data-avatar-status={workspaceAccount ? undefined : account.avatar?.status}>
+            <AccountAvatar avatar={workspaceAccount ? undefined : account.avatar} avatarFailed={avatarFailed} />
           </span>
           : <IconEllipsisOutlineMedium size={14} />}
-        {wide && <span className={css.label}>{signedIn ? label : t('more')}</span>}
+        {wide && <span className={css.label} title={workspaceAccount?.name}>{workspaceAccount?.name ?? (signedIn ? label : t('more'))}</span>}
       </button>}
       items={[
         { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} />,
           ...(settingsShortcut === undefined ? {} : { shortcut: settingsShortcut }) },
         { id: 'contact', label: t('contactUs'), icon: <IconPaperPlaneOutlineMedium size={16} /> },
-        ...(signedIn ? [{ id: 'signout', label: t('signOut'), icon: <LogoutIcon />, disabled: busy }]
+        ...(hasIdentity ? [{ id: 'signout', label: t('signOut'), icon: <LogoutIcon />, disabled: busy }]
           : [{ id: 'signin', label: t('signIn'), icon: <IconUserOutlineMedium size={16} /> }]),
       ]}
       onClose={() => { setOpen(false) }}

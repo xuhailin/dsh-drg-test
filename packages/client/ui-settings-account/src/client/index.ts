@@ -31,6 +31,7 @@ import { DesktopOnboardingEntry, type DesktopOnboardingInjected } from './Deskto
 import { readOnboardingApiKeyPresence } from './onboarding-credentials.ts'
 import { refreshAfterReturn } from './account-refresh.ts'
 import { AccountAvatarLoader } from './account-avatar.ts'
+import { readWorkspaceAccount } from './workspace-account.ts'
 export type { AccountSectionInjected, AccountSectionProps } from './AccountSection.tsx'
 export type { AccountMenuProps } from './AccountMenu.tsx'
 export type { AccountSnapshot } from './AccountSection.tsx'
@@ -47,6 +48,7 @@ export function apply(ctx: Context): void {
   const desktop = 'dshDesktop' in globalThis
   ctx.effect(() => ctx.locale.register('settings.account', { en, zh }), 'account: dictionaries')
   const t = ctx.locale.bind('settings.account')
+  const workspaceAccount = readWorkspaceAccount(globalThis.document)
   const page = globalThis as Partial<Record<typeof CONTACT_CONFIG_GLOBAL, unknown>>
   const config = ContactConfig(page[CONTACT_CONFIG_GLOBAL] ?? {})
   let snapshot: AccountSnapshot = {
@@ -172,6 +174,7 @@ export function apply(ctx: Context): void {
       if (reason === 'returned' && page === 'top-up') void refreshAfterReturn(refreshing, reRead)
     })
   const operations: AccountSectionInjected = {
+    ...(workspaceAccount ? { workspaceAccount } : {}),
     avatarFailed: (value) => { avatar.failed(value) },
     subscribeSessionExpired: listener => ctx.remote.$on('deepseek-account/session-expired', listener),
     subscribeModelSignInRequired: listener => ctx.remote.$on('deepseek-account/model-sign-in-required', listener),
@@ -313,9 +316,9 @@ export function apply(ctx: Context): void {
   ctx.slots.inject('settings.section', () => {
     let unregister: (() => void) | undefined
     const update = () => {
-      if (snapshot.view?.status === 'credential-stored') {
+      if (workspaceAccount || snapshot.view?.status === 'credential-stored') {
         unregister ??= ctx.slots.register({
-          name: 'settings.section', id: 'account', order: -10, label: () => t('nav'),
+          name: 'settings.section', id: 'account', order: -10, label: () => t(workspaceAccount ? 'workspaceNav' : 'nav'),
           locale: 'settings.account', inject: () => operations,
         }, AccountSection)
       } else {

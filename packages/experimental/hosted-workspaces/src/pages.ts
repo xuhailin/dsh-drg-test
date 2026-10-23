@@ -1,4 +1,4 @@
-/** Localized gateway pages and the authenticated workspace logout control. */
+/** Localized gateway pages and authenticated workspace account metadata. */
 import { createHash } from 'node:crypto'
 
 type PageState = 'entry' | 'failure' | 'signedOut' | 'handoff' | 'loginFailure' | 'workspaceFailure'
@@ -139,15 +139,14 @@ export function implicitCallbackPage(locale: string | undefined, signedIn = fals
 }
 
 /**
- * Add a server-owned logout form to the real DSH document.
+ * Publish a verified workspace identity and a server-owned POST logout form to the account UI.
  * @param html - authenticated DSH index.
  * @param name - verified display label.
  * @param locale - browser language header.
- * @returns the document with a reserved account row above the application mount.
+ * @returns the document with hidden account metadata, leaving application layout unchanged.
  */
 export function withLogout(html: string, name: string, locale: string | undefined): string {
   const c = locale?.toLowerCase().includes('zh') ? copy.zh : copy.en
-  const style = '<style>body{display:grid;grid-template-rows:auto minmax(0,1fr)}body>#root{grid-row:2;min-height:0;min-width:0}.dsh-hosted-account{grid-row:1;margin:0;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:4px 12px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1);border-bottom:0.5px solid var(--dsw-alias-border-l3);font-size:12px;line-height:18px}.dsh-hosted-account span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dsh-hosted-account button{flex:none;height:28px;padding:0 10px;border:0.5px solid var(--dsw-alias-border-l3);border-radius:var(--dsw-radius-sm);color:inherit;background:transparent;font:inherit;cursor:pointer}</style>'
-  const form = `<form class="dsh-hosted-account" method="post" action="/auth/logout"><span title="${escapeHtml(name)}">${escapeHtml(name)}</span><button type="submit">${c.logout}</button></form>`
-  return html.replace(/<body(?:\s[^>]*)?>/iu, body => body + style + form)
+  const account = `<form id="dsh-workspace-account" data-name="${escapeHtml(name)}" method="post" action="/auth/logout" hidden><button type="submit">${c.logout}</button></form>`
+  return html.replace(/<body(?:\s[^>]*)?>/iu, body => body + account)
 }
