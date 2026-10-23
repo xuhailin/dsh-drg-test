@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-本包为 Synyi Web 部署提供蓝色操作、冷灰工作区、紧凑圆角，以及与浅色和深色模式一致的启动背景。用户继续使用标准浅色、深色、跟随系统的主题偏好与字体设置。Synyi 临床应用可在标准主题旁启用本包。
+本包为 Synyi Web 部署提供蓝色操作、紧凑圆角，以及与浅色和深色模式一致的启动背景。浅色模式采用白色工作区与浅灰导航区。用户继续使用标准浅色、深色、跟随系统的主题偏好与字体设置。Synyi 临床应用可在标准主题旁启用本包。
 
 ## 目录
 
@@ -42,7 +42,7 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
-同一份浅／深色 token 字典同时用于启动与 Client 渲染。head CSS 通过 `light-dark()` 与标准主题已解析的配色模式，在 body 脚本执行前选择启动背景。Host 随后读取标准启动代码的 body 色板属性并同步设置 token。Client 通过 `ctx.theme.overrideTokens` 注册相同字典；标准布局展示器负责应用更新，并在停用时撤回该层。配色、圆角、渐变与菜单材质均由本包维护。
+同一份浅／深色 token 字典同时用于启动与 Client 渲染。head CSS 通过 `light-dark()` 与标准主题已解析的配色模式，在 body 脚本执行前选择启动背景。Host 随后读取标准启动代码的 body 色板属性并同步设置 token。Client 通过 `ctx.theme.overrideTokens` 注册相同字典；标准布局展示器负责应用更新，并在停用时撤回该层。配色、圆角、渐变与菜单材质均由本包维护。组件通过现有语义 token 使用色板，并自行负责页面布局。
 
 </details>
 

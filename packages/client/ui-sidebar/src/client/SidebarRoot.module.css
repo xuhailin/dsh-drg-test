@@ -512,7 +512,7 @@
 }
 
 .panelRow.panelActive {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: var(--dsw-specific-sidebar-nav-item-active);
   color: var(--dsw-alias-label-primary);
 }
 

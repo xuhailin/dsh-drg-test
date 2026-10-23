@@ -21,10 +21,11 @@ async function observeFirstFrame(page: Page): Promise<void> {
 }
 
 async function palette(page: Page) {
-  return await page.evaluate(() => {
+  return await page.getByRole('navigation', { name: 'Global panels', exact: true }).evaluate((navigation) => {
     const style = getComputedStyle(document.body)
     return {
       background: style.backgroundColor,
+      sidebar: getComputedStyle(navigation.parentElement!).backgroundColor,
       brand: style.getPropertyValue('--dsw-alias-brand-primary').trim(),
       radius: style.getPropertyValue('--dsw-radius-md').trim(),
       dark: document.body.hasAttribute('data-ds-dark-theme'),
@@ -59,8 +60,15 @@ it.each([
   expect([...scaffold.ctx.loader.entries()].find(entry => entry.options.id === 'ui-brand-official')?.disabled).toBe(true)
   const expectedTitle = readClientBuildRecord(repoRoot).environment.DSH_CLIENT_TITLE ?? 'DSH Local Build'
   await expect.poll(() => page.title()).toBe(expectedTitle)
-  await expect.poll(() => palette(page)).toEqual({ background: 'rgb(240, 242, 245)', brand: '#3664d9', radius: '4px', dark: false })
-  expect(await page.locator('html').getAttribute('data-synyi-first-frame-background')).toBe('rgb(240, 242, 245)')
+  await expect.poll(() => palette(page)).toEqual({ background: 'rgb(255, 255, 255)', sidebar: 'rgb(245, 246, 248)', brand: '#3664d9', radius: '4px', dark: false })
+  expect(await page.locator('html').getAttribute('data-synyi-first-frame-background')).toBe('rgb(255, 255, 255)')
+
+  const plugins = page.getByRole('button', { name: 'Plugins', exact: true })
+  await plugins.hover()
+  await expect.poll(() => plugins.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(236, 238, 242)')
+  await plugins.click()
+  await expect.poll(() => plugins.getAttribute('aria-current')).toBe('page')
+  await expect.poll(() => plugins.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(232, 238, 251)')
 
   const resources = await page.evaluate(async () => {
     const icons = [...document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]')]
@@ -87,13 +95,13 @@ it.each([
   expect(JSON.parse(resources.responses[2]!.body)).toMatchObject({ name: '森亿智能', start_url: '../', scope: '../' })
 
   await scaffold.ctx.settings.update('ui-theme', { preference: 'dark' })
-  await expect.poll(() => palette(page)).toEqual({ background: 'rgb(21, 30, 44)', brand: '#9cb6ff', radius: '4px', dark: true })
+  await expect.poll(() => palette(page)).toEqual({ background: 'rgb(21, 30, 44)', sidebar: 'rgb(25, 37, 58)', brand: '#9cb6ff', radius: '4px', dark: true })
   await page.reload()
   await page.getByText('SYNYI AI', { exact: true }).waitFor()
   expect(await page.locator('html').getAttribute('data-synyi-first-frame-background')).toBe('rgb(21, 30, 44)')
   await expect.poll(() => page.title()).toBe(expectedTitle)
   await scaffold.ctx.settings.update('ui-theme', { preference: 'system' })
-  await expect.poll(() => palette(page)).toMatchObject({ background: 'rgb(240, 242, 245)', dark: false })
+  await expect.poll(() => palette(page)).toMatchObject({ background: 'rgb(255, 255, 255)', dark: false })
   await page.emulateMedia({ colorScheme: 'dark' })
   await expect.poll(() => palette(page)).toMatchObject({ background: 'rgb(21, 30, 44)', dark: true })
   expect(tripwire.pageErrors).toEqual([])

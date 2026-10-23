@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-This package gives Synyi Web deployments blue actions, cool gray workspaces, compact rounded corners, and matching light and dark startup backgrounds. Users retain the standard light, dark, and system preferences and typography settings. Choose it alongside the standard theme for Synyi clinical applications.
+This package gives Synyi Web deployments blue actions, compact rounded corners, and matching light and dark startup backgrounds. Light mode uses white workspaces and light gray navigation. Users retain the standard light, dark, and system preferences and typography settings. Choose it alongside the standard theme for Synyi clinical applications.
 
 ## Table of Contents
 
@@ -42,7 +42,7 @@ The standard theme owns persisted preferences and font settings. This plugin fol
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-One light/dark token dictionary supplies both bootstrap and Client rendering. Head CSS selects the startup background through `light-dark()` and the standard theme's resolved color scheme before body scripts execute. The Host then reads the standard bootstrap's body palette attribute and installs the tokens synchronously. The Client registers the same dictionary through `ctx.theme.overrideTokens`; the standard layout presenter applies updates and retracts that layer on disposal. Color, radius, gradient, and menu material choices stay in this package.
+One light/dark token dictionary supplies both bootstrap and Client rendering. Head CSS selects the startup background through `light-dark()` and the standard theme's resolved color scheme before body scripts execute. The Host then reads the standard bootstrap's body palette attribute and installs the tokens synchronously. The Client registers the same dictionary through `ctx.theme.overrideTokens`; the standard layout presenter applies updates and retracts that layer on disposal. Color, radius, gradient, and menu material choices stay in this package. Components consume the palette through existing semantic tokens and own their page composition.
 
 </details>
 

@@ -1,8 +1,8 @@
 /** Synyi palette and geometry applied before and after client activation. */
 /** Light and dark values for the deployment's token override layer. */
 export const SYNYI_TOKENS = {
-  '--dsh-boot-bg': { light: '#f0f2f5', dark: '#151e2c' },
-  '--dsw-alias-bg-base': { light: '#f0f2f5', dark: '#151e2c' },
+  '--dsh-boot-bg': { light: '#ffffff', dark: '#151e2c' },
+  '--dsw-alias-bg-base': { light: '#ffffff', dark: '#151e2c' },
   '--dsw-alias-bg-document-preview': { light: '#e4e5e7', dark: '#151e2c' },
   '--dsw-alias-bg-layer-1': { light: 'var(--dsw-static-neutral-bluish-00)', dark: '#1d2a40' },
   '--dsw-alias-bg-layer-2': { light: 'var(--dsw-static-neutral-bluish-00)', dark: '#24334b' },
@@ -32,9 +32,9 @@ export const SYNYI_TOKENS = {
   '--dsw-alias-button-primary-fill': { light: 'var(--dsw-alias-brand-primary)', dark: '#3664d9' },
   '--dsw-alias-button-primary-hover': { light: '#2e56bf', dark: '#2e56bf' },
   '--dsw-alias-interactive-bg-active': { light: '#dbeaff', dark: '#273f68' },
-  '--dsw-alias-interactive-bg-hover': { light: '#e8effd', dark: '#24334b' },
+  '--dsw-alias-interactive-bg-hover': { light: '#eceef2', dark: '#24334b' },
   '--dsw-alias-interactive-bg-hover-accent': { light: '#ccdeff', dark: '#344966' },
-  '--dsw-alias-interactive-bg-hover-solid': { light: '#eff4ff', dark: '#24334b' },
+  '--dsw-alias-interactive-bg-hover-solid': { light: '#f5f6f8', dark: '#24334b' },
   '--dsw-alias-label-caption': { light: '#5b6880', dark: '#9aaac2' },
   '--dsw-alias-label-dimmed': { light: '#5b6880', dark: '#9aaac2' },
   '--dsw-alias-label-document-preview': { light: '#54627b', dark: '#b9c5d8' },
@@ -70,9 +70,9 @@ export const SYNYI_TOKENS = {
   '--dsw-specific-login-input': { light: '#f6f7f9', dark: 'var(--dsw-alias-bg-layer-1)' },
   '--dsw-specific-menu': { light: 'var(--dsw-menu-surface-fill)', dark: 'var(--dsw-menu-surface-fill)' },
   '--dsw-specific-selector': { light: '#f0f2f5', dark: '#24334b' },
-  '--dsw-specific-sidebar-fill': { light: '#ffffff', dark: '#19253a' },
-  '--dsw-specific-sidebar-nav-item-active': { light: '#dbeaff', dark: '#273f68' },
-  '--dsw-specific-sidebar-nav-item-active-accent': { light: '#dbeaff', dark: '#273f68' },
-  '--dsw-specific-sidebar-nav-item-hover': { light: '#eff4ff', dark: '#24334b' },
+  '--dsw-specific-sidebar-fill': { light: '#f5f6f8', dark: '#19253a' },
+  '--dsw-specific-sidebar-nav-item-active': { light: '#e8eefb', dark: '#273f68' },
+  '--dsw-specific-sidebar-nav-item-active-accent': { light: '#e8eefb', dark: '#273f68' },
+  '--dsw-specific-sidebar-nav-item-hover': { light: '#eceef2', dark: '#24334b' },
   '--dsw-specific-tip': { light: 'var(--dsw-alias-bg-layer-3)', dark: 'var(--dsw-alias-bg-layer-2)' },
 }

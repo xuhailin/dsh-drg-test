@@ -31,7 +31,9 @@ describe('Synyi theme layer', () => {
     await fiber.await()
     expect(theme.getTheme().preference).toBe('system')
     expect(theme.getTheme().active.tokens).toMatchObject({
-      '--dsw-alias-bg-base': '#f0f2f5',
+      '--dsw-alias-bg-base': '#ffffff',
+      '--dsh-boot-bg': '#ffffff',
+      '--dsw-specific-sidebar-fill': '#f5f6f8',
       '--dsw-alias-brand-primary': '#3664d9',
       '--dsw-alias-label-primary': '#293750',
       '--dsw-radius-md': '4px',
@@ -42,6 +44,7 @@ describe('Synyi theme layer', () => {
     theme.setTheme('dark')
     expect(theme.getTheme().active.tokens).toMatchObject({
       '--dsw-alias-bg-base': '#151e2c',
+      '--dsw-specific-sidebar-fill': '#19253a',
       '--dsw-alias-brand-primary': '#9cb6ff',
       '--dsw-alias-label-primary': '#e6ecf5',
       '--dsw-menu-surface-fill': 'rgba(36, 51, 75, 0.96)',
@@ -65,7 +68,7 @@ describe('Synyi theme layer', () => {
     const { ctx, theme } = bench()
     const fiber = ctx.plugin(plugin)
     await fiber.await()
-    expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('#f0f2f5')
+    expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('#ffffff')
     media.matches = true
     notify()
     expect(theme.getTheme().preference).toBe('system')

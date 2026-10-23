@@ -20,9 +20,9 @@ afterEach(() => {
 
 describe('Synyi theme bootstrap composition', () => {
   it.each([
-    ['light', true, '#f0f2f5'],
+    ['light', true, '#ffffff'],
     ['dark', false, '#151e2c'],
-    ['system', false, '#f0f2f5'],
+    ['system', false, '#ffffff'],
     ['system', true, '#151e2c'],
   ] as const)('starts %s with OS dark=%s before client activation', async (preference, systemDark, background) => {
     const dir = await mkdtemp(join(tmpdir(), 'synyi-theme-'))
@@ -41,7 +41,7 @@ describe('Synyi theme bootstrap composition', () => {
       }
       const rows = collect()
       expect(rows).toHaveLength(4)
-      expect(rows[2]).toEqual({ kind: 'style', text: 'html body{background-color:var(--dsw-alias-bg-base,light-dark(#f0f2f5,#151e2c));--dsh-boot-bg:light-dark(#f0f2f5,#151e2c)}' })
+      expect(rows[2]).toEqual({ kind: 'style', text: 'html body{background-color:var(--dsw-alias-bg-base,light-dark(#ffffff,#151e2c));--dsh-boot-bg:light-dark(#ffffff,#151e2c)}' })
       for (const row of rows) {
         if (row.kind === 'script') runInNewContext(row.text, { document, matchMedia: () => ({ matches: systemDark }) })
       }
