@@ -13,6 +13,7 @@
     "**/.node-next-types-*/**",
     "website/.generated/**",
     "vendor/**",
+    "packages/experimental/clinical-pathway-reference/src/emr/**",
     "native/**",
     "**/*.js",
     "**/*.mjs",
