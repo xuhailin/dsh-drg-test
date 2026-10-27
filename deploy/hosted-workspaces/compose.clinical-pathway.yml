@@ -1,0 +1,23 @@
+# Optional pathway reads. Database and access-policy files are mounted only in the gateway.
+services:
+  gateway:
+    command: [gateway, --patch, /opt/dsh/deploy/hosted-workspaces/clinical-pathway.gateway.patch.yml]
+    environment:
+      HOSTED_RUNTIME_PATCH_FILE: /opt/dsh/deploy/hosted-workspaces/clinical-pathway.runtime.patch.yml
+      CLINICAL_PATHWAY_SOURCE_SYSTEM: ${CLINICAL_PATHWAY_SOURCE_SYSTEM:?Set the verified source system}
+      CLINICAL_PATHWAY_DATABASE_CONFIG_FILE: /run/secrets/clinical_pathway_database
+      CLINICAL_PATHWAY_POLICY_FILE: /run/secrets/clinical_pathway_policy
+      CLINICAL_PATHWAY_SCHEMA: ${CLINICAL_PATHWAY_SCHEMA:-public}
+      CLINICAL_PATHWAY_READ_ROLE_POLICY: ${CLINICAL_PATHWAY_READ_ROLE_POLICY:-select-only}
+      CLINICAL_PATHWAY_HERBAL_TABLES: ${CLINICAL_PATHWAY_HERBAL_TABLES:-false}
+      CLINICAL_PATHWAY_OPERATION_TABLES: ${CLINICAL_PATHWAY_OPERATION_TABLES:-false}
+      CLINICAL_PATHWAY_DICTIONARY_TABLES: ${CLINICAL_PATHWAY_DICTIONARY_TABLES:-false}
+    secrets:
+      - clinical_pathway_database
+      - clinical_pathway_policy
+
+secrets:
+  clinical_pathway_database:
+    file: ${CLINICAL_PATHWAY_DATABASE_CONFIG_PATH:?Set a private read-only database configuration file}
+  clinical_pathway_policy:
+    file: ${CLINICAL_PATHWAY_POLICY_PATH:?Set the account and clinical read-scope policy file}

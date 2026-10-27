@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for clinical-pathway-workbench-roadmap.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/clinical-pathway-workbench-roadmap.md
+/clinical-pathway-assistant-phased-prds-and-repository-ownership:
+  en: 33ae35d67fa3dd15
+  zh: 67b942f856de09b8
+/clinical-pathway-assistant-phased-prds-and-repository-ownership/summary:
+  en: fd7a735db325d7cb
+  zh: 363a0966da0bebaa
+/clinical-pathway-assistant-phased-prds-and-repository-ownership/table-of-contents:
+  en: 1ca66ef737e314cf
+  zh: 83f74c644fe590cf
+/clinical-pathway-assistant-phased-prds-and-repository-ownership/confirmed-direction-and-current-facts:
+  en: 28b669503b4bbe65
+  zh: 193deea9867ebd8a
+/clinical-pathway-assistant-phased-prds-and-repository-ownership/data-and-frontend-ownership:
+  en: 38697b4e15faabcd
+  zh: 888c12aaf9b78740
+/clinical-pathway-assistant-phased-prds-and-repository-ownership/prd-split-and-dependencies:
+  en: cd33a08fd64af4b2
+  zh: 23fc111b30ed22fa
+/clinical-pathway-assistant-phased-prds-and-repository-ownership/recommended-stages-and-coverage:
+  en: c7f459e8bf553e29
+  zh: d9f4fe2fa2080a71
+/clinical-pathway-assistant-phased-prds-and-repository-ownership/acceptance-and-open-decisions:
+  en: 39cb8873bef839ea
+  zh: 20aacddc838ab65b
+/clinical-pathway-assistant-phased-prds-and-repository-ownership/dev-note:
+  en: 6b6f3d8330cbb4d0
+  zh: 1a72a46dca604955

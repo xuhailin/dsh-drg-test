@@ -54,6 +54,8 @@ kind: "package-reference"
 
 [读取器](src/reader.ts)将保存的原始内容、来源元数据、覆盖情况、绑定及提供方版本计算为 `caseRevision`；证据未变时，不同采集时间保持相同版本。`capturedAt` 和 `cutoff` 独立记录本次采集时间。不可用文书正文标为未读，医嘱状态与实际执行证据保持区分。发布前拒绝超限，每条查询前重验登录，并在返回前重读授权。取消会关闭来源连接；卸载会停止请求并移除运行实例处理器。
 
+本包还向可选[路径读取器](../clinical-pathway-reader/README.zh.md)导出 `PgReadDatabase`、`ReadDatabase`／`ReadTransaction` 类型、`databaseConfigSchema`、`readBoundedFile` 及 `readClinicalRequestBody` 及 `writeClinicalReadFailure`。这些辅助能力不注册路由或扩大就诊策略；消费者持有固定 SQL、来源／schema 核对、授权及完整结果限额。
+
 </details>
 
 <a id="further-exploration"></a>

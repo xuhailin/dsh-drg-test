@@ -42,9 +42,11 @@ Browser configuration and action requests resolve `api/...` relative to the curr
 
 ### Open and review an encounter
 
-Use **Connect encounter** in the sidebar to enter the source system, hospital code, inpatient record ID, and optional admission number. Opening a Session binds identifiers without reading clinical text or calling a model. In that Session, **Pre-discharge review → Start review** captures evidence and starts analysis. **Refresh evidence** captures a new snapshot without starting analysis; review again to replace the previous findings. Results appear through the existing chat tools. DRG/DIP grouping remains unavailable until a calculation provider is configured.
+**Connect encounter** appears in the sidebar while viewing a `clinical-review` Session, including a new one, or the clinical patient panel. **Pre-discharge review** appears only on a Session whose recorded preset is `clinical-review`. Other presets and unknown Session summaries show neither conversation entry. These display rules grant no access; server authorization is unchanged, and authenticated external EMR launches remain available regardless of the selected preset.
 
-Opening the review controls reads the current Session's progress and revision. **Update status** repeats only that metadata query; it does not capture evidence or call the model. The panel distinguishes a generated report awaiting human review, a model stop without a submitted report, an output-limit failure, unavailable status, and denied access. An ordinary chat shows that no encounter is connected. Failed status queries retain the last retrieved metadata with an explicit label. Closing the controls, switching Sessions, or unloading the plugin prevents old responses from replacing the current view.
+Use **Connect encounter** to enter the source system, hospital code, inpatient record ID, and optional admission number. Opening a Session binds identifiers without reading clinical text or calling a model. In that Session, **Pre-discharge review → Start review** captures evidence and starts analysis. **Refresh evidence** captures a new snapshot without starting analysis; review again to replace the previous findings. Results appear through the existing chat tools. DRG/DIP grouping remains unavailable until a calculation provider is configured.
+
+Opening the review controls reads the current Session's progress and revision. **Update status** repeats only that metadata query; it does not capture evidence or call the model. The panel distinguishes a generated report awaiting human review, a model stop without a submitted report, an output-limit failure, unavailable status, and denied access. An unbound clinical-review chat shows that no encounter is connected. Failed status queries retain the last retrieved metadata with an explicit label. Closing the controls, switching Sessions, or unloading the plugin prevents old responses from replacing the current view.
 
 Failed or uncertain operations retain the form and show a shared notice. Inspect the Session before retrying an uncertain request. Local cancellation stops waiting; it does not undo server-admitted work or affect discharge.
 
@@ -86,8 +88,7 @@ None directly; the clinical-review Session events determine later request conten
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Window integration requires an already authenticated personal workspace and a retained opener or parent. First-login redirects that change the workspace origin or remove its opener need a new handshake after login; no launch context is stored in URL fragments or browser persistence. The manual entry form remains available.
-- Review controls can appear on ordinary chats; connect an encounter before starting review.
+- Window integration requires an already authenticated personal workspace and a retained opener or parent. First-login redirects that change the workspace origin or remove its opener need a new handshake after login; no launch context is stored in URL fragments or browser persistence. The manual entry form remains available in the clinical-review contexts above.
 - Progress is read on opening the controls or choosing **Update status**; no automatic polling is performed. Report content stays in chat, and this package does not configure DRG/DIP calculation engines.
 
 <a id="dev-note"></a>

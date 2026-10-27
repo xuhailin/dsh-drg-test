@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for clinical-pathway-workbench-p4-assistance.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/clinical-pathway-workbench-p4-assistance.md
+/p4-ai-creation-and-controlled-changes:
+  en: 219ae6ece3397546
+  zh: 69a54bb677c131b6
+/p4-ai-creation-and-controlled-changes/summary:
+  en: 2ca3ff9da65e0829
+  zh: ce10e788f1b04085
+/p4-ai-creation-and-controlled-changes/table-of-contents:
+  en: 2661c4784f0327b5
+  zh: 5d5242c584263e76
+/p4-ai-creation-and-controlled-changes/clinical-task-and-scope:
+  en: 15a1ba5818433d8f
+  zh: 2dd453e565b813ec
+/p4-ai-creation-and-controlled-changes/behavior-and-operation-ownership:
+  en: 49e057abffadb92a
+  zh: 8dab0c21f94cc176
+/p4-ai-creation-and-controlled-changes/data-prerequisites-and-dependencies:
+  en: 0601b81bda07d2aa
+  zh: fe810c63617be318
+/p4-ai-creation-and-controlled-changes/acceptance-scenarios:
+  en: 5b406f8c636e1e83
+  zh: 5affea34550292d9
+/p4-ai-creation-and-controlled-changes/stages-and-deferrals:
+  en: dbb1a5e69f74aa87
+  zh: 2cdb3c702bd04859
+/p4-ai-creation-and-controlled-changes/dev-note:
+  en: 1795eb81f3430134
+  zh: e846baeffa98cf00

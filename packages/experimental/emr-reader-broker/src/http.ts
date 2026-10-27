@@ -12,7 +12,13 @@ const consumeSchema = z.strictObject({ grant: grantResultSchema.shape.grant })
 const captureSchema = z.strictObject({ binding: bindingSchema })
 interface PendingGrant { actorId: string; expiresAt: number; binding: EncounterBinding }
 
-function readBody(request: IncomingMessage, maxBytes: number, signal: AbortSignal): Promise<unknown> {
+/** Read one bounded JSON body and release transport listeners on settlement.
+ * @param request - Owned HTTP request stream.
+ * @param maxBytes - Complete accepted body byte limit.
+ * @param signal - Request cancellation or deadline.
+ * @returns Parsed untrusted JSON for the owning request schema.
+ */
+export function readBody(request: IncomingMessage, maxBytes: number, signal: AbortSignal): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
     let size = 0
@@ -38,6 +44,17 @@ function write(response: ServerResponse, status: number, value: unknown): void {
   if (response.destroyed || response.writableEnded) return
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
   response.end(JSON.stringify(value))
+}
+
+/** Release a safe clinical read failure using its shared HTTP handling category.
+ * @param response - Response owned by the authenticated read operation.
+ * @param failure - Safe diagnostic without SQL, source values or credentials.
+ */
+export function writeClinicalReadFailure(response: ServerResponse, failure: EncounterReadError): void {
+  const code = failure.code
+  const status = code === 'forbidden' || code === 'invalid-binding' ? 403 : code === 'expired-grant' ? 410
+    : code === 'invalid-request' ? 400 : code === 'not-found' ? 404 : code === 'limit-exceeded' ? 413 : code === 'cancelled' ? 408 : 503
+  write(response, status, { error: { code, message: failure.message } })
 }
 
 /** Owns transport admission, launch grants and request cancellation until plugin disposal. */
@@ -118,9 +135,7 @@ export class ClinicalBroker {
       const failure = error instanceof EncounterReadError ? error : error instanceof z.ZodError
         ? new EncounterReadError('invalid-request', 'The clinical request or source fields are invalid.')
         : new EncounterReadError('source-unavailable', 'Clinical data is unavailable. Check the reader configuration and retry.')
-      const status = failure.code === 'forbidden' || failure.code === 'invalid-binding' ? 403 : failure.code === 'expired-grant' ? 410
-        : failure.code === 'invalid-request' ? 400 : failure.code === 'not-found' ? 404 : failure.code === 'limit-exceeded' ? 413 : failure.code === 'cancelled' ? 408 : 503
-      write(request.response, status, { error: { code: failure.code, message: failure.message } })
+      writeClinicalReadFailure(request.response, failure)
     }
   }
   /**

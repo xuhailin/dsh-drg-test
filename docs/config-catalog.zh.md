@@ -1066,6 +1066,104 @@ export interface CotTranslationPreferences {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-client-ui-cot-translation -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-clinical-pathway-reader -->
+<a id="deepseek-aidsh-experimental-clinical-pathway-reader"></a>
+
+## `@deepseek-ai/dsh-experimental-clinical-pathway-reader`
+
+- `source`: [`packages/experimental/clinical-pathway-reader/src/config.ts:5`](../packages/experimental/clinical-pathway-reader/src/config.ts)
+
+```ts config-catalog
+/** The same plugin is explicitly mounted as either a gateway reader or preset tools. */
+export interface Config {
+  /** Select the gateway provider or the scoped tool consumer. */
+  mode: 'gateway' | 'tools'
+  /** Source identity required in gateway mode. */
+  sourceSystem?: string
+  /** Gateway-only PostgreSQL credential file. */
+  databaseConfigFile?: string
+  /** Gateway-only account, hospital, department and admission-window policy. */
+  policyFile?: string
+  /** Expected PostgreSQL schema; each transaction pins and verifies this search path. */
+  schema: string
+  /** Require a SELECT-only role, or explicitly reuse a development role inside enforced read-only transactions. */
+  readRolePolicy: 'select-only' | 'development-transaction-only'
+  /** Authenticated hosted gateway URL; required in tools mode. */
+  brokerBaseUrl?: string
+  /** Server-owned credential name; required in tools mode. */
+  runtimeTokenEnv: string
+  /** Maximum bytes in a complete gateway request. */
+  maxRequestBytes: number
+  /** Maximum bytes read from an operator-owned policy or database file. */
+  maxPolicyBytes: number
+  /** Maximum bytes in the complete response and rendered model result. */
+  maxResponseBytes: number
+  /** Maximum original JSON row bytes acquired from PostgreSQL. */
+  maxRowBytes: number
+  /** Maximum rows per child collection, independent of model-requested pagination. */
+  maxRows: number
+  /** Maximum document passage characters per read. */
+  maxTextChars: number
+  /** Maximum recursively expanded branch depth. */
+  maxBranchDepth: number
+  /** Maximum expanded branch definitions. */
+  maxBranches: number
+  /** Enable the separately installed whole-prescription tables. */
+  herbalTables: boolean
+  /** Enable operation-detail rows after target-schema verification. */
+  operationTables: boolean
+  /** Enable scoped item dictionary interpretation and current same-hospital drug conversion parameters. */
+  dictionaryTables: boolean
+  /** Complete request deadline, including database work and body consumption. */
+  timeoutMs: number
+  /** Gateway-wide concurrent read admission bound. */
+  maxConcurrentReads: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-clinical-pathway-reader -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-clinical-pathway-reference -->
+<a id="deepseek-aidsh-experimental-clinical-pathway-reference"></a>
+
+## `@deepseek-ai/dsh-experimental-clinical-pathway-reference`
+
+- `inject`: `agents` · `sessions` · `sessionProjections` · `sessionPersistence` · `sessionController` · `tools` · `connection` · `agentPresets`
+- `source`: [`packages/experimental/clinical-pathway-reference/src/config.ts:5`](../packages/experimental/clinical-pathway-reference/src/config.ts)
+
+```ts config-catalog
+/** Runtime settings are explicit deployment inputs, independent of source-read permission. */
+export type Config = ReferenceConfig
+
+/** Public, credential-free bounds and permitted analysis scope. */
+export interface ReferenceConfig {
+  /** Frozen analysis scope; gateway policy independently authorizes source reads. */
+  scope: ReferenceScope
+  /** Maximum UTF-8 bytes in one complete browser or tool mutation request. */
+  maxRequestBytes: number
+  /** Maximum UTF-8 bytes in the complete retained task history. */
+  maxStateBytes: number
+  /** Maximum saved revisions before further changes are rejected. */
+  maxRevisions: number
+}
+
+/** Frozen permitted analysis context; it grants no source read access. */
+export interface ReferenceScope {
+  /** Exact reader source identity allowed for this reference owner. */
+  sourceSystem: string
+  /** Hospital containing the source definitions and historical cohort. */
+  hospitalCode: string
+  /** Authorized current-department codes, retained with the task. */
+  departmentCodes: string[]
+  /** Department attribution uses current departments. */
+  departmentBasis: 'current'
+  /** Inclusive admission-window start as an offset-aware ISO timestamp. */
+  admissionFrom: string
+  /** Exclusive admission-window end as an offset-aware ISO timestamp. */
+  admissionTo: string
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-experimental-clinical-pathway-reference -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-experimental-clinical-review -->
 <a id="deepseek-aidsh-experimental-clinical-review"></a>
 

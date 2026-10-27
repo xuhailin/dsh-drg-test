@@ -229,8 +229,9 @@
     "@deepseek-ai/dsh-experimental-browser-use-runtime": "workspace:*",
     "@deepseek-ai/dsh-experimental-browser-use-stagehand-native": "workspace:*",
     "@deepseek-ai/dsh-experimental-claude-code-mods": "workspace:*",
-    "@deepseek-ai/dsh-experimental-client-emr-entry": "workspace:*",
     "@deepseek-ai/dsh-experimental-client-clinical-results": "workspace:*",
+    "@deepseek-ai/dsh-experimental-client-emr-entry": "workspace:*",
+    "@deepseek-ai/dsh-experimental-clinical-pathway-reader": "workspace:*",
     "@deepseek-ai/dsh-experimental-clinical-review": "workspace:*",
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp": "workspace:*",
     "@deepseek-ai/dsh-experimental-computer-use-cua-driver-native": "workspace:*",
@@ -298,6 +299,7 @@
     "vite": "8.2.2",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.11",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@deepseek-ai/dsh-experimental-clinical-pathway-reference": "workspace:*"
   }
 }

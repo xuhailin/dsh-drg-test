@@ -24,6 +24,8 @@
   "exclude": [
     "tests/synyi-presentation.e2e.ts",
     "tests/clinical-results.e2e.ts",
+    "tests/clinical-pathway-analysis.e2e.ts",
+    "tests/clinical-pathway-reference.e2e.ts",
     "tests/collapse-timing.e2e.ts",
     "tests/notice-wake-tail.e2e.ts",
     "tests/fold-blank-matrix.e2e.ts",
@@ -216,6 +218,7 @@
     "tests/workflow-run.e2e.ts"
   ],
   "references": [
+    { "path": "../../packages/experimental/clinical-pathway-reference/tsconfig.client.json" },
     { "path": "../../packages/experimental/auto-review" },
     {
       "path": "../../packages/client/store"

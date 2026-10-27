@@ -75,7 +75,7 @@ describe('encounter entry controls', () => {
     expect(screen.getByText(zh.hint)).toBeTruthy()
   })
 
-  it('shows an unbound ordinary chat and keeps the encounter entry form available', async () => {
+  it('shows an unbound clinical-review chat and keeps the encounter entry form available', async () => {
     const b = bench({ error: { code: 'unbound-session' } }, 503)
     act(() => { b.actions.show('bound' as SessionId) })
     await waitFor(() => { expect(screen.getByText(zh.statusUnbound)).toBeTruthy() })

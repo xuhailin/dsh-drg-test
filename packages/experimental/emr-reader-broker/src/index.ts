@@ -9,6 +9,10 @@ import { EncounterPolicy } from './policy.ts'
 import { PgEncounterReader } from './reader.ts'
 import { PgEncounterDirectory } from './directory.ts'
 export { Config }
+export { databaseConfigSchema, PgReadDatabase } from './database.ts'
+export type { ReadDatabase, ReadTransaction } from './database.ts'
+export { readBoundedFile } from './files.ts'
+export { readBody as readClinicalRequestBody, writeClinicalReadFailure } from './http.ts'
 /** Optional clinical runtime plugin identity. */
 export const name = 'emr-reader-broker'
 /** The generic runtime event supplies identity without service-side token access. */

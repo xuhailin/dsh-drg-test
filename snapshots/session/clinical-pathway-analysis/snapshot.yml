@@ -1,0 +1,10 @@
+version: 1
+scenario: clinical-pathway-analysis
+profile: headless
+composition: clinical-pathway-analysis
+recording: authored
+environment:
+  TZ: UTC
+header:
+  class: clinical-pathway-analysis
+  pin: true

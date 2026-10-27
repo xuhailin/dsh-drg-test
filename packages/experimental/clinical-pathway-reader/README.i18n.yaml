@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/clinical-pathway-reader/README.md
+/:
+  en: 8004c55b0b37a796
+  zh: 0d199dbd37794d20
+/deepseek-ai-dsh-experimental-clinical-pathway-reader:
+  en: 30b9040e52840c70
+  zh: df3b26f7c4154866
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/summary:
+  en: 1b1f41c8f966eea5
+  zh: 7e8ffe8729482392
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 3459302dfbd34ad4
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/use-this-package:
+  en: 5a3673c4364e38c4
+  zh: aea4ac0c305dcf0b
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/understand-the-implementation:
+  en: 3a4129a79b34c489
+  zh: a6b2492de24a4cd6
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/further-exploration:
+  en: 66404e8badeb1b01
+  zh: 1996cd7e5f616263
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/model-experience/pathway-evidence:
+  en: c652cc4a297eb4ee
+  zh: f473ef6daa89dda8
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/model-experience/pathway-evidence/what-the-model-sees:
+  en: bc6046bb8b212cb1
+  zh: e817f4a666d13cec
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/model-experience/pathway-evidence/token-effect:
+  en: c0b7e98a9e624581
+  zh: f4576d4482631f27
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/model-experience/pathway-evidence/kv-cache-effect:
+  en: 1b272f04495b0aca
+  zh: 9f8260aad9f3b77d
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/known-limitations-and-deferred-work:
+  en: 86ef023093d68146
+  zh: 2579184abe75f68b
+/deepseek-ai-dsh-experimental-clinical-pathway-reader/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: e88aeb617ffb74ea

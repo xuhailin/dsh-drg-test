@@ -36,6 +36,7 @@ Promotion requires a named product role, documented public behavior and limitati
 
 | Package | Role | ctx key |
 |---|---|---|
+| [`clinical-pathway-reader`](clinical-pathway-reader/README.md) | Optional read-only pathway definitions, historical cohorts and encounter evidence for reference proposals | — |
 | [`drg-resources`](drg-resources/README.md) | Operator-published, versioned national source archives with read-only verification | library — no ctx key |
 | [`tool-session-query`](tool-session-query/README.md) | Workspace-authorized model session search, trace, and event reads | — |
 | [`session-search`](session-search/README.md) | Optional experimental global session search tools | — |

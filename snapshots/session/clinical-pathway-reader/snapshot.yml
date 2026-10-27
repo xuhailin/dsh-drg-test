@@ -1,0 +1,11 @@
+version: 1
+scenario: clinical-pathway-reader
+profile: headless
+composition: clinical-pathway-reader
+recording: authored
+environment:
+  TZ: UTC
+  PATHWAY_FIXTURE_TOKEN: synthetic-pathway-runtime-token
+header:
+  class: clinical-pathway-reader
+  pin: true

@@ -1,0 +1,343 @@
+{
+  "format": "emr-clinical-pathway-definition",
+  "schemaVersion": 1,
+  "clinicalPathway": {
+    "localId": "pathway-a",
+    "name": "合成完整路径（仅验数据结构）",
+    "createDept": {
+      "code": "99999",
+      "name": "合成科室"
+    },
+    "deptInfos": [
+      {
+        "localId": "dept-a",
+        "deptCode": "99999",
+        "deptName": "合成科室"
+      }
+    ],
+    "feesRange": [
+      null,
+      null
+    ],
+    "inpatDayRange": [
+      1,
+      4
+    ],
+    "diagnoseGroup": [
+      {
+        "localId": "diagnosis-a",
+        "code": "SYN-DIAG",
+        "name": "合成诊断",
+        "codingSystem": null
+      }
+    ],
+    "inclusionAssessment": [
+      {
+        "localId": "assessment-a",
+        "inclusionItem": "合成待讨论条件",
+        "isInclude": true,
+        "required": true,
+        "basisKind": null,
+        "basisKindName": null
+      }
+    ],
+    "treatments": [
+      {
+        "localId": "phase-a",
+        "name": "合成第1—2天",
+        "nodeAttribute": 0,
+        "clinicalAttributes": null,
+        "inpatDayRange": [
+          1,
+          2
+        ],
+        "parentTreatmentLocalId": null,
+        "parentTreatmentId": null,
+        "branchs": [],
+        "recordTreatmentProjects": [
+          {
+            "localId": "document-a",
+            "projectType": 1,
+            "code": "SYN-D",
+            "name": "合成诊疗工作",
+            "dictionaryId": null,
+            "templateCode": null,
+            "required": true
+          }
+        ],
+        "nursingTreatmentProjects": [
+          {
+            "localId": "nursing-a",
+            "projectType": 2,
+            "code": null,
+            "name": "合成护理工作",
+            "dictionaryId": null,
+            "required": null
+          }
+        ],
+        "orderTreatmentProjects": [
+          {
+            "localId": "bundle-a",
+            "projectType": 0,
+            "levelType": 3,
+            "name": "合成组包",
+            "required": null,
+            "repeatable": false,
+            "singleUse": true,
+            "children": [
+              {
+                "localId": "group-a",
+                "projectType": 0,
+                "levelType": 2,
+                "name": "合成组",
+                "children": [
+                  {
+                    "localId": "order-a",
+                    "projectType": 0,
+                    "levelType": 1,
+                    "name": "合成单条 A",
+                    "code": "SYN-A",
+                    "drugCode": "SYN-A",
+                    "drugId": null,
+                    "orderClass": {
+                      "code": "10",
+                      "name": "合成药品"
+                    },
+                    "specs": null,
+                    "onceDose": {
+                      "value": 0,
+                      "adjustable": true
+                    },
+                    "unit": {
+                      "code": null,
+                      "name": "合成单位"
+                    },
+                    "usage": {
+                      "code": null,
+                      "name": null
+                    },
+                    "frequency": null,
+                    "execDept": {
+                      "code": "99999",
+                      "name": "合成科室"
+                    },
+                    "days": 0,
+                    "orderTypeCode": null,
+                    "required": false,
+                    "repeatable": null,
+                    "isSelf": null,
+                    "operations": null
+                  },
+                  {
+                    "localId": "order-b",
+                    "projectType": 0,
+                    "levelType": 1,
+                    "name": "合成单条 B",
+                    "code": "SYN-B",
+                    "drugCode": "SYN-B",
+                    "drugId": null,
+                    "orderClass": {
+                      "code": "10",
+                      "name": "合成药品"
+                    },
+                    "specs": null,
+                    "onceDose": {
+                      "value": 0,
+                      "adjustable": true
+                    },
+                    "unit": {
+                      "code": null,
+                      "name": "合成单位"
+                    },
+                    "usage": {
+                      "code": null,
+                      "name": null
+                    },
+                    "frequency": null,
+                    "execDept": {
+                      "code": "99999",
+                      "name": "合成科室"
+                    },
+                    "days": 0,
+                    "orderTypeCode": null,
+                    "required": false,
+                    "repeatable": null,
+                    "isSelf": null
+                  }
+                ]
+              },
+              {
+                "localId": "order-c",
+                "projectType": 0,
+                "levelType": 1,
+                "name": "合成单条 C",
+                "code": null,
+                "drugCode": null,
+                "drugId": null,
+                "orderClass": {
+                  "code": "10",
+                  "name": "合成药品"
+                },
+                "specs": null,
+                "onceDose": {
+                  "value": 0,
+                  "adjustable": true
+                },
+                "unit": {
+                  "code": null,
+                  "name": "合成单位"
+                },
+                "usage": {
+                  "code": null,
+                  "name": null
+                },
+                "frequency": null,
+                "execDept": {
+                  "code": "99999",
+                  "name": "合成科室"
+                },
+                "days": 0,
+                "orderTypeCode": null,
+                "required": false,
+                "repeatable": null,
+                "isSelf": null
+              }
+            ]
+          },
+          {
+            "localId": "herbal-order",
+            "projectType": 0,
+            "levelType": 1,
+            "name": "合成整方项目",
+            "code": null,
+            "drugCode": null,
+            "drugId": null,
+            "orderClass": {
+              "code": "24",
+              "name": "整方"
+            },
+            "specs": null,
+            "onceDose": {
+              "value": 0,
+              "adjustable": true
+            },
+            "unit": {
+              "code": null,
+              "name": "合成单位"
+            },
+            "usage": {
+              "code": null,
+              "name": null
+            },
+            "frequency": null,
+            "execDept": {
+              "code": "99999",
+              "name": "合成科室"
+            },
+            "days": 0,
+            "orderTypeCode": null,
+            "required": false,
+            "repeatable": null,
+            "isSelf": null,
+            "herbalRecipe": {
+              "localId": "recipe-a",
+              "orderName": "合成整方（不作临床建议）",
+              "orderTypeCode": "0",
+              "execDeptCode": "99999",
+              "drugCount": null,
+              "decoctCount": 0,
+              "usageCode": null,
+              "usageName": null,
+              "isDecoction": null,
+              "isPrescription": true,
+              "detail": [
+                {
+                  "localId": "herb-a",
+                  "drugId": 0,
+                  "drugCode": "SYN-H1",
+                  "drugName": "合成药味一",
+                  "onceDose": 0,
+                  "doseUnitCode": null,
+                  "doseUnitName": "合成单位",
+                  "sort": 1
+                },
+                {
+                  "localId": "herb-b",
+                  "drugId": null,
+                  "drugCode": null,
+                  "drugName": "未匹配合成药味",
+                  "onceDose": null,
+                  "doseUnitCode": null,
+                  "doseUnitName": null,
+                  "sort": 2
+                },
+                {
+                  "localId": "herb-c",
+                  "drugId": null,
+                  "drugCode": "SYN-H3",
+                  "drugName": "合成药味三",
+                  "onceDose": null,
+                  "doseUnitCode": null,
+                  "doseUnitName": null,
+                  "sort": 3
+                }
+              ]
+            }
+          },
+          {
+            "localId": "lab-order",
+            "projectType": 0,
+            "levelType": 1,
+            "name": "合成检验",
+            "orderClass": {
+              "code": "test",
+              "name": "检验"
+            },
+            "isApplyOrder": true,
+            "templateCode": "SYN-T",
+            "applyData": {
+              "levelType": 1,
+              "groupCode": null,
+              "groupName": null,
+              "items": [
+                {
+                  "localId": "lab-item",
+                  "itemCode": "SYN-L1",
+                  "itemName": "合成项目",
+                  "specimenId": null,
+                  "specimenName": null
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "localId": "phase-b",
+        "name": "合成第3—4天",
+        "nodeAttribute": 0,
+        "clinicalAttributes": null,
+        "inpatDayRange": [
+          3,
+          4
+        ],
+        "parentTreatmentLocalId": "phase-a",
+        "parentTreatmentId": null,
+        "branchs": [
+          {
+            "localId": "branch-a",
+            "name": "未读取的关联路径",
+            "relatedClinicalPathwayId": 321,
+            "relatedClinicalPathwayLocalId": null,
+            "relatedClinicalPathwayCode": null,
+            "relatedClinicalPathwayVersion": null,
+            "clinicalProperties": null
+          }
+        ],
+        "recordTreatmentProjects": null,
+        "nursingTreatmentProjects": [],
+        "orderTreatmentProjects": []
+      }
+    ]
+  }
+}

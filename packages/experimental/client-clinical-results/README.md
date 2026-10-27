@@ -32,6 +32,8 @@ Medical record update status reports only a comparison supported by an explicit 
 
 **Request another review** admits an explicit idempotent request. Admission, analysis progress, and report selection remain separate. Update progress and choose a new saved revision when it becomes available. Failed reads retain a previously displayed report with a notice; authentication or permission loss clears clinical content. An uncertain admission requires inspecting progress and the chat before another request.
 
+The Insurance assistant sidebar entry appears only in a `clinical-review` conversation or while its patient workspace is open. Clinical-pathway and other presets hide the entry; switching conversations updates it immediately. This visibility rule does not change saved-report authorization.
+
 ### Embed a result
 
 Open the workspace root document with `?page=clinical-results` inside the authorized EMR parent or opener and configure its exact origin. Each load announces a new protocol-versioned view challenge. The opening window must verify the workspace origin and retain its window reference. The protocol carries selection references and correlated action receipts; report bodies are read through authenticated HTTP and never sent through window messages. Switching patients or accounts clears the view and invalidates pending correlations. A direct page reauthorizes the same explicit report revision after reconnecting. An embedded page clears clinical content and requires a fresh handshake after reconnecting or reloading.

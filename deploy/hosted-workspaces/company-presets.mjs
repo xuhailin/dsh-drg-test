@@ -54,8 +54,41 @@ function profileOverrides(rows, profilePatch) {
  * @throws When the clinical declaration or prompt-policy row is missing.
  */
 export function generateClinicalPreset(root, profilePatch) {
-  const file = resolve(root, 'deploy/hosted-workspaces/clinical.preset.yml')
-  const declaration = exactlyOne(applyEntryPatches([], readList(file), failPatch), `preset-${clinicalPresetId}`, file)
+  return clinicalDeclaration(root, 'clinical.preset.yml', clinicalPresetId, profilePatch)
+}
+
+/**
+ * Load pathway analysis and optionally enable its gateway-backed read tools.
+ * @param {string} root - Repository or installed image root.
+ * @param {string} [profilePatch] - Optional saved profile patch.
+ * @param {boolean} [enableReader] - Enable pathway read tools after saved profile edits.
+ * @returns {import('./company-presets.mjs').ClinicalPresetDeclaration} Complete pathway analysis preset declaration.
+ * @throws When the declaration or prompt-policy row is missing.
+ */
+export function generateClinicalPathwayPreset(root, profilePatch, enableReader = false) {
+  const declaration = clinicalDeclaration(root, 'clinical-pathway.preset.yml', 'clinical-pathway-analysis', profilePatch)
+  return enableReader ? withPathwayReader(root, declaration) : declaration
+}
+
+function withPathwayReader(root, declaration) {
+  if (!Array.isArray(declaration.config?.plugins)) throw new Error(`Expected plugins in ${declaration.id}`)
+  const plugins = [...declaration.config.plugins]
+  if (!plugins.some(row => row?.id === 'pathway-reader')) {
+    const canonical = clinicalDeclaration(root, 'clinical-pathway.preset.yml', 'clinical-pathway-analysis')
+    plugins.push(exactlyOne(canonical.config.plugins, 'pathway-reader', 'canonical pathway preset'))
+  }
+  const reader = exactlyOne(plugins, 'pathway-reader', declaration.id)
+  if (reader.name !== '@deepseek-ai/dsh-experimental-clinical-pathway-reader') {
+    throw new Error(`Expected the pathway reader plugin in ${declaration.id}`)
+  }
+  return { ...declaration, config: { ...declaration.config,
+    plugins: plugins.map(row => row === reader ? { ...row, disabled: false } : row),
+  } }
+}
+
+function clinicalDeclaration(root, filename, presetId, profilePatch) {
+  const file = resolve(root, 'deploy/hosted-workspaces', filename)
+  const declaration = exactlyOne(applyEntryPatches([], readList(file), failPatch), `preset-${presetId}`, file)
   const prompt = exactlyOne(declaration.config.plugins, 'clinical-prompt', file)
   if (prompt.name !== './clinical-prompt.mjs') throw new Error(`Expected the clinical prompt plugin in ${file}`)
   prompt.name = resolve(root, 'deploy/hosted-workspaces/clinical-prompt.mjs')
@@ -101,9 +134,12 @@ export function requiresClinicalPreset(runtimePatch) {
  * @param {string} root - Repository or installed image root containing packages and deploy.
  * @param {string} [profilePatch] - Optional user profile patch file; an absent file contributes no overrides.
  * @param {boolean} [includeClinicalReview] - Also override the hosted clinical preset.
+ * @param {boolean} [includeClinicalPathway] - Also override the independent pathway analysis preset.
+ * @param {boolean} [enablePathwayReader] - Enable pathway read tools after saved profile edits.
  * @returns {import('./company-presets.mjs').CompanyPresetPatch[]} Full preset config overrides for a later Loader patch layer.
  */
-export function generateCompanyPresets(root, profilePatch, includeClinicalReview = false) {
+export function generateCompanyPresets(root, profilePatch, includeClinicalReview = false, includeClinicalPathway = false, enablePathwayReader = false) {
+  if (enablePathwayReader && !includeClinicalPathway) throw new Error('Pathway reader requires the pathway preset')
   const policyFile = resolve(root, 'deploy/hosted-workspaces/company-model.runtime.patch.yml')
   const policy = exactlyOne(readList(policyFile), 'compaction-basic', policyFile)
   if (policy.config === null || typeof policy.config !== 'object' || Array.isArray(policy.config)) {
@@ -111,8 +147,11 @@ export function generateCompanyPresets(root, profilePatch, includeClinicalReview
   }
   const canonical = presets.map(preset => canonicalPreset(root, preset))
   if (includeClinicalReview) canonical.push(generateClinicalPreset(root))
+  if (includeClinicalPathway) canonical.push(generateClinicalPathwayPreset(root))
   const effective = profileOverrides(canonical, profilePatch)
-  return effective.map((entry) => {
+  return effective.map((effectiveEntry) => {
+    const entry = enablePathwayReader && effectiveEntry.id === 'preset-clinical-pathway-analysis'
+      ? withPathwayReader(root, effectiveEntry) : effectiveEntry
     if (!Array.isArray(entry.config?.plugins)) throw new Error(`Expected plugins in ${entry.id}`)
     return {
       id: entry.id,
@@ -125,10 +164,13 @@ export function generateCompanyPresets(root, profilePatch, includeClinicalReview
 }
 
 function main(args) {
-  const clinical = args.at(-1) === '--clinical-review'
-  const paths = clinical ? args.slice(0, -1) : args
-  if (paths.length !== 2 && paths.length !== 3) throw new Error('Usage: company-presets.mjs <root> <output-path> [profile-patch] [--clinical-review]')
-  const rows = generateCompanyPresets(resolve(paths[0]), paths[2] === undefined ? undefined : resolve(paths[2]), clinical)
+  const flags = new Set(args.filter(arg => arg.startsWith('--')))
+  const paths = args.filter(arg => !arg.startsWith('--'))
+  if ((paths.length !== 2 && paths.length !== 3) || [...flags].some(flag => !['--clinical-review', '--clinical-pathway', '--pathway-reader'].includes(flag))) {
+    throw new Error('Usage: company-presets.mjs <root> <output-path> [profile-patch] [--clinical-review] [--clinical-pathway [--pathway-reader]]')
+  }
+  const rows = generateCompanyPresets(resolve(paths[0]), paths[2] === undefined ? undefined : resolve(paths[2]),
+    flags.has('--clinical-review'), flags.has('--clinical-pathway'), flags.has('--pathway-reader'))
   writeFileSync(resolve(paths[1]), dump(rows, { schema: entryListSchema, noRefs: true, lineWidth: -1 }))
 }
 

@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for clinical-pathway-workbench-p1-draft.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/clinical-pathway-workbench-p1-draft.md
+/p1-emr-shared-definitions-and-structured-reference-drafts:
+  en: ac5918566ff09cd3
+  zh: 5158f51538dd6094
+/p1-emr-shared-definitions-and-structured-reference-drafts/summary:
+  en: 04ca096a9d40295e
+  zh: 0c426a66469ef370
+/p1-emr-shared-definitions-and-structured-reference-drafts/table-of-contents:
+  en: a10582052d316ef0
+  zh: 58a458319ef1e92e
+/p1-emr-shared-definitions-and-structured-reference-drafts/task-and-scope:
+  en: 3689e85a8952e329
+  zh: 39ab2dbb106b27d5
+/p1-emr-shared-definitions-and-structured-reference-drafts/shared-definitions-and-operation-ownership:
+  en: a0e437b4a0657c1c
+  zh: e47744fa521eb80a
+/p1-emr-shared-definitions-and-structured-reference-drafts/dependencies-and-prerequisites:
+  en: 4acf1c474c42dee3
+  zh: 3851a7fbbc0c0e3d
+/p1-emr-shared-definitions-and-structured-reference-drafts/acceptance-scenarios:
+  en: 68c0b84dc384d055
+  zh: a68a2058cfd35f8f
+/p1-emr-shared-definitions-and-structured-reference-drafts/stages-and-deferrals:
+  en: 3fa62df208a4dc35
+  zh: 12ad60ecffe13f60
+/p1-emr-shared-definitions-and-structured-reference-drafts/dev-note:
+  en: a3eab27d4897c332
+  zh: 52effba83dc16829

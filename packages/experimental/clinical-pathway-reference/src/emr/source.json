@@ -1,0 +1,11 @@
+{
+  "owner": "emr-app",
+  "schemaVersion": 1,
+  "sourceDirectory": "src/app/core/models/clinical-pathway/definition",
+  "files": {
+    "definition.schema.json": "98acd27e160b7439d4eb45e4d91e88e3163d98d4adec54e4478b302958ef9033",
+    "definition.generated.d.ts": "7a9b7fc9e84686491f433ca456b6a837a4c115562e4b9946cd4cab112cb88119",
+    "definition-schema.generated.ts": "13f4a0efa30c178d6e10b6d27c58bde7c2a247aa7037e5609865b0250dc69dfc",
+    "definition-reader.ts": "08eb27ab82fdb6c251ff0911933e1cd76234af676238f5c810977897463bf6ba"
+  }
+}

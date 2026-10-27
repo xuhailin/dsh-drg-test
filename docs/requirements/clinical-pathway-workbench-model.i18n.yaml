@@ -1,0 +1,67 @@
+# Bilingual-pair consistency record for clinical-pathway-workbench-model.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/clinical-pathway-workbench-model.md
+/clinical-pathway-workbench-shared-data-and-operations:
+  en: 9fc955c9d675d9fe
+  zh: 21ba2c2e61f92140
+/clinical-pathway-workbench-shared-data-and-operations/summary:
+  en: c20c7e9325616df8
+  zh: 966eb455e6125091
+/clinical-pathway-workbench-shared-data-and-operations/table-of-contents:
+  en: d54bcf2751cf261e
+  zh: fef28a05dc24ccff
+/clinical-pathway-workbench-shared-data-and-operations/emr-data-authority-and-frontend-ownership:
+  en: 1830c36f1c40ae11
+  zh: 50315327728ad276
+/clinical-pathway-workbench-shared-data-and-operations/tasks-identities-and-basic-definitions:
+  en: 23f2c7dbe253fcae
+  zh: 6b02939e9e511e6b
+/clinical-pathway-workbench-shared-data-and-operations/tasks-identities-and-basic-definitions/m-01-task-and-scope:
+  en: 63f14b7bcc9330f6
+  zh: 821adc204701dd54
+/clinical-pathway-workbench-shared-data-and-operations/tasks-identities-and-basic-definitions/m-02-identity-dictionaries-and-revisions:
+  en: b6194ce32d70e803
+  zh: ca7f0c568106eed3
+/clinical-pathway-workbench-shared-data-and-operations/tasks-identities-and-basic-definitions/m-03-header-and-departments:
+  en: 56a8ec1d513c5ed1
+  zh: 257167ed0020c987
+/clinical-pathway-workbench-shared-data-and-operations/clinical-structures:
+  en: 9a43835aadf3b62f
+  zh: 441d9bfdb43f7d32
+/clinical-pathway-workbench-shared-data-and-operations/clinical-structures/m-04-diagnoses-and-admission:
+  en: dfdf2bb67054b664
+  zh: 3121ae19ad16ca9d
+/clinical-pathway-workbench-shared-data-and-operations/clinical-structures/m-05-phases-and-dates:
+  en: 19415e561a2302d1
+  zh: a7f7931eee76f497
+/clinical-pathway-workbench-shared-data-and-operations/clinical-structures/m-06-single-orders-clinical-work-and-nursing:
+  en: 4ea3d8a36631ce0a
+  zh: cf5bb97967030eb1
+/clinical-pathway-workbench-shared-data-and-operations/clinical-structures/m-07-groups-bundles-and-selection:
+  en: b03c88511dbb0016
+  zh: 3676dd7a5a842979
+/clinical-pathway-workbench-shared-data-and-operations/clinical-structures/m-08-herbal-prescriptions-and-linked-pathways:
+  en: 18fa8d2fbb97029a
+  zh: c9816afcb9ab8c76
+/clinical-pathway-workbench-shared-data-and-operations/operations-evidence-and-artifacts:
+  en: af128e1dd553b014
+  zh: 18c49c1b83065109
+/clinical-pathway-workbench-shared-data-and-operations/operations-evidence-and-artifacts/m-09-changes-locks-and-undo:
+  en: dc2fa4753bf97e3d
+  zh: 59170fd02895264e
+/clinical-pathway-workbench-shared-data-and-operations/operations-evidence-and-artifacts/m-10-evidence-coverage-and-clinical-questions:
+  en: a6452a74b15f761c
+  zh: 85da69ec17f5d82e
+/clinical-pathway-workbench-shared-data-and-operations/operations-evidence-and-artifacts/m-11-persistence-inspection-and-delivery:
+  en: 60cffbeba5a297c5
+  zh: eb0566ff539357d1
+/clinical-pathway-workbench-shared-data-and-operations/operations-evidence-and-artifacts/m-13-cross-host-reference-editing-and-commits:
+  en: 719a7662bf1770b1
+  zh: a4cf0a90fa7a1820
+/clinical-pathway-workbench-shared-data-and-operations/emr-compatibility-constraints:
+  en: 790c4f180daa5f77
+  zh: 35b34dcc02117d00
+/clinical-pathway-workbench-shared-data-and-operations/dev-note:
+  en: 7ffa8cf523c6d237
+  zh: d961e735af0e3e21

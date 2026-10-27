@@ -1,0 +1,12 @@
+# Apply after compose.yml, compose.clinical.yml and compose.clinical-pathway.yml.
+# Both providers inherit their environment and gateway-only secrets from those layers.
+services:
+  gateway:
+    command:
+      - gateway
+      - --patch
+      - /opt/dsh/deploy/hosted-workspaces/clinical.gateway.patch.yml
+      - --patch
+      - /opt/dsh/deploy/hosted-workspaces/clinical-pathway.gateway.patch.yml
+    environment:
+      HOSTED_RUNTIME_PATCH_FILE: /opt/dsh/deploy/hosted-workspaces/clinical-with-pathway.runtime.patch.yml

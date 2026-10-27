@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for clinical-pathway-workbench-p3-analysis.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/clinical-pathway-workbench-p3-analysis.md
+/p3-department-history-and-observation-candidates:
+  en: b4b1b6acb55f0c89
+  zh: f2958c2f47394945
+/p3-department-history-and-observation-candidates/summary:
+  en: 710e2c0bbd81d04b
+  zh: af16cc47db447662
+/p3-department-history-and-observation-candidates/table-of-contents:
+  en: c0b382dc9bce5a7e
+  zh: 3720cf9ba4547e0e
+/p3-department-history-and-observation-candidates/clinical-task-and-scope:
+  en: 914f3b7227a55a9d
+  zh: f3db2143dd807087
+/p3-department-history-and-observation-candidates/behavior-and-data-ownership:
+  en: fa869317c87ecc36
+  zh: e5590659132b2816
+/p3-department-history-and-observation-candidates/data-prerequisites-and-dependencies:
+  en: 0c74bf0643806b2f
+  zh: 8f1e5a426eed2d51
+/p3-department-history-and-observation-candidates/acceptance-scenarios:
+  en: d0da9b281e01c55b
+  zh: 9c872bcb607d4783
+/p3-department-history-and-observation-candidates/stages-and-deferrals:
+  en: 0ca5f8f467cac5f6
+  zh: 3fa560c1faceffd0
+/p3-department-history-and-observation-candidates/dev-note:
+  en: d62d656328cb7a82
+  zh: a5706f5bb1070c21

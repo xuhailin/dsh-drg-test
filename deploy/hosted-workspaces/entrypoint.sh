@@ -49,6 +49,7 @@ case "$mode" in
     cd /home/node/workspace
     runtime_profile=web
     clinical_review=false
+    pathway_reader=false
     if [ -n "${HOSTED_RUNTIME_PATCH_FILE:-}" ]; then
       test -r "$HOSTED_RUNTIME_PATCH_FILE" \
         || { echo "Configured runtime patch is unavailable." >&2; exit 1; }
@@ -63,16 +64,33 @@ case "$mode" in
       set -- --patch "$HOSTED_RUNTIME_PATCH_FILE" "$@"
       clinical_review=$(node /opt/dsh/deploy/hosted-workspaces/clinical-presets.mjs \
         --required "$HOSTED_RUNTIME_PATCH_FILE")
+      case "$HOSTED_RUNTIME_PATCH_FILE" in
+        /opt/dsh/deploy/hosted-workspaces/clinical-pathway.runtime.patch.yml)
+          pathway_reader=true
+          ;;
+        /opt/dsh/deploy/hosted-workspaces/clinical-with-pathway.runtime.patch.yml)
+          clinical_review=true
+          pathway_reader=true
+          set -- --patch /opt/dsh/deploy/hosted-workspaces/clinical.runtime.patch.yml "$@"
+          ;;
+      esac
     fi
+    generate_pathway_presets() {
+      if [ "$pathway_reader" = true ]; then
+        node "$@" --pathway-reader
+      else
+        node "$@"
+      fi
+    }
     if [ "${HOSTED_MODEL_PROTOCOL:-}" = openai-responses ]; then
       if [ "$clinical_review" = true ]; then
-        node /opt/dsh/deploy/hosted-workspaces/company-presets.mjs \
+        generate_pathway_presets /opt/dsh/deploy/hosted-workspaces/company-presets.mjs \
           /opt/dsh /tmp/dsh-company-presets.patch.yml \
-          "$DSH_HOME/profiles/$runtime_profile/cordis.patch.yml" --clinical-review
+          "$DSH_HOME/profiles/$runtime_profile/cordis.patch.yml" --clinical-review --clinical-pathway
       else
-        node /opt/dsh/deploy/hosted-workspaces/company-presets.mjs \
+        generate_pathway_presets /opt/dsh/deploy/hosted-workspaces/company-presets.mjs \
           /opt/dsh /tmp/dsh-company-presets.patch.yml \
-          "$DSH_HOME/profiles/$runtime_profile/cordis.patch.yml"
+          "$DSH_HOME/profiles/$runtime_profile/cordis.patch.yml" --clinical-pathway
       fi
       set -- --patch /opt/dsh/deploy/hosted-workspaces/company-model.runtime.patch.yml \
         --patch /tmp/dsh-company-presets.patch.yml "$@"
@@ -83,6 +101,10 @@ case "$mode" in
         "$DSH_HOME/profiles/$runtime_profile/cordis.patch.yml"
       set -- --patch /tmp/dsh-clinical-presets.patch.yml "$@"
     fi
+    generate_pathway_presets /opt/dsh/deploy/hosted-workspaces/clinical-presets.mjs \
+      /opt/dsh /tmp/dsh-pathway-presets.patch.yml \
+      "$DSH_HOME/profiles/$runtime_profile/cordis.patch.yml" --clinical-pathway
+    set -- --patch /tmp/dsh-pathway-presets.patch.yml "$@"
     exec node /opt/dsh/apps/cli/lib/bin.js --profile "$runtime_profile" \
       --patch /opt/dsh/packages/bundle/synyi-web-app/cordis.patch.yml "$@" \
       --host "$HOSTED_BIND_IP" \

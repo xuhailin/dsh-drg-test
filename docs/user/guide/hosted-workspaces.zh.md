@@ -16,6 +16,7 @@ description: "在本地 Docker 中试用公司账号登录和个人 DSH 工作�
 - [使用 GitLab CI 构建镜像](#gitlab-ci)
 - [注册公司 SSO 应用](#sso-registration)
 - [连接公司服务](#company-services)
+- [分析临床路径](#clinical-pathway-analysis)
 - [共享国家资料](#shared-references)
 - [隔离与运行限制](#isolation-and-limits)
 - [验证与恢复](#verification-and-recovery)
@@ -137,9 +138,20 @@ implicit 应用设置 `HOSTED_OIDC_FLOW=implicit`。此模式不读取 `clientSe
 
 默认上游为 `https://api.deepseek.com/anthropic`；配置的模型 ID 是 `deepseek-flash` 和 `deepseek-v4-pro`。共享 Key 代理限制每账号请求和输出。兼容 Responses 的公司模型使用 `modelProtocol: openai-responses`，并显式配置 `modelKeyFile`／`modelBaseUrl`；[包参考](../../../packages/experimental/hosted-workspaces/README.zh.md#configuration)定义地址前缀和无状态请求限制。图片仍须单独进行端到端确认。
 
-公司模型组合在启动时将压缩策略应用到四个内置 Web 预设，并保留各自工具。该路由配置 4,096 token 的压缩余量、摘要输出及近期保留预算，适配默认 32K 上下文／8K 输出；改变容量时须同时核对[压缩策略](../../../packages/compaction/compaction-basic/README.zh.md#use-this-package)，避免历史挤占模型输出空间。
+公司模型组合在启动时将压缩策略应用到四个内置 Web 预设、`clinical-pathway-analysis` 及已启用的 `clinical-review`，并保留各自工具。该路由配置 4,096 token 的压缩余量、摘要输出及近期保留预算，适配默认 32K 上下文／8K 输出；改变容量时须同时核对[压缩策略](../../../packages/compaction/compaction-basic/README.zh.md#use-this-package)，避免历史挤占模型输出空间。
 
 公司入口需要为入口及 `*.portal-hostname` 配置 DNS，并提供覆盖这些名称的 TLS 证书。反向代理须保留 Host，将 HTTP 和 WebSocket 流量转发到网关。个人运行实例端口不对外发布；浏览器不直接连接运行实例容器。底层 Web 传输要求见[公开部署转发](public-deployments.zh.md)。
+
+-----
+
+<a id="clinical-pathway-analysis"></a>
+## 分析临床路径
+
+新建托管聊天时，选择**临床路径分析**（`clinical-pathway-analysis`）。默认托管运行实例包含此预设，独立于可选就诊核查 overlay，不要求数据库连接。提供获准使用的导出、已有路径文档或临床参考资料即可分析。
+
+可以请求生成 v1 新路径参考方案、分析所提供的执行与变异依据，或根据用户修改生成列明前后差异的 v2 参考方案。预设要求模型说明资料来源、人群与时间范围、分母完整性及执行证据，区分医嘱开立与实际执行，并分别呈现合理例外、未解释的变异及未知情况。不完整的导出只支持样本结论；历史上的高频做法本身不足以构成临床建议。
+
+v1 和 v2 是私有对话或用户要求的参考文件，不是医院草案或业务版本。可选[只读读取器](../../../packages/experimental/clinical-pathway-reader/README.zh.md)提供定义、人群和病例依据；显式选择 `compose.clinical-pathway.yml` 启用独立读取组合，同时保留医保入口时再叠加 `compose.clinical-with-pathway.yml`。数据库凭据只挂网关，连接须通过来源和只读事务检查；默认要求专用只读角色，开发联调可明确选择 `development-transaction-only`，不修改授权；没有写回、审核发布或实时监控能力。
 
 -----
 
@@ -219,5 +231,7 @@ mock 流程完成仅验证本地代码路径。公司验收仍需要已注册的
 <summary>验证工作上下文——点击展开</summary>
 
 [需求验证记录](../../requirements/sso-private-workspaces-v1.zh.md#dev-note) 统一记录已执行的 Docker、浏览器、工具和模型检查。公司回调已注册，并已观察到真实账号进入个人首页。[资料集成记录](../../requirements/drg-review-assistant-v1-implementation.zh.md#dev-note)记录了新 standard 聊天通过公司 SSO／DeepSeek 自动加载技能、核验摘要及引用 PDF 页码的结果；公司部署及独立用户验收仍待完成。
+
+临床路径固定 SQL 已通过隔离 PostgreSQL 合成验证，开发 schema 已核对；获准开发取数已在强制只读事务中通过，部署入口的临床推理和用户验收仍未完成。实际资料缺口、导入不完整或当前保留的原因记录，均不能据此认定总体缺失率或完整变异轨迹。
 
 </details>

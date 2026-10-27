@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/experimental/clinical-pathway-reference/README.md
+/:
+  en: 743dbcf14c6215b3
+  zh: 1dfe08920c9a75cd
+/deepseek-ai-dsh-experimental-clinical-pathway-reference:
+  en: 002f3ec479518481
+  zh: 6e1bd55ea7518763
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/summary:
+  en: 783fea32dccaf76d
+  zh: 32808633c1fe1fc4
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/table-of-contents:
+  en: 65663b0d5dfa1600
+  zh: 55b2121ae6059425
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/use-this-package:
+  en: bc57ad06f464db95
+  zh: d27a08df45d987c4
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/understand-the-implementation:
+  en: d47824fa6f57a88d
+  zh: 78617e57c472814d
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/further-exploration:
+  en: f47275fa8a2bb53f
+  zh: 4af2459e58c03b72
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/model-experience:
+  en: 215e7ba838619b7b
+  zh: f63d9f319a8d6b8f
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/model-experience/reference-operations:
+  en: 71c86bd73ed4f35d
+  zh: 81c6f26d751392bf
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/model-experience/reference-operations/what-the-model-sees:
+  en: b306442d41438626
+  zh: be923b01b85f2e09
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/model-experience/reference-operations/token-effect:
+  en: 1436d62d45f1c37b
+  zh: 8df461bc91c212d7
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/model-experience/reference-operations/kv-cache-effect:
+  en: 3782f375bd784cd0
+  zh: 47019716532505be
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/known-limitations-and-deferred-work:
+  en: ff8a77e32ce85165
+  zh: cb3573fdee944f1f
+/deepseek-ai-dsh-experimental-clinical-pathway-reference/known-limitations-and-deferred-work/dev-note:
+  en: d0032074fb735704
+  zh: 5f2eba6ba00e150b

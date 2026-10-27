@@ -28,6 +28,10 @@
     // not declaration path aliases, keep each package/vendor source compiled
     // under its own tsconfig boundary.
     "paths": {
+      "@deepseek-ai/dsh-experimental-clinical-pathway-reference": ["./packages/experimental/clinical-pathway-reference/src/index.ts"],
+      "@deepseek-ai/dsh-experimental-clinical-pathway-reference/types": ["./packages/experimental/clinical-pathway-reference/src/types.ts"],
+      "@deepseek-ai/dsh-experimental-clinical-pathway-reference/client": ["./packages/experimental/clinical-pathway-reference/src/client/index.ts"],
+      "@deepseek-ai/dsh-experimental-clinical-pathway-reader": ["./packages/experimental/clinical-pathway-reader/src/index.ts"],
       "@deepseek-ai/dsh-experimental-emr-encounter/wire": ["./packages/experimental/emr-encounter/src/wire.ts"],
       "@deepseek-ai/dsh-experimental-client-clinical-results": ["./packages/experimental/client-clinical-results/src/index.ts"],
       "@deepseek-ai/dsh-experimental-client-clinical-results/client": ["./packages/experimental/client-clinical-results/src/client/index.ts"],

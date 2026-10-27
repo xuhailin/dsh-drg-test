@@ -42,8 +42,16 @@ function statusKey(status: NonNullable<EntryView['status']>): EntryKey {
   return keys[status.status]
 }
 
-/** @param props - sidebar geometry, localized copy, and entry opener. @returns global encounter-entry action. */
-export function EntryButton({ wide, show, t }: PropsRuntime<'sidebar.footer.action'> & Face) {
+/**
+ * @param props - sidebar geometry, active clinical context, localized copy, and entry opener.
+ * @returns the encounter-entry action in clinical review, otherwise null.
+ */
+export function EntryButton({ wide, usePanelInfo, useSessions, show, t }: PropsRuntime<'sidebar.footer.action'> & Face) {
+  const panel = usePanelInfo(info => info.activePanelId)
+  const clinicalSession = useSessions(state => Object.values(state.byId)
+    .find(session => (session.retainedBy.mainView ?? 0) > 0)?.projectionValues?.agentPreset === 'clinical-review')
+  if (panel !== 'clinical-patients' && (panel !== null || !clinicalSession)) return null
+
   return <Tooltip label={t('entry')} disabled={wide}>
     <Button size="sm" icon={<IconUserOutlineRegular size={16} />} aria-label={t('entry')} onClick={() => { show() }}>
       {wide ? t('entry') : null}
@@ -51,8 +59,14 @@ export function EntryButton({ wide, show, t }: PropsRuntime<'sidebar.footer.acti
   </Tooltip>
 }
 
-/** @param props - bound Session, localized copy, and entry opener. @returns the review action in the existing conversation header. */
-export function ReviewButton({ sessionId, show, t }: PropsRuntime<'conversation.session.header.actions'> & Face) {
+/**
+ * @param props - bound Session, preset summary, localized copy, and entry opener.
+ * @returns the clinical-review header action, otherwise null.
+ */
+export function ReviewButton({ sessionId, useSessions, show, t }: PropsRuntime<'conversation.session.header.actions'> & Face) {
+  const clinicalSession = useSessions(state => state.byId[sessionId]?.projectionValues?.agentPreset === 'clinical-review')
+  if (!clinicalSession) return null
+
   return <Tooltip label={t('review')}>
     <Button size="sm" variant="toolbar" icon={<IconChecklistOutlineRegular size={16} />}
       aria-label={t('review')} onClick={() => { show(sessionId) }}>

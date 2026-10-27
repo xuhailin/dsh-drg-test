@@ -171,7 +171,7 @@ export async function apply(ctx: Context): Promise<void> {
       }, ResultCards))
     })
   })
-  ctx.inject(['layout', 'uiWorkspace'], (patientCtx) => {
+  ctx.inject(['layout', 'uiWorkspace', 'sessions'], (patientCtx) => {
     const patientFace: PatientInjected = {
       hooks: { viewer: workspaceResult.view, directory: directory.view },
       select: (ref) => { void workspaceResult.select(ref) }, refresh: () => { void workspaceResult.refresh() },
@@ -184,9 +184,28 @@ export async function apply(ctx: Context): Promise<void> {
       openChat: () => { const id = directory.view.getSnapshot().sessionId; if (id !== null) patientCtx.uiWorkspace.openSession(id) },
     }
     patientCtx.slots.inject('main', () => patientCtx.slots.register({ name: 'main', key: 'clinical-patients', locale: 'clinical-results', inject: () => patientFace }, PatientWorkspace))
-    patientCtx.slots.inject('sidebar.panellist', () => patientCtx.slots.register({ name: 'sidebar.panellist', id: 'clinical-patients', locale: 'clinical-results',
-      label: () => patientCtx.locale.bind('clinical-results')('assistantName'), order: 20,
-    }, PatientIcon))
+    patientCtx.slots.inject('sidebar.panellist', function* () {
+      let removeEntry: (() => void) | undefined
+      const syncEntry = (): void => {
+        const panel = patientCtx.layout.panelInfo.getSnapshot().activePanelId
+        const clinicalSession = Object.values(patientCtx.sessions.list.getSnapshot().byId)
+          .find(session => (session.retainedBy.mainView ?? 0) > 0)?.projectionValues?.agentPreset === 'clinical-review'
+        const visible = panel === 'clinical-patients' || (panel === null && clinicalSession)
+        if (visible && removeEntry === undefined) {
+          removeEntry = patientCtx.slots.register({ name: 'sidebar.panellist', id: 'clinical-patients', locale: 'clinical-results',
+            label: () => patientCtx.locale.bind('clinical-results')('assistantName'), order: 20,
+          }, PatientIcon)
+        } else if (!visible && removeEntry !== undefined) {
+          const remove = removeEntry
+          removeEntry = undefined
+          remove()
+        }
+      }
+      yield () => { removeEntry?.() }
+      yield patientCtx.sessions.list.subscribe(syncEntry)
+      yield patientCtx.layout.panelInfo.subscribe(syncEntry)
+      syncEntry()
+    })
   })
 
 }

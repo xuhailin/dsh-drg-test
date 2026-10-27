@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for clinical-pathway-assistant-v1.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/clinical-pathway-assistant-v1.md
+/clinical-pathway-assistant-v1:
+  en: fb054ba21e31182a
+  zh: 1d976c074ace3af7
+/clinical-pathway-assistant-v1/summary:
+  en: 535f64ea8c9a3d50
+  zh: c264e5e28720311b
+/clinical-pathway-assistant-v1/table-of-contents:
+  en: 53dcc9533ef5274f
+  zh: 99449a31fee1bf07
+/clinical-pathway-assistant-v1/goals-and-scope:
+  en: 77d79cd2393ed4b5
+  zh: ffac2e805264aef6
+/clinical-pathway-assistant-v1/user-flow-and-reference-outputs:
+  en: a90e0cc85bc38452
+  zh: 68956b6e8c36c2ab
+/clinical-pathway-assistant-v1/three-read-only-tools:
+  en: 7729c0f6ec869142
+  zh: b2e7f6a827ff0a78
+/clinical-pathway-assistant-v1/behavioral-requirements:
+  en: 14619860bee6df42
+  zh: 16e03a9d11477456
+/clinical-pathway-assistant-v1/acceptance-scenarios:
+  en: 982e8a3d9f3e20d3
+  zh: 3230bf56585d4119
+/clinical-pathway-assistant-v1/future-write-integration:
+  en: e27d78f11f47da08
+  zh: 33499821eb123c31
+/clinical-pathway-assistant-v1/dependencies-and-status:
+  en: 2da421140b26b362
+  zh: 2940c98aee93c4bf
+/clinical-pathway-assistant-v1/dev-note:
+  en: 819c7f0dd6dff8a7
+  zh: 4d3689a4d95c4b52

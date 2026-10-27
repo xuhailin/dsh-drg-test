@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for clinical-pathway-workbench-p2-structures.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/clinical-pathway-workbench-p2-structures.md
+/p2-emr-single-pathway-components-and-complete-reference-editing:
+  en: 779170493a07a966
+  zh: fcad06c842723a98
+/p2-emr-single-pathway-components-and-complete-reference-editing/summary:
+  en: 405cf4403250b524
+  zh: 7bf67e7e3a73591f
+/p2-emr-single-pathway-components-and-complete-reference-editing/table-of-contents:
+  en: a645303ba42a6f5b
+  zh: 0472bb1559079b80
+/p2-emr-single-pathway-components-and-complete-reference-editing/clinical-task-and-scope:
+  en: e1a043365c4164e7
+  zh: d188a10bc089c3b7
+/p2-emr-single-pathway-components-and-complete-reference-editing/component-separation-and-editing:
+  en: 10b116b91a4493b6
+  zh: 1175342d2992062d
+/p2-emr-single-pathway-components-and-complete-reference-editing/cross-day-confirmation-semantics:
+  en: dcec9e510f72ed24
+  zh: d85acf8d557da6e9
+/p2-emr-single-pathway-components-and-complete-reference-editing/data-prerequisites-and-dependencies:
+  en: 1c37c31978e9587c
+  zh: 3920702f56a5aee2
+/p2-emr-single-pathway-components-and-complete-reference-editing/acceptance-and-stages:
+  en: 985809a80255c20e
+  zh: cd291607e52b9734
+/p2-emr-single-pathway-components-and-complete-reference-editing/dev-note:
+  en: 47ae7c2715f9f331
+  zh: 6fe614e3f06979c6

@@ -1,0 +1,13 @@
+- insert:
+    - id: clinical-pathway-reader-gateway
+      name: '@deepseek-ai/dsh-experimental-clinical-pathway-reader'
+      config:
+        mode: gateway
+        sourceSystem: !!js process.env.CLINICAL_PATHWAY_SOURCE_SYSTEM
+        databaseConfigFile: !!js process.env.CLINICAL_PATHWAY_DATABASE_CONFIG_FILE
+        policyFile: !!js process.env.CLINICAL_PATHWAY_POLICY_FILE
+        schema: !!js process.env.CLINICAL_PATHWAY_SCHEMA || 'public'
+        readRolePolicy: !!js process.env.CLINICAL_PATHWAY_READ_ROLE_POLICY || 'select-only'
+        herbalTables: !!js process.env.CLINICAL_PATHWAY_HERBAL_TABLES === 'true'
+        operationTables: !!js process.env.CLINICAL_PATHWAY_OPERATION_TABLES === 'true'
+        dictionaryTables: !!js process.env.CLINICAL_PATHWAY_DICTIONARY_TABLES === 'true'

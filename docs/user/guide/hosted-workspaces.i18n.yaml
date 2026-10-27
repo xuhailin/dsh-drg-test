@@ -12,8 +12,8 @@
   en: a56a15df87d12518
   zh: be6c2ee1a27061c1
 /company-login-and-private-docker-workspaces/table-of-contents:
-  en: b04dc2a2f52c6a1b
-  zh: 2676e465c5deab38
+  en: 7d5bd1d3e6aab341
+  zh: c9bb0466ee3ae8d4
 /company-login-and-private-docker-workspaces/run-the-local-trial:
   en: 0a1fe1d787dc0666
   zh: d4069f79f7196ecf
@@ -33,8 +33,11 @@
   en: 10576ff327232823
   zh: f60de5b7775c74f5
 /company-login-and-private-docker-workspaces/connect-company-services:
-  en: e5536ffca909ac86
-  zh: 5aac79545eecaddb
+  en: 8b57eedf2f80512e
+  zh: aa7a7c48b89d584b
+/company-login-and-private-docker-workspaces/analyze-clinical-pathways:
+  en: 52a67bc93da29fc8
+  zh: 4eefcd2f4c498cef
 /company-login-and-private-docker-workspaces/optional-encounter-review:
   en: 8b5e954d31d514d4
   zh: d5019b032aadfd45
@@ -51,5 +54,5 @@
   en: cea45aeed7e7dc98
   zh: eea651712893b47f
 /company-login-and-private-docker-workspaces/dev-note:
-  en: a23c5c31d8e54a82
-  zh: 6b9eae5f383917c0
+  en: d559dfc7ada29baa
+  zh: cf146e1528f3c80b

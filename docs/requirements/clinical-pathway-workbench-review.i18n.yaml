@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for clinical-pathway-workbench-review.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/clinical-pathway-workbench-review.md
+/clinical-pathway-assistant-requirements-review-record:
+  en: 4f0cf78bbb661664
+  zh: 4cb1890549b2fd71
+/clinical-pathway-assistant-requirements-review-record/summary:
+  en: 4b09c282c7e934ef
+  zh: 2dd18dab53f72874
+/clinical-pathway-assistant-requirements-review-record/table-of-contents:
+  en: 5332bea6ebb67c6f
+  zh: 1fe67bf36dee08db
+/clinical-pathway-assistant-requirements-review-record/review-scope-and-conclusions:
+  en: 3ac0992372060a7b
+  zh: 95f34f007c18b839
+/clinical-pathway-assistant-requirements-review-record/findings-and-corrections:
+  en: 2ac881018c295488
+  zh: 55b93f1548c5f23c
+/clinical-pathway-assistant-requirements-review-record/retained-requirements-and-open-decisions:
+  en: 65f74408ae394678
+  zh: b6f6e1f4be914f78
+/clinical-pathway-assistant-requirements-review-record/document-checks-in-this-round:
+  en: 8144cdefbc70ed55
+  zh: f1973e751ce081a0
+/clinical-pathway-assistant-requirements-review-record/dev-note:
+  en: 5273d9ef31990a45
+  zh: 99199be50032d464

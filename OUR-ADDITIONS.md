@@ -5,6 +5,7 @@
 | 名称 | 类型 | 位置 | 用途 |
 |---|---|---|---|
 | `hosted-workspaces` | 网关插件／Profile 组合包 | [packages/experimental/hosted-workspaces/](packages/experimental/hosted-workspaces/) | 公司 SSO 登录、每人独立的 Docker 工作区、文件与会话持久化，以及受限的模型请求代理。 |
+| `clinical-pathway-analysis` | 托管聊天预设 | [deploy/hosted-workspaces/clinical-pathway.preset.yml](deploy/hosted-workspaces/clinical-pathway.preset.yml) | 在获准范围内读取路径与历史依据，采用 EMR 共享定义保存参考稿并轻量预览；不创建医院草案、业务版本或 EMR 写回。 |
 | `emr-encounter` | 服务定义与共享类型包 | [packages/experimental/emr-encounter/](packages/experimental/emr-encounter/) | 定义就诊身份、授权绑定、证据快照及可替换的 `EncounterReader` 读取服务，不直接读取数据库。 |
 | `emr-reader-broker` | 网关取数插件 | [packages/experimental/emr-reader-broker/](packages/experimental/emr-reader-broker/) | 按开发白名单校验就诊权限，只读获取 PostgreSQL 中的住院信息、诊断、医嘱和病历文书；数据库凭据留在网关。 |
 | `clinical-review` | 临床核查插件 | [packages/experimental/clinical-review/](packages/experimental/clinical-review/) | 将授权就诊绑定到私人会话，采集证据、发起出院前核查、保存带原文引用的建议和报告；不写回 EMR、不阻断出院。 |
@@ -16,5 +17,5 @@
 | `review_get_report` | 模型工具（就诊会话内） | [packages/experimental/clinical-review/src/tools.ts](packages/experimental/clinical-review/src/tools.ts) | 读取当前核查报告及尚未核查的范围。 |
 | `drg-national-reference` | 模型技能（Skill） | [deploy/hosted-workspaces/skills/drg-national-reference/SKILL.md](deploy/hosted-workspaces/skills/drg-national-reference/SKILL.md) | 指导模型复用已有文件和 Bash 工具读取共享国家 DRG PDF，校验版本并注明来源与页码；不计算 DRG／DIP 分组。 |
 | `drg-resources.ts` | 运维脚本 | [scripts/drg-resources.ts](scripts/drg-resources.ts) | 提供资料集合的初始化、发布、列出、校验、设置默认版本、撤回、恢复和补登记操作。 |
-| `company-presets.mjs` | 部署配置生成脚本 | [deploy/hosted-workspaces/company-presets.mjs](deploy/hosted-workspaces/company-presets.mjs) | 为 minimal、standard、PTC 和 Cordis 四种 Web 预设生成公司上下文压缩配置覆盖。 |
+| `company-presets.mjs` | 部署配置生成脚本 | [deploy/hosted-workspaces/company-presets.mjs](deploy/hosted-workspaces/company-presets.mjs) | 为四种 Web 预设、临床路径分析及已启用的临床核查预设生成公司上下文压缩配置覆盖。 |
 | 托管工作区部署配套 | 部署配置与构建脚本 | [deploy/hosted-workspaces/](deploy/hosted-workspaces/) | 提供 Docker 镜像构建、Compose 部署、运行时启动及临床核查和共享资料的可选配置。 |

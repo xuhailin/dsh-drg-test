@@ -1,0 +1,11 @@
+version: 1
+scenario: clinical-pathway-reference
+profile: headless
+composition: clinical-pathway-reference
+recording: authored
+environment:
+  TZ: UTC
+  REFERENCE_FIXTURE_TOKEN: synthetic-reference-read-token
+header:
+  class: clinical-pathway-reference
+  pin: true

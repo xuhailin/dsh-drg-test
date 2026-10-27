@@ -54,6 +54,8 @@ The [broker](src/http.ts) owns fixed `/runtime/emr/launch`, `/runtime/emr/consum
 
 The [reader](src/reader.ts) hashes exact retained content, source metadata, coverage, binding and provider version into `caseRevision`; unchanged evidence retains that revision across capture times. `capturedAt` and `cutoff` record the current capture independently. It marks unavailable document text as unread and keeps order state distinct from administration evidence. It rejects overflow before publication, rechecks login before each query, and rereads authorization before returning. Cancellation closes the source connection; unloading stops requests and removes the runtime handler.
 
+The package also exports `PgReadDatabase`, its `ReadDatabase`/`ReadTransaction` types, `databaseConfigSchema`, `readBoundedFile` and `readClinicalRequestBody` and `writeClinicalReadFailure` for the optional [pathway reader](../clinical-pathway-reader/README.md). These helpers do not register routes or broaden encounter policy; the consumer owns fixed SQL, source/schema checks, authorization and complete-result limits.
+
 </details>
 
 <a id="further-exploration"></a>

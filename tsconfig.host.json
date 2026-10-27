@@ -9,6 +9,8 @@
   },
   "include": [
     "apps/web/tests/clinical-results.e2e.ts",
+    "apps/web/tests/clinical-pathway-analysis.e2e.ts",
+    "apps/web/tests/clinical-pathway-reference.e2e.ts",
     "apps/web/tests/synyi-presentation.e2e.ts",
     "apps/web/tests/collapse-timing.e2e.ts",
     "apps/web/tests/notice-wake-tail.e2e.ts",
@@ -244,6 +246,8 @@
     { "path": "./packages/experimental/hosted-workspaces" },
     { "path": "./packages/experimental/emr-encounter" },
     { "path": "./packages/experimental/emr-reader-broker" },
+    { "path": "./packages/experimental/clinical-pathway-reader" },
+    { "path": "./packages/experimental/clinical-pathway-reference/tsconfig.host.json" },
     { "path": "./packages/experimental/clinical-review" },
     { "path": "./packages/experimental/drg-resources" },
     { "path": "./packages/experimental/client-ui-cot-translation/tsconfig.host.json" },

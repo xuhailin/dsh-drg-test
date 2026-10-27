@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for clinical-pathway-workbench-p5-handoff.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/clinical-pathway-workbench-p5-handoff.md
+/p5-discussion-reports-and-structured-reference-handoff:
+  en: 1bba06fb88035c9a
+  zh: acaff4b41fcd4dea
+/p5-discussion-reports-and-structured-reference-handoff/summary:
+  en: 505ac7378293d30d
+  zh: e83ed0cdd23a9011
+/p5-discussion-reports-and-structured-reference-handoff/table-of-contents:
+  en: 3b3559ad8ef8ae64
+  zh: a86ce69403b6b46b
+/p5-discussion-reports-and-structured-reference-handoff/owner-task-and-scope:
+  en: 343549ea536d1caa
+  zh: e714f53ad91dbaa9
+/p5-discussion-reports-and-structured-reference-handoff/behavior-and-artifact-ownership:
+  en: 7dd63250fe05ba1a
+  zh: 79335dd877fda46b
+/p5-discussion-reports-and-structured-reference-handoff/data-prerequisites-and-dependencies:
+  en: 5aa4db5bcfe5a30d
+  zh: 59ebfd6dbe8abd7c
+/p5-discussion-reports-and-structured-reference-handoff/acceptance-scenarios:
+  en: 437466041d86d622
+  zh: 412e96b60fa0b3aa
+/p5-discussion-reports-and-structured-reference-handoff/stages-and-future-integration:
+  en: 0daf8b460c595a68
+  zh: 5d4a8ddff4f14d07
+/p5-discussion-reports-and-structured-reference-handoff/dev-note:
+  en: a9bbebe166e7476e
+  zh: a9d521692059581e

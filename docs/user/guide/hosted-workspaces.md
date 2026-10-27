@@ -16,6 +16,7 @@ Try company-style login and private DSH chats on a local Docker engine before ch
 - [Build images with GitLab CI](#gitlab-ci)
 - [Register the company SSO application](#sso-registration)
 - [Connect company services](#company-services)
+- [Analyze clinical pathways](#clinical-pathway-analysis)
 - [Shared national references](#shared-references)
 - [Isolation and operating limits](#isolation-and-limits)
 - [Verify and recover](#verification-and-recovery)
@@ -137,9 +138,20 @@ These are replacement examples, not an existing company deployment. `HOSTED_OIDC
 
 The default upstream is `https://api.deepseek.com/anthropic`; the configured model IDs are `deepseek-flash` and `deepseek-v4-pro`. The shared-key proxy applies per-account admission and output limits. Company Responses-compatible models use `modelProtocol: openai-responses` and explicit `modelKeyFile` / `modelBaseUrl` settings; the [package reference](../../../packages/experimental/hosted-workspaces/README.md#configuration) defines endpoint prefixes and the stateless request restrictions. Images need separate end-to-end confirmation.
 
-At startup, the company-model composition applies its compaction policy to all four bundled Web presets without changing their tools. It gives its route 4,096 tokens each for compaction headroom, summary output, and retained recent history, fitting the default 32K context and 8K output. Recheck the [compaction policy](../../../packages/compaction/compaction-basic/README.md#use-this-package) when changing capacities so history does not consume the model's output space.
+At startup, the company-model composition applies its compaction policy to the four bundled Web presets, `clinical-pathway-analysis`, and `clinical-review` when enabled, without changing their tools. It gives its route 4,096 tokens each for compaction headroom, summary output, and retained recent history, fitting the default 32K context and 8K output. Recheck the [compaction policy](../../../packages/compaction/compaction-basic/README.md#use-this-package) when changing capacities so history does not consume the model's output space.
 
 A company entry needs DNS for both the portal and `*.portal-hostname`, plus TLS certificates covering those names. The reverse proxy must preserve Host and forward HTTP and WebSocket traffic to the gateway. Personal runtime ports remain unpublished; browsers never connect directly to a runtime container. See [public deployment forwarding](public-deployments.md) for the underlying Web transport requirements.
+
+-----
+
+<a id="clinical-pathway-analysis"></a>
+## Analyze clinical pathways
+
+Choose **临床路径分析** (`clinical-pathway-analysis`) for a new hosted chat. The default hosted runtime includes this preset independently of the optional encounter-review overlay and requires no database connection. Supply authorized exports, existing pathway documents, or clinical reference material.
+
+Ask for a v1 new-pathway reference, analysis of supplied execution/variation evidence, or a v2 reference showing before/after changes requested by the user. The preset instructs the model to identify sources, the population and time period, denominator completeness, and execution evidence. It distinguishes order entry from actual execution, and separates reasonable exceptions, unexplained variation, and unknowns. Partial exports support sample findings only; frequent historical practice alone does not establish a clinical recommendation.
+
+Both v1 and v2 remain private conversation or user-requested reference files, not hospital drafts or business versions. The optional [read-only reader](../../../packages/experimental/clinical-pathway-reader/README.md) supplies definitions, cohorts and encounter evidence. Explicitly select `compose.clinical-pathway.yml` for standalone reads; also layer `compose.clinical-with-pathway.yml` to retain the insurance entry. Database credentials stay in the gateway, and the connection must pass source and read-only-transaction checks. Default access requires a SELECT-only role; explicit development integration may select `development-transaction-only` without changing grants. No writeback, review/publication or realtime monitoring is provided.
 
 -----
 
@@ -219,5 +231,7 @@ Persistent volumes and account mappings survive container restarts. Image replac
 <summary>Working verification context — click to expand</summary>
 
 The [requirements verification record](../../requirements/sso-private-workspaces-v1.md#dev-note) owns executed Docker, browser, tool, and model checks. Company callback registration and a real-account home-page visit have been observed. The [reference integration record](../../requirements/drg-review-assistant-v1-implementation.md#dev-note) covers the fresh standard chat through company SSO/DeepSeek, automatic skill loading, digest verification, and PDF page citations; company deployment and independent user acceptance remain pending.
+
+Fixed pathway SQL passes isolated PostgreSQL synthetic verification and development schema checks. Approved development source reads pass in enforced read-only transactions; deployed clinical inference and user acceptance remain unverified. Coverage gaps, incomplete imports and retained reasons cannot establish population-wide missing-data rates or a complete variation history.
 
 </details>

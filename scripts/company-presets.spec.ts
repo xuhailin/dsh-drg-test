@@ -10,13 +10,23 @@ import { interpolate } from '@deepseek-ai/cordis-plugin-loader'
 import { BasicCompactionEngine } from '@deepseek-ai/dsh-compaction-basic'
 import type { BasicCompactionConfig } from '@deepseek-ai/dsh-compaction-basic'
 import { resolveCompactSpec, resolveConfig, resolveTargetPolicy } from '../packages/compaction/compaction-basic/src/config.ts'
-import { generateClinicalPreset, generateCompanyPresets, requiresClinicalPreset } from '../deploy/hosted-workspaces/company-presets.mjs'
+import { generateClinicalPathwayPreset, generateClinicalPreset, generateCompanyPresets, requiresClinicalPreset } from '../deploy/hosted-workspaces/company-presets.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const script = join(root, 'deploy/hosted-workspaces/company-presets.mjs')
 const policyPath = 'deploy/hosted-workspaces/company-model.runtime.patch.yml'
 const presetPath = (name: string): string => `packages/bundle/web-app/presets/${name}.patch.yml`
 const directories: string[] = []
+
+function expectCompanyClinicalPolicy(
+  patch: ReturnType<typeof generateCompanyPresets>[number] | undefined, webConfig: unknown,
+): void {
+  expect(patch).toBeDefined()
+  const plugins = patch?.config.plugins ?? []
+  expect(walk(plugins).find(row => row.id === 'tool-web')?.config).toEqual(webConfig)
+  expect(walk(plugins).find(row => row.id === 'compaction-basic')?.config)
+    .toMatchObject({ modelPolicies: [{ provider: 'company-gateway', headroomTokens: 4096 }] })
+}
 
 afterEach(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
@@ -42,7 +52,7 @@ function walk(rows: readonly unknown[]): Record<string, unknown>[] {
 function fixture(): string {
   const directory = mkdtempSync(join(tmpdir(), 'dsh-company-presets-'))
   directories.push(directory)
-  for (const path of [policyPath, 'deploy/hosted-workspaces/clinical.preset.yml', 'deploy/hosted-workspaces/clinical-prompt.mjs',
+  for (const path of [policyPath, 'deploy/hosted-workspaces/clinical.preset.yml', 'deploy/hosted-workspaces/clinical-pathway.preset.yml', 'deploy/hosted-workspaces/clinical-prompt.mjs',
     ...['minimal', 'standard', 'ptc', 'cordis'].map(presetPath)]) {
     mkdirSync(dirname(join(directory, path)), { recursive: true })
     writeFileSync(join(directory, path), readFileSync(join(root, path)))
@@ -65,7 +75,7 @@ it('patches all active preset services and preserves every other plugin and defe
 })
 
 it('resolves legal pressure budgets for both deployed model capacities', () => {
-  for (const patch of generateCompanyPresets(root, undefined, true)) {
+  for (const patch of generateCompanyPresets(root, undefined, true, true)) {
     const raw = walk(patch.config.plugins).find(row => row.id === 'compaction-basic')!.config
     const interpolated: unknown = interpolate({ process: { env: { HOSTED_MODEL_ID: 'gpt-5.5' } } }, raw)
     const config = resolveConfig(BasicCompactionEngine.Config(interpolated as BasicCompactionConfig))
@@ -101,10 +111,7 @@ it('keeps clinical profile edits before replacing only the company compaction po
   expect(generateClinicalPreset(directory, profile)).toEqual(clinical)
   const company = generateCompanyPresets(directory, profile, true)
   expect(company).toHaveLength(5)
-  const actual = company.find(row => row.id === clinical.id)!
-  expect(walk(actual.config.plugins).find(row => row.id === 'tool-web')?.config).toEqual(tool.config)
-  expect(walk(actual.config.plugins).find(row => row.id === 'compaction-basic')?.config)
-    .toMatchObject({ modelPolicies: [{ provider: 'company-gateway', headroomTokens: 4096 }] })
+  expectCompanyClinicalPolicy(company.find(row => row.id === clinical.id), tool.config)
 })
 
 it('keeps saved standard-preset edits separate from the clinical composition', () => {
@@ -113,6 +120,91 @@ it('keeps saved standard-preset edits separate from the clinical composition', (
   const profile = join(directory, 'profile.patch.yml')
   writeFileSync(profile, dump([{ id: 'preset-standard', config: { id: 'standard', plugins: [] } }], { schema: entryListSchema }))
   expect(generateClinicalPreset(directory, profile)).toEqual(clinical)
+})
+
+it('keeps pathway analysis independent of other presets and applies its own saved edits before company policy', () => {
+  const directory = fixture()
+  const pathway = generateClinicalPathwayPreset(directory)
+  expect(pathway).toMatchObject({ id: 'preset-clinical-pathway-analysis', name: '@deepseek-ai/dsh-agent-preset',
+    config: { id: 'clinical-pathway-analysis', name: '临床路径分析' } })
+  const plugins = pathway.config.plugins
+  expect(plugins.find(row => row.id === 'clinical-prompt')?.name).toBe(join(directory, 'deploy/hosted-workspaces/clinical-prompt.mjs'))
+  expect(plugins.filter(row => !['persona', 'pathway-reader'].includes(row.id ?? '')))
+    .toEqual(generateClinicalPreset(directory).config.plugins.filter(row => row.id !== 'persona'))
+  expect(plugins.find(row => row.id === 'pathway-reader')?.disabled).toBe(true)
+  const profile = join(directory, 'profile.patch.yml')
+  const unrelated = ['standard', 'clinical-review'].map(id => ({ id: `preset-${id}`, config: { id, plugins: [] } }))
+  writeFileSync(profile, dump(unrelated, { schema: entryListSchema }))
+  expect(generateClinicalPathwayPreset(directory, profile)).toEqual(pathway)
+  const tool = walk(plugins).find(row => row.id === 'tool-web')!
+  tool.config = { fetch: false, searchTimeoutMs: 1234 }
+  writeFileSync(profile, dump([{ id: pathway.id, config: pathway.config }], { schema: entryListSchema }))
+  expect(generateClinicalPathwayPreset(directory, profile)).toEqual(pathway)
+  const company = generateCompanyPresets(directory, profile, false, true)
+  expect(company.map(row => row.id)).toEqual(['preset-minimal', 'preset-standard', 'preset-ptc', 'preset-cordis', pathway.id])
+  expectCompanyClinicalPolicy(company.find(row => row.id === pathway.id), tool.config)
+})
+
+it.each([false, true])('enables only the pathway reader after saved profile replacement with company models=%s', (company) => {
+  const directory = fixture()
+  const profile = join(directory, 'profile.patch.yml')
+  const pathway = generateClinicalPathwayPreset(directory)
+  const reader = pathway.config.plugins.find(row => row.id === 'pathway-reader')!
+  const config = { ...pathway.config, name: 'Saved pathway analysis' }
+  const generate = (enabled: boolean) => company
+    ? generateCompanyPresets(directory, profile, true, true, enabled).find(row => row.id === pathway.id)!
+    : generateClinicalPathwayPreset(directory, profile, enabled)
+  writeFileSync(profile, dump([{ id: pathway.id, config }], { schema: entryListSchema }))
+  expect(generate(false).config.plugins.find(row => row.id === 'pathway-reader')).toEqual(reader)
+  const enabled = generate(true)
+  expect(enabled.config.name).toBe(config.name)
+  expect(enabled.config.plugins.filter(row => row.id === 'pathway-reader')).toEqual([{ ...reader, disabled: false }])
+  expect(record(reader.config).brokerBaseUrl).toEqual({ __jsExpr: "process.env.HOSTED_RUNTIME_GATEWAY_URL + '/runtime/clinical-pathway/'" })
+  const legacyConfig = { ...config, plugins: config.plugins.filter(row => row.id !== 'pathway-reader') }
+  writeFileSync(profile, dump([{ id: pathway.id, config: legacyConfig }], { schema: entryListSchema }))
+  expect(generate(false).config.plugins.some(row => row.id === 'pathway-reader')).toBe(false)
+  expect(generate(true).config.plugins.filter(row => row.id === 'pathway-reader')).toEqual([{ ...reader, disabled: false }])
+  const customReader = { ...reader, disabled: false, config: { ...record(reader.config), timeoutMs: 12345 } }
+  writeFileSync(profile, dump([{ id: pathway.id,
+    config: { ...legacyConfig, plugins: [...legacyConfig.plugins, customReader] },
+  }], { schema: entryListSchema }))
+  expect(generate(false).config.plugins.find(row => row.id === 'pathway-reader')).toEqual(customReader)
+  expect(generate(true).config.plugins.find(row => row.id === 'pathway-reader')).toEqual(customReader)
+  if (company) {
+    const combined = generateCompanyPresets(directory, profile, true, true, true)
+    for (const preset of combined.filter(row => row.id !== pathway.id)) {
+      expect(preset.config.plugins.some(row => row.id === 'pathway-reader')).toBe(false)
+    }
+  }
+})
+
+it('rejects missing, duplicate, or unrelated reader declarations when enabling pathway reads', () => {
+  const directory = fixture()
+  const profile = join(directory, 'profile.patch.yml')
+  const pathway = generateClinicalPathwayPreset(directory)
+  const reader = pathway.config.plugins.find(row => row.id === 'pathway-reader')!
+  writeFileSync(profile, dump([{ id: pathway.id,
+    config: { ...pathway.config, plugins: [...pathway.config.plugins, reader] },
+  }], { schema: entryListSchema }))
+  expect(() => generateClinicalPathwayPreset(directory, profile, true)).toThrow('Expected one pathway-reader entry')
+  writeFileSync(profile, dump([{ id: pathway.id, config: { ...pathway.config, plugins: pathway.config.plugins.map(row => row === reader ? { ...row, name: 'unrelated-plugin' } : row) } }], { schema: entryListSchema }))
+  expect(() => generateClinicalPathwayPreset(directory, profile, true)).toThrow('Expected the pathway reader plugin')
+  const canonical = join(directory, 'deploy/hosted-workspaces/clinical-pathway.preset.yml')
+  writeFileSync(canonical, readFileSync(canonical, 'utf8').replace('id: pathway-reader', 'id: missing-reader'))
+  expect(() => generateClinicalPathwayPreset(directory, undefined, true)).toThrow('Expected one pathway-reader entry')
+  expect(() => generateCompanyPresets(directory, undefined, false, false, true)).toThrow('Pathway reader requires the pathway preset')
+})
+
+it('fails when the pathway declaration or prompt policy is unavailable', () => {
+  const directory = fixture()
+  const path = join(directory, 'deploy/hosted-workspaces/clinical-pathway.preset.yml')
+  const source = readFileSync(path, 'utf8')
+  writeFileSync(path, source.replace('id: clinical-prompt', 'id: missing-prompt'))
+  expect(() => generateClinicalPathwayPreset(directory)).toThrow('Expected one clinical-prompt entry')
+  writeFileSync(path, source.replace('name: ./clinical-prompt.mjs', 'name: ./wrong-prompt.mjs'))
+  expect(() => generateClinicalPathwayPreset(directory)).toThrow('Expected the clinical prompt plugin')
+  writeFileSync(path, '[]\n')
+  expect(() => generateClinicalPathwayPreset(directory)).toThrow('Expected one preset-clinical-pathway-analysis entry')
 })
 
 it('loads its own clinical configuration independently of the standard persona and fails on a missing clinical prompt row', () => {
@@ -169,6 +261,25 @@ it('writes the clinical declaration and its matching company override through th
   expect(detection.signal).toBe(null)
   expect(detection.status).toBe(0)
   expect(detection.stdout).toBe('true\n')
+  const pathway = spawnSync(process.execPath, [clinicalScript, directory, output, profile, '--clinical-pathway'], { encoding: 'utf8', cwd: root })
+  expect(pathway.stderr).toBe('')
+  expect(pathway.status).toBe(0)
+  expect(load(readFileSync(output, 'utf8'), { schema: entryListSchema })).toEqual([{ insert: [generateClinicalPathwayPreset(directory)] }])
+  const combined = spawnSync(process.execPath, [script, directory, output, profile, '--clinical-review', '--clinical-pathway'], { encoding: 'utf8', cwd: root })
+  expect(combined.stderr).toBe('')
+  expect(combined.status).toBe(0)
+  expect(load(readFileSync(output, 'utf8'), { schema: entryListSchema })).toEqual(generateCompanyPresets(directory, undefined, true, true))
+  const reading = spawnSync(process.execPath, [clinicalScript, directory, output, profile, '--pathway-reader', '--clinical-pathway'], { encoding: 'utf8', cwd: root })
+  expect(reading.stderr).toBe('')
+  expect(reading.status).toBe(0)
+  expect(load(readFileSync(output, 'utf8'), { schema: entryListSchema })).toEqual([{ insert: [generateClinicalPathwayPreset(directory, undefined, true)] }])
+  const readingCompany = spawnSync(process.execPath, [script, directory, output, profile, '--clinical-pathway', '--pathway-reader'], { encoding: 'utf8', cwd: root })
+  expect(readingCompany.stderr).toBe('')
+  expect(readingCompany.status).toBe(0)
+  expect(load(readFileSync(output, 'utf8'), { schema: entryListSchema })).toEqual(generateCompanyPresets(directory, undefined, false, true, true))
+  const invalid = spawnSync(process.execPath, [clinicalScript, directory, output, '--pathway-reader'], { encoding: 'utf8', cwd: root })
+  expect(invalid.status).not.toBe(0)
+  expect(invalid.stderr).toContain('Usage: clinical-presets.mjs')
 })
 
 it('fails when a canonical preset loses its compaction target', () => {

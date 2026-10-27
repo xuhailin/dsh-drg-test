@@ -1,0 +1,15 @@
+# Explicit reference scope only; gateway policy still owns all source-read authorization.
+- insert:
+    - id: clinical-pathway-reference
+      name: '@deepseek-ai/dsh-experimental-clinical-pathway-reference'
+      config:
+        scope:
+          sourceSystem: emr-development
+          hospitalCode: '1001'
+          departmentCodes: ['99999']
+          departmentBasis: current
+          admissionFrom: '2025-10-27T00:00:00+08:00'
+          admissionTo: '2026-10-27T00:00:00+08:00'
+        maxRequestBytes: 2097152
+        maxStateBytes: 16777216
+        maxRevisions: 100

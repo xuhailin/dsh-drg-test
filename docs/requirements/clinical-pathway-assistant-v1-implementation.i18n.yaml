@@ -1,0 +1,49 @@
+# Bilingual-pair consistency record for clinical-pathway-assistant-v1-implementation.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/requirements/clinical-pathway-assistant-v1-implementation.md
+/clinical-pathway-assistant-v1-implementation-plan:
+  en: d36566a04a717cfd
+  zh: 6d8cc3d2f70a8904
+/clinical-pathway-assistant-v1-implementation-plan/summary:
+  en: 5fa514c0f361e905
+  zh: ca81319975dab656
+/clinical-pathway-assistant-v1-implementation-plan/table-of-contents:
+  en: 6b28184d4c1ffe6c
+  zh: 551b50a3b7e7cd5c
+/clinical-pathway-assistant-v1-implementation-plan/ownership-and-tool-definitions:
+  en: 84bc516a30611dad
+  zh: 588460c65f38072f
+/clinical-pathway-assistant-v1-implementation-plan/table-and-field-inventory:
+  en: 25bf9c3160659fc1
+  zh: 7000b052a209c181
+/clinical-pathway-assistant-v1-implementation-plan/table-and-field-inventory/pathway-read-definitions:
+  en: 04ee7cbeb597569a
+  zh: eac1a1dc607b320e
+/clinical-pathway-assistant-v1-implementation-plan/table-and-field-inventory/history-query-cohorts-and-recorded-execution:
+  en: af25788b2720f0c6
+  zh: 71cab402086b330b
+/clinical-pathway-assistant-v1-implementation-plan/table-and-field-inventory/case-read-encounter-evidence:
+  en: e82e375e84eec801
+  zh: 3c05ec29366b8843
+/clinical-pathway-assistant-v1-implementation-plan/join-rules-and-query-semantics:
+  en: d2268bcecf881c2f
+  zh: 9e1a37294927e2a4
+/clinical-pathway-assistant-v1-implementation-plan/join-rules-and-query-semantics/required-measures:
+  en: b936c0ad1440db6c
+  zh: 6b780076ad759fa7
+/clinical-pathway-assistant-v1-implementation-plan/implementation-tasks:
+  en: e1d91d7fba9f18f8
+  zh: 2d00a73624f1479a
+/clinical-pathway-assistant-v1-implementation-plan/verification-and-acceptance:
+  en: 749f2e873ce09a52
+  zh: 8f03f3bf090aa5d9
+/clinical-pathway-assistant-v1-implementation-plan/compatibility-and-future-integration:
+  en: b90161e093c64adb
+  zh: 039d706484dd61eb
+/clinical-pathway-assistant-v1-implementation-plan/dependencies-and-status:
+  en: 54503e98d7e8b8eb
+  zh: 5a32935699b4ab13
+/clinical-pathway-assistant-v1-implementation-plan/dev-note:
+  en: b0393db048955dc5
+  zh: 8c46f8f07c234b4d

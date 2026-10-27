@@ -36,6 +36,7 @@ kind: "package-group"
 
 | 包 | 职责 | ctx 键 |
 |---|---|---|
+| [`clinical-pathway-reader`](clinical-pathway-reader/README.zh.md) | 可选只读路径定义、历史人群及就诊依据，用于参考方案 | — |
 | [`drg-resources`](drg-resources/README.zh.md) | 由运维发布、按版本保留的国家原始资料及只读校验 | 库 — 无 ctx key |
 | [`tool-session-query`](tool-session-query/README.zh.md) | 按工作区授权的模型会话搜索、追踪与事件读取 | — |
 | [`session-search`](session-search/README.zh.md) | 可选实验性全局会话搜索工具 | — |
